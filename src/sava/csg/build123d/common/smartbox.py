@@ -1,5 +1,5 @@
 
-from build123d import Solid, Vector
+from build123d import Solid
 
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -9,4 +9,4 @@ class SmartBox(SmartSolid):
         super().__init__(length, width, height, x, y, z)
 
         self.solid = Solid.make_box(length, width, height)
-        self.solid = self.solid.translate(Vector(x, y, z))
+        self.solid.position = (x, y, z)

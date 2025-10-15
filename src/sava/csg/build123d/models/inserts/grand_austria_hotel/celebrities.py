@@ -1,10 +1,5 @@
-from sava.csg.build123d.common.smartbox import SmartBox
-from dataclasses import dataclass
-# from ocp_vscode import show, set_defaults, Camera
-from build123d import *
 from dataclasses import dataclass
 
-# from ocp_vscode import show, set_defaults, Camera
 from build123d import *
 
 from sava.csg.build123d.common.smartbox import SmartBox
@@ -42,7 +37,7 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions):
 
     card_box = SmartBox(dim.internal_length + dim.gap, dim.inner_width, dim.internal_height, dim.wall_thickness, dim.wall_thickness, dim.floor_thickness)
     cube_box = SmartBox(dim.cube_side + dim.gap, dim.inner_width, dim.cube_side)
-    cube_box.translate(card_box.x_to + dim.wall_thickness, card_box.y, card_box.z_to - cube_box.height)
+    cube_box.move(card_box.x_to + dim.wall_thickness, card_box.y, card_box.z_to - cube_box.height)
 
     return outer_box.solid - card_box.solid - cube_box.solid
 
