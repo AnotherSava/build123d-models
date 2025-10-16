@@ -4,6 +4,15 @@ from math import cos, sin, radians
 from build123d import Vector
 
 
+# Ways to align one 2d vector (or another else) to another
+class Alignment(IntEnum):
+    LL = 1 # left side, attach to the left
+    LR = 2 # left side, attach to the right
+    C = 3 # align both centres
+    RL = 4 # right side, attach to the left
+    RR = 5 # right side, attach to the right
+
+
 class Side(IntEnum):
     S = 180
     E = 270

@@ -22,7 +22,7 @@ class SmartBox(SmartSolid):
 
         actual_height = (height or self.height) * 2
         cut = Box(length, width or distance_from_centre, actual_height)
-        cut.position = Vector(self.centre) + createVector(distance_from_centre, side.value) + Vector(0, 0, self.height / 2)
+        cut.position = Vector(self.centre) + createVector(distance_from_centre, side.value) + Vector(0, 0, self.height / 2) + createVector(shift, side.value + 90)
         cut.orientation = (0, 0, side)
 
         if width:

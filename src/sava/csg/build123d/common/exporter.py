@@ -10,7 +10,7 @@ def show_red(shape):
     extra_shapes.append(set_color(shape, "red"))
 
 def set_color(shape: Shape, color: str = "yellow") -> Shape:
-    shape = shape.solid()
+    shape = shape.solid() # see https://github.com/gumyr/build123d/issues/929
     shape.color = Color(color)
     shape.label = color
     return shape
