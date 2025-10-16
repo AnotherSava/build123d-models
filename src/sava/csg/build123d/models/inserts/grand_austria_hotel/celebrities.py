@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
-from build123d import *
+from build123d import fillet, Axis
 
+from sava.csg.build123d.common.exporter import Exporter
 from sava.csg.build123d.common.smartbox import SmartBox
 
 
@@ -36,26 +37,15 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions):
     outer_box = SmartBox(dim.outer_length, dim.outer_width, dim.outer_height)
 
     card_box = SmartBox(dim.internal_length + dim.gap, dim.inner_width, dim.internal_height, dim.wall_thickness, dim.wall_thickness, dim.floor_thickness)
+    card_box_filleted = fillet(card_box.solid.edges().filter_by(Axis.Z), radius=5)
+
     cube_box = SmartBox(dim.cube_side + dim.gap, dim.inner_width, dim.cube_side)
     cube_box.move(card_box.x_to + dim.wall_thickness, card_box.y, card_box.z_to - cube_box.height)
 
-    return outer_box.solid - card_box.solid - cube_box.solid
+    return outer_box.solid - card_box_filleted - cube_box.solid
 
 
 dimensions = CelebritiesBoxDimensions()
-
 celebrities_box = create_celebrities_box(dimensions)
-celebrities_box.color = Color("blue")
-celebrities_box.label = "blue"
 
-exporter = Mesher()
-exporter.add_shape(celebrities_box, part_number="celebrity-box")
-exporter.add_meta_data(
-    name_space="custom",
-    name="test_meta_data",
-    value="hello world",
-    metadata_type="str",
-    must_preserve=False,
-)
-exporter.add_code_to_metadata()
-exporter.write("D:\\projects\\3d\\build123d-models\\models\\inserts\\grand_austria_hotel\\celebrities_box.3mf")
+Exporter(celebrities_box).export()

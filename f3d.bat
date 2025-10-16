@@ -1,0 +1,1 @@
+f3d-console models\current_model.3mf --watch --opacity=0.6
