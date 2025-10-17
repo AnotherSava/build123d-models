@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import IntEnum, auto
 from math import cos, sin, radians
 
 from build123d import Vector
@@ -6,11 +6,13 @@ from build123d import Vector
 
 # Ways to align one 2d vector (or another else) to another
 class Alignment(IntEnum):
-    LL = 1 # left side, attach to the left
-    LR = 2 # left side, attach to the right
-    C = 3 # align both centres
-    RL = 4 # right side, attach to the left
-    RR = 5 # right side, attach to the right
+    LL = auto() # left side, attach to the left
+    L = auto() # left side, attach to the centre
+    LR = auto() # left side, attach to the right
+    C = auto() # align both centres
+    RL = auto() # right side, attach to the left
+    R = auto() # right side, attach to the centre
+    RR = auto() # right side, attach to the right
 
 
 class Side(IntEnum):
@@ -29,14 +31,14 @@ class Side(IntEnum):
 
 
 # angle is measured in degrees CCW from axis Y
-def createVector(length: float, angle: float) -> Vector:
+def create_vector(length: float, angle: float) -> Vector:
     return Vector(-length * sin(radians(angle)), length * cos(radians(angle)))
 
 # args = series of lengths and angles, where angles are measured in degrees CCW from axis Y
-def shiftVector(vector: Vector, *args: float) -> Vector:
+def shift_vector(vector: Vector, *args: float) -> Vector:
     assert len(args) >= 2 and len(args) % 2 == 0
     result = vector
     for i in range(0, len(args), 2):
-        result += createVector(args[i], args[i + 1])
+        result += create_vector(args[i], args[i + 1])
 
     return result
