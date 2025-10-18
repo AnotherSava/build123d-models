@@ -1,7 +1,7 @@
 from enum import IntEnum, auto
 from math import cos, sin, radians
 
-from build123d import Vector
+from build123d import Vector, Axis
 
 
 # Ways to align one 2d vector (or another else) to another
@@ -15,7 +15,7 @@ class Alignment(IntEnum):
     RR = auto() # right side, attach to the right
 
 
-class Side(IntEnum):
+class Direction(IntEnum):
     S = 180
     E = 270
     N = 0
@@ -23,11 +23,15 @@ class Side(IntEnum):
 
     @property
     def horizontal(self) -> bool:
-        return self in (Side.E, Side.W)
+        return self in (Direction.E, Direction.W)
 
     @property
     def vertical(self) -> bool:
-        return self in (Side.S, Side.N)
+        return self in (Direction.S, Direction.N)
+
+    @property
+    def axis(self) -> Axis:
+        return Axis.X if self.horizontal else Axis.Y
 
 
 # angle is measured in degrees CCW from axis Y

@@ -1,6 +1,10 @@
 from build123d import Vector, fillet, Axis, Location, ShapeList, Edge
 
-from sava.csg.build123d.common.geometry import Alignment, shift_vector
+from sava.csg.build123d.common.geometry import Alignment, shift_vector, Direction
+
+
+def get_solid(element):
+    return element.solid if isinstance(element, SmartSolid) else element
 
 
 class SmartSolid:
@@ -37,14 +41,6 @@ class SmartSolid:
     def z_mid(self):
         return self.z + self.height / 2
 
-    @property
-    def orientation(self):
-        return self.solid.orientation
-
-    def with_orientation(self, orientation) -> 'SmartSolid':
-        self.solid.orientation = orientation
-        return self
-
     def move_in_direction(self, *args: float):
         return self.move_vector(shift_vector(Vector(), *args))
 
@@ -67,6 +63,12 @@ class SmartSolid:
     def get_to(self, axis: Axis) -> float:
         return self.get_bounds(axis)[1]
 
+    def get_side_length(self, direction: Direction):
+        return self.width if direction.horizontal else self.length
+
+    def get_other_side_length(self, direction: Direction):
+        return self.length if direction.horizontal else self.width
+
     def get_bounds(self, axis: Axis) -> tuple[float, float]:
         match axis:
             case Axis.X:
@@ -82,6 +84,12 @@ class SmartSolid:
 
     def bottom_half(self) -> 'SmartSolid':
         return SmartSolid(self.length, self.width, self.height / 2).move(self.x, self.y, self.z)
+
+    def cut(self, element):
+        self.solid -= get_solid(element)
+
+    def fuse(self, element):
+        self.solid += get_solid(element)
 
     def align_x(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
         position = self._calculate_position(solid.x, solid.x_to, self.length, alignment) + shift

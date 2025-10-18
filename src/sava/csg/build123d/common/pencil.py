@@ -132,14 +132,14 @@ class Pencil:
         return self.extrudeCustom(Vector(0, 0, height))
 
     def extrudeX(self, height: float, transpose: Vector = Vector()):
-        solid = self.extrude(-height)
-        solid.orientation = (90, -90, 0)
+        solid = self.extrude(height)
+        solid.orientation = (90, 90, 0)
         solid.position = transpose
         return solid
 
     def extrudeY(self, height: float, transpose: Vector = Vector()):
-        solid = self.extrude(-height)
-        solid.orientation = (90, 0, 0)
+        solid = self.extrude(height)
+        solid.orientation = (90, 180, 0)
         solid.position = transpose
         return solid
 

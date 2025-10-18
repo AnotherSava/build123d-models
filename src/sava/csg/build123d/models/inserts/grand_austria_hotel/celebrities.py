@@ -1,10 +1,7 @@
 from dataclasses import dataclass
 
-from build123d import Vector
-
 from sava.csg.build123d.common.exporter import Exporter
-from sava.csg.build123d.common.geometry import Side, Alignment
-from sava.csg.build123d.common.pencil import Pencil
+from sava.csg.build123d.common.geometry import Direction, Alignment
 from sava.csg.build123d.common.smartbox import SmartBox
 
 
@@ -18,6 +15,8 @@ class CelebritiesBoxDimensions:
     cards_width: float = 47.4
     cards_height: float = 26.0
     cards_fillet_radius: float = 5.0
+    cards_cut_length: float = 20.0
+    cards_cut_width: float = 15.0
 
     cube_side: float = 16.15
     cube_cut_length: float = 12.5
@@ -28,9 +27,13 @@ class CelebritiesBoxDimensions:
     tokens_length = 15.35
     tokens_width = 23.1
     tokens_height = 6.4
-    token_fillet_radius: float = 7.0
-    token_notch_height: float = 3.0
-    token_notch_width: float = 8.0
+    token_fillet_radius: float = 6.5
+    token_notch_max_depth: float = 4.0
+    token_notch_length: float = 10.0
+
+    @property
+    def token_notch_depth(self):
+        return min(self.token_notch_max_depth, self.cards_height - self.cube_side - self.tokens_height)
 
     @property
     def inner_width(self):
@@ -54,22 +57,22 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions):
 
     card_box = SmartBox(dim.cards_length + dim.gap, dim.inner_width, dim.cards_height)
     card_box.align(outer_box, Alignment.LR, dim.wall_thickness, dim.wall_thickness, dim.floor_thickness)
-    card_box.fillet_z(dim.cards_fillet_radius)
+    # card_box.fillet_z(dim.cards_fillet_radius)
 
     cube_box = SmartBox(dim.cube_side + dim.gap, dim.inner_width, dim.cube_side)
     cube_box.align(outer_box, Alignment.RL, -dim.wall_thickness, -dim.wall_thickness)
 
     token_box = SmartBox(dim.tokens_length + dim.gap, dim.tokens_width + dim.gap, dim.tokens_height)
 
-    token_notch_height_total = dim.token_notch_height / dim.token_notch_width * token_box.width
-    token_notch = Pencil().up(token_notch_height_total).left(token_box.width).extrudeX(token_box.length, Vector(0, 0, -dim.token_notch_height))
-    token_box.solid += token_notch
+    token_box.addNotch(Direction.S, dim.token_notch_depth, dim.token_notch_length)
     token_box.align_xy(cube_box).align_z(cube_box, Alignment.LL)
     token_box.fillet_z(dim.token_fillet_radius)
 
     cube_cut_shift = cube_box.x_mid - outer_box.x_mid
-    outer_box.addCutout(Side.S, dim.cube_cut_length, dim.cube_cut_fillet_radius_bottom, height=dim.cube_cut_fillet_height, shift=cube_cut_shift)
-    outer_box.addCutout(Side.N, dim.cube_cut_length, dim.cube_cut_fillet_radius_bottom, height=dim.cube_cut_fillet_height, shift=-cube_cut_shift)
+    outer_box.addCutout(Direction.S, dim.cube_cut_length, dim.cube_cut_fillet_radius_bottom, height=dim.cube_cut_fillet_height, shift=cube_cut_shift)
+    outer_box.addCutout(Direction.N, dim.cube_cut_length, dim.cube_cut_fillet_radius_bottom, height=dim.cube_cut_fillet_height, shift=-cube_cut_shift)
+
+    outer_box.addCutout(Direction.W, dim.cards_cut_length, dim.cube_cut_fillet_radius_bottom, width=dim.cards_cut_width)
 
     return outer_box.solid - card_box.solid - cube_box.solid - token_box.solid
 

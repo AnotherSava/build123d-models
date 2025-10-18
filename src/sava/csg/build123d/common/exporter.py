@@ -9,6 +9,12 @@ extra_shapes = []
 def show_red(shape):
     extra_shapes.append(set_color(shape, "red"))
 
+def show_blue(shape):
+    extra_shapes.append(set_color(shape, "blue"))
+
+def show_green(shape):
+    extra_shapes.append(set_color(shape, "green"))
+
 def set_color(shape: Shape, color: str = "yellow") -> Shape:
     shape = shape.solid() # see https://github.com/gumyr/build123d/issues/929
     shape.color = Color(color)
