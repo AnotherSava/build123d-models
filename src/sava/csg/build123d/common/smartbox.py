@@ -12,7 +12,7 @@ class SmartBox(SmartSolid):
         self.solid = Box(self.length, self.width, self.height, align=align)
         self.x, self.y, self.z = self.solid.bounding_box().min
 
-    def addCutout(self, direction: Direction, length: float, radius_bottom: float, radius_top: float = None, width: float = None, height: float = None, shift: float = 0) -> 'SmartBox':
+    def addCutout(self, direction: Direction, length: float, radius_bottom: float = 0, radius_top: float | None = None, width: float | None = None, height: float | None = None, shift: float = 0) -> 'SmartBox':
         assert width is not None or height is not None, "Either width or height must be specified"
 
         distance_from_centre = self.get_other_side_length(direction) / 2
@@ -20,10 +20,12 @@ class SmartBox(SmartSolid):
         cutout = SmartBox(length, width or distance_from_centre, height or self.height, Align.CENTER, direction.horizontal)
         cutout.align(self).align_z(self, Alignment.RL)
         cutout.move_in_direction(distance_from_centre, direction.value, shift, direction.value + 90)
-        cutout.fillet_z(radius_bottom)
+        if radius_bottom:
+            cutout.fillet_z(radius_bottom)
 
         self.cut(cutout)
-        self.solid = fillet(self.filter_edges_within(cutout.top_half()).filter_by(direction.axis), radius_bottom if radius_top is None else radius_top)
+        if radius_bottom or radius_top:
+            self.solid = fillet(self.filter_edges_within(cutout.top_half()).filter_by(direction.axis), radius_bottom if radius_top is None else radius_top)
 
         if height:
             self.solid = fillet(self.filter_edges_within(cutout.bottom_half()).filter_by(direction.axis), radius_bottom)

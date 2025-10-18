@@ -14,6 +14,11 @@ class Alignment(IntEnum):
     R = auto() # right side, attach to the centre
     RR = auto() # right side, attach to the right
 
+    def shift_towards_centre(self, value: float) -> float:
+        assert self != Alignment.C
+
+        return value if self in (Alignment.LL, Alignment.LR) else -value
+
 
 class Direction(IntEnum):
     S = 180

@@ -1,4 +1,4 @@
-from build123d import Vector, fillet, Axis, Location, ShapeList, Edge
+from build123d import Vector, fillet, Axis, Location, ShapeList, Edge, Shape
 
 from sava.csg.build123d.common.geometry import Alignment, shift_vector, Direction
 
@@ -16,6 +16,17 @@ class SmartSolid:
         self.x = self.y = self.z = 0
 
         self.solid = None
+
+    @classmethod
+    def create(cls, shape: Shape):
+        bounding_box = shape.bounding_box()
+        solid = SmartSolid(bounding_box.size.X, bounding_box.size.Y, bounding_box.size.Z)
+        solid.solid = shape
+        solid.x = bounding_box.min.X
+        solid.y = bounding_box.min.Y
+        solid.z = bounding_box.min.Z
+
+        return solid
 
     @property
     def x_to(self):
@@ -40,6 +51,14 @@ class SmartSolid:
     @property
     def z_mid(self):
         return self.z + self.height / 2
+
+    @property
+    def parent(self):
+        return self.solid.parent
+
+    @parent.setter
+    def parent(self, parent: Shape):
+        self.solid.parent = parent
 
     def move_in_direction(self, *args: float):
         return self.move_vector(shift_vector(Vector(), *args))
