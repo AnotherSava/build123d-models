@@ -14,7 +14,6 @@ class CelebritiesBoxDimensions:
     cards_length: float = 84.3
     cards_width: float = 47.4
     cards_height: float = 26.0
-    cards_fillet_radius: float = 5.0
     cards_cut_length: float = 20.0
     cards_cut_width: float = 15.0
 
@@ -57,7 +56,6 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions):
 
     card_box = SmartBox(dim.cards_length + dim.gap, dim.inner_width, dim.cards_height)
     card_box.align(outer_box, Alignment.LR, dim.wall_thickness, dim.wall_thickness, dim.floor_thickness)
-    # card_box.fillet_z(dim.cards_fillet_radius)
 
     cube_box = SmartBox(dim.cube_side + dim.gap, dim.inner_width, dim.cube_side)
     cube_box.align(outer_box, Alignment.RL, -dim.wall_thickness, -dim.wall_thickness)
