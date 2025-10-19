@@ -41,7 +41,7 @@ class TurnOrderBoxDimensions:
 
     @property
     def outer_box_length(self):
-        return self.turn_order_length + self.wall_thickness * 2
+        return self.turn_order_box_length + self.wall_thickness * 2
 
 
 class TurnOrder:
@@ -64,9 +64,7 @@ class TurnOrder:
             for i in range(3):
                 for direction in [-1, 1]:
                     shift = self.dim.insert_width / 2 - self.dim.wall_thickness * (i + 1) - self.dim.turn_order_box_width * (i + 0.5)
-                    # box.addCutout(side, self.dim.turn_order_cutout_length, self.dim.turn_order_cutout_radius, None, self.dim.turn_order_cutout_width, None, shift)
-                    box.addCutout(side, self.dim.turn_order_cutout_length, 0, None, self.dim.turn_order_cutout_width, None, shift * direction)
-                    return box
+                    box.addCutout(side, self.dim.turn_order_cutout_length, self.dim.turn_order_cutout_radius, None, self.dim.turn_order_cutout_width, None, shift * direction)
 
         return box
 
@@ -91,7 +89,4 @@ class TurnOrder:
 
 dimensions = TurnOrderBoxDimensions()
 key = TurnOrder(dimensions)
-solid = key.create_box()
-# solid = key.create_key()
-
-Exporter(solid).export()
+Exporter(key.create_box()).export()

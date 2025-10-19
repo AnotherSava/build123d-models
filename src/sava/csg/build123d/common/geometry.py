@@ -38,6 +38,21 @@ class Direction(IntEnum):
     def axis(self) -> Axis:
         return Axis.X if self.horizontal else Axis.Y
 
+    @property
+    def orthogonal_axis(self) -> Axis:
+        return Axis.Y if self.horizontal else Axis.X
+
+    @property
+    def alignment_further(self) -> Alignment:
+        return Alignment.RR if self in [Direction.N, Direction.E] else Alignment.LL
+
+    @property
+    def alignment_middle(self) -> Alignment:
+        return Alignment.R if self in [Direction.N, Direction.E] else Alignment.L
+
+    @property
+    def alignment_closer(self) -> Alignment:
+        return Alignment.RL if self in [Direction.N, Direction.E] else Alignment.LR
 
 # angle is measured in degrees CCW from axis Y
 def create_vector(length: float, angle: float) -> Vector:

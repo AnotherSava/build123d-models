@@ -20,7 +20,7 @@ def show_green(shape):
 
 def set_color(shape: Shape, color: str = "yellow") -> Iterable[Solid]:
     result = []
-    for solid in shape.solids(): # see https://github.com/gumyr/build123d/issues/929
+    for solid in get_solid(shape).solids(): # see https://github.com/gumyr/build123d/issues/929
         solid.color = Color(color)
         solid.label = color
         result.append(solid)
@@ -40,7 +40,7 @@ class Exporter:
     def __init__(self, *shapes):
         self.exporter = Mesher()
         for shape in shapes:
-            self.add(get_solid(shape))
+            self.add(shape)
 
     def add(self, shape: Shape, color: str = "yellow"):
         self.exporter.add_shape(set_color(shape, color))
