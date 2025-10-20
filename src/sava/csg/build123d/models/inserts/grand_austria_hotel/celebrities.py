@@ -66,9 +66,7 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions):
     token_box.align_xy(cube_box).align_z(cube_box, Alignment.LL)
     token_box.fillet_z(dim.token_fillet_radius)
 
-    cube_cut_shift = cube_box.x_mid - outer_box.x_mid
-    outer_box.addCutout(Direction.S, dim.cube_cut_length, dim.cube_cut_fillet_radius_bottom, height=dim.cube_cut_fillet_height, shift=cube_cut_shift)
-    outer_box.addCutout(Direction.N, dim.cube_cut_length, dim.cube_cut_fillet_radius_bottom, height=dim.cube_cut_fillet_height, shift=-cube_cut_shift)
+    outer_box.addCutout(Direction.S, dim.cube_cut_length, dim.cube_cut_fillet_radius_bottom, None, None, dim.cube_cut_fillet_height, cube_box.x_mid - outer_box.x_mid)
 
     outer_box.addCutout(Direction.W, dim.cards_cut_length, dim.cube_cut_fillet_radius_bottom, width=dim.cards_cut_width)
 

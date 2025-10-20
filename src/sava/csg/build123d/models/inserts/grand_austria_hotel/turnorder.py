@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from build123d import Compound, Vector, extrude, import_svg, Axis
+from build123d import Vector, extrude, import_svg, Axis
 
 from sava.csg.build123d.common.exporter import Exporter, get_path
 from sava.csg.build123d.common.geometry import Direction, Alignment
@@ -55,10 +55,11 @@ class TurnOrder:
         key_box.align_xy(box).align_z(box, Alignment.RL)
         box.cut(key_box)
 
-        for alignment in [Alignment.LR, Alignment.RL]:
-            turn_order_boxes = self.create_turn_order_boxes()
-            turn_order_boxes.align_x(box).align_y(box, alignment, alignment.shift_towards_centre(self.dim.wall_thickness)).align_z(box, Alignment.RL)
-            box.cut(turn_order_boxes)
+        # for alignment in [Alignment.LR, Alignment.RL]:
+        turn_order_boxes = self.create_turn_order_boxes().align_z(box, Alignment.RL)
+
+        box.cut(turn_order_boxes.align_x(box).align_y(box, Alignment.RL, -self.dim.wall_thickness))
+        box.cut(turn_order_boxes.orient((0, 0, 180)).align_x(box).align_y(box, Alignment.LR, self.dim.wall_thickness))
 
         for side in [Direction.E, Direction.W]:
             for i in range(3):
@@ -69,13 +70,17 @@ class TurnOrder:
         return box
 
     def create_turn_order_boxes(self) -> SmartSolid:
-        turn_order_boxes = Compound(label="turn_order_boxes")
-        for i in range(2, 5):
-            box = SmartBox(self.dim.turn_order_box_length, self.dim.turn_order_box_width, self.dim.turn_order_height * i)
-            box.move(0, (i - 2) * (box.width + self.dim.wall_thickness), (4 - i) * self.dim.turn_order_height)
-            box.parent = turn_order_boxes
+        box_2 = self.create_turn_order_box(2)
+        box_3 = self.create_turn_order_box(3, box_2)
+        box_4 = self.create_turn_order_box(4, box_3)
 
-        return SmartSolid.create(turn_order_boxes)
+        return SmartSolid(box_2, box_3, box_4)
+
+    def create_turn_order_box(self, count: int, align_to: SmartSolid = None) -> SmartSolid:
+        box = SmartBox(self.dim.turn_order_box_length, self.dim.turn_order_box_width, self.dim.turn_order_height * count)
+        if align_to:
+            box.align_x(align_to).align_y(align_to, Alignment.RR, self.dim.wall_thickness).align_z(align_to, Alignment.RL)
+        return box
 
     def create_key(self) -> SmartSolid:
         svg_shapes = import_svg(get_path(self.dim.key_svg_file))
@@ -84,7 +89,10 @@ class TurnOrder:
         shape2d = shape2d.scale((self.dim.key_length + self.dim.gap * 2) / shape2d.bounding_box().size.X)
         shape2d = shape2d.rotate(Axis.Z, self.dim.key_rotation)
 
-        return SmartSolid.create(extrude(shape2d, self.dim.turn_order_height, Vector(0, 0, 1)))
+        solid = SmartSolid(extrude(shape2d, self.dim.turn_order_height, Vector(0, 0, 1)))
+        # solid.addNotch(Direction.N, 5, 15)
+        # show_red(copy(solid).move(0, 0, 50))
+        return solid
 
 
 dimensions = TurnOrderBoxDimensions()
