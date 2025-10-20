@@ -1,6 +1,6 @@
 from copy import copy
 
-from build123d import Vector, fillet, Axis, Location, Shape, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike
+from build123d import Vector, fillet, Axis, Location, Shape, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale
 
 from sava.csg.build123d.common.geometry import Alignment, shift_vector, Direction
 from sava.csg.build123d.common.pencil import Pencil
@@ -216,12 +216,22 @@ class SmartSolid:
         self.solid = fillet(edges, radius)
         return self
 
-    def addNotch(self, direction: Direction, depth: float, length: float):
-        notch_height = depth / length * self.get_other_side_length(direction)
-        pencil = Pencil().up(notch_height).right(self.get_side_length(direction))
-        notch = pencil.extrudeX(self.get_side_length(direction), Vector(0, 0, -depth))
+    def intersect(self, shape) -> 'SmartSolid':
+        self.solid = self.solid.intersect(get_solid(shape))
+        return self
 
-        self.fuse(notch)
+    def addNotch(self, direction: Direction, depth: float, length: float):
+        notch_height = depth / length * self.get_side_length(direction)
+
+        pencil = Pencil().up(notch_height).left(self.get_side_length(direction))
+        notch = SmartSolid(pencil.extrude(self.get_side_length(direction)))
+        notch.orient((90, 90 + direction.value, 0))
+        notch.align_z(self, Alignment.LR, -depth).align_axis(self, direction.axis, direction.alignment_closer).align_axis(self, direction.orthogonal_axis)
+
+        extended_shape = SmartSolid(scale(self.solid, (1, 1, depth / self.z_size)))
+        extended_shape.align_xy(self).align_z(self, Alignment.LL)
+
+        self.fuse(notch.intersect(extended_shape))
 
     def copy(self):
         return SmartSolid(copy(self.solid))

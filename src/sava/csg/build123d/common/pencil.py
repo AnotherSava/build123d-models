@@ -124,12 +124,9 @@ class Pencil:
     def right(self, length: float):
         return self.draw(length, -90)
 
-    def extrudeCustom(self, vector: Vector):
-        wire = self.createWire()
-        return extrude(Face(wire), vector.length, vector)
-
     def extrude(self, height: float):
-        return self.extrudeCustom(Vector(0, 0, height))
+        face = self.createFace()
+        return extrude(face, height)
 
     def extrudeX(self, height: float, transpose: Vector = Vector()):
         solid = self.extrude(height)
@@ -143,7 +140,10 @@ class Pencil:
         solid.position = transpose
         return solid
 
-    def createWire(self):
+    def createFace(self) -> Face:
+        return Face(self.createWire())
+
+    def createWire(self) -> Wire:
         curves = self.curves.copy()
         if self.location != self.start:
             curves.append(Line(self.location, self.start))
