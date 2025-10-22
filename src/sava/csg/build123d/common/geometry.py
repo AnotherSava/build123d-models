@@ -1,5 +1,5 @@
 from enum import IntEnum, auto
-from math import cos, sin, radians
+from math import cos, sin, radians, atan2, degrees
 
 from build123d import Vector, Axis
 
@@ -66,3 +66,6 @@ def shift_vector(vector: Vector, *args: float) -> Vector:
         result += create_vector(args[i], args[i + 1])
 
     return result
+
+def get_angle(vector: Vector):
+    return -degrees(atan2(vector.X, vector.Y))

@@ -1,8 +1,8 @@
-from math import radians, degrees, acos, sin, cos
+from math import radians, degrees, acos, sin, cos, tan
 
 from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire
 
-from sava.csg.build123d.common.geometry import shift_vector, create_vector
+from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle
 
 
 class Pencil:
@@ -37,6 +37,11 @@ class Pencil:
 
     def arcWithAngleToCentre(self, angleToCentre: float, destinationVector: Vector):
         return self.arcWithCentreDirection(create_vector(1, angleToCentre), destinationVector)
+
+    def arcWithVectorToIntersection(self, vectorToTangentsIntersection: Vector, angle: float):
+        direction_to_centre = get_angle(vectorToTangentsIntersection) + 90 * (-1 if angle % 360 < 180 else 1)
+        radius = vectorToTangentsIntersection.length * tan(radians(angle / 2))
+        return self.arcWithRadius(radius, direction_to_centre, angle - 180)
 
     def arcWithAngleToCentreAbs(self, angleToCentre: float, destination: Vector):
         return self.arcWithCentreDirectionAbs(create_vector(1, angleToCentre), destination)

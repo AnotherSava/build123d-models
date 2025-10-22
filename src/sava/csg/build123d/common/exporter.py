@@ -23,7 +23,7 @@ def set_color(shape: Shape, color: str = "yellow") -> Iterable[Solid]:
     for solid in get_solid(shape).solids(): # see https://github.com/gumyr/build123d/issues/929
         solid.color = Color(color)
         solid.label = color
-        result.append(solid)
+        result.append(solid.clean())
     return result
 
 def get_project_root_folder():

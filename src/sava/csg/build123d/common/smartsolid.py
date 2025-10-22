@@ -1,6 +1,7 @@
 from copy import copy
+from typing import Iterable
 
-from build123d import Vector, fillet, Axis, Location, Shape, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale
+from build123d import Vector, fillet, Axis, Location, Shape, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror
 
 from sava.csg.build123d.common.geometry import Alignment, shift_vector, Direction
 from sava.csg.build123d.common.pencil import Pencil
@@ -9,15 +10,21 @@ from sava.csg.build123d.common.pencil import Pencil
 def get_solid(element):
     return element.solid if isinstance(element, SmartSolid) else element
 
+def fuse(*args):
+    elements = []
+
+    for arg in args:
+        if isinstance(arg, Iterable):
+            elements += [get_solid(sub_arg) for sub_arg in arg]
+        else:
+            elements.append(get_solid(arg))
+
+    return elements[0] if len(elements) == 1 else Compound(elements)
+
 
 class SmartSolid:
     def __init__(self, *args):
-        if len(args) == 0:
-            self.solid = None
-        elif len(args) == 1:
-            self.solid = get_solid(args[0])
-        else:
-            self.solid = Compound([get_solid(arg) for arg in args])
+        self.solid = fuse(*args) if len(args) > 0 else None
 
     @property
     def bound_box(self) -> BoundBox:
@@ -141,11 +148,8 @@ class SmartSolid:
         self.solid -= get_solid(element)
         return self
 
-    def fuse(self, element) -> 'SmartSolid':
-        if self.solid:
-            self.solid = self.solid.fuse(get_solid(element))
-        else:
-            self.solid = get_solid(element)
+    def fuse(self, *args) -> 'SmartSolid':
+        self.solid = fuse(self.solid, *args)
         return self
 
     def align_axis(self, solid: 'SmartSolid | None', axis: Axis, alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
@@ -228,13 +232,44 @@ class SmartSolid:
         notch.orient((90, 90 + direction.value, 0))
         notch.align_z(self, Alignment.LR, -depth).align_axis(self, direction.axis, direction.alignment_closer).align_axis(self, direction.orthogonal_axis)
 
-        extended_shape = SmartSolid(scale(self.solid, (1, 1, depth / self.z_size)))
+        extended_shape = self.scaled(1, 1, depth / self.z_size)
         extended_shape.align_xy(self).align_z(self, Alignment.LL)
 
         self.fuse(notch.intersect(extended_shape))
 
     def copy(self):
         return SmartSolid(copy(self.solid))
+
+    def _pad_solid(self, pad_x: float, pad_y: float, pad_z: float):
+        factor_x = 1 + pad_x / self.x_size
+        factor_y = 1 + (pad_x if pad_y is None else pad_y) / self.y_size
+        factor_z = 1 + ((pad_x if pad_y is None else pad_y) if pad_z is None else pad_z) / self.z_size
+
+        return self._scale_solid(factor_x, factor_y, factor_z)
+
+    def _scale_solid(self, factor_x: float, factor_y: float, factor_z: float):
+        return scale(self.solid, (factor_x, factor_y or factor_x, factor_z or factor_y or factor_x))
+
+    def pad(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None):
+        self.solid = self._pad_solid(pad_x, pad_y, pad_z)
+        return self
+
+    def padded(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None):
+        return SmartSolid(self._pad_solid(pad_x, pad_y, pad_z))
+
+    def scale(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None):
+        self.solid = self._scale_solid(factor_x, factor_y, factor_z)
+        return self
+
+    def scaled(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None):
+        return SmartSolid(self._scale_solid(factor_x, factor_y, factor_z))
+
+    def mirror(self, about: Plane = Plane.XZ) -> 'SmartSolid':
+        self.solid = mirror(self.solid, about)
+        return self
+
+    def mirrored(self, about: Plane = Plane.XZ) -> 'SmartSolid':
+        return SmartSolid(mirror(self.solid, about))
 
     @classmethod
     def _calculate_position(cls, left: float, right: float, self_size: float, alignment: Alignment):
