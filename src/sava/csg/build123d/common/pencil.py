@@ -1,7 +1,8 @@
-from math import radians, degrees, acos, sin, cos, tan
+from math import radians, degrees, acos, sin, cos, tan, atan
 
 from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire
 
+from sava.csg.build123d.common.advanced_math import advanced_mod
 from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle
 
 
@@ -15,6 +16,10 @@ class Pencil:
         tolerance = 1e-7
         return self.start if (destination - self.start).length < tolerance else destination
 
+    def doubleArc(self, destination: Vector, shift_coefficient: float = 0.5, angle: float = None):
+        angle_actual = 180 - degrees(2 * atan(destination.Y / destination.X)) if angle is None else angle
+        angle_actual = advanced_mod(angle_actual, 360, -180)
+        return self.arcWithDestination(destination * (1 - shift_coefficient), -angle_actual).arcWithDestination(destination * shift_coefficient, angle_actual)
 
     def arcWithRadius(self, radius: float, centreAngle: float, arcDegrees: float):
         centre = shift_vector(self.location, radius, centreAngle)

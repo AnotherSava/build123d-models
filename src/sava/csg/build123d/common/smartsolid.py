@@ -280,8 +280,12 @@ class SmartSolid:
                 return left - self_size / 2
             case Alignment.LR:
                 return left
+            case Alignment.CL:
+                return (left + right) / 2 - self_size
             case Alignment.C:
                 return (left + right - self_size) / 2
+            case Alignment.CR:
+                return (left + right) / 2
             case Alignment.RL:
                 return right - self_size
             case Alignment.R:

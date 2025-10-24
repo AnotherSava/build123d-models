@@ -9,7 +9,9 @@ class Alignment(IntEnum):
     LL = auto() # left side, attach to the left
     L = auto() # left side, attach to the centre
     LR = auto() # left side, attach to the right
+    CL = auto() # centre, attach to the left
     C = auto() # align both centres
+    CR = auto() # centre, attach to the right
     RL = auto() # right side, attach to the left
     R = auto() # right side, attach to the centre
     RR = auto() # right side, attach to the right
@@ -17,7 +19,7 @@ class Alignment(IntEnum):
     def shift_towards_centre(self, value: float) -> float:
         assert self != Alignment.C
 
-        return value if self in (Alignment.LL, Alignment.LR) else -value
+        return value if self in (Alignment.LL, Alignment.LR, Alignment.CL) else -value
 
 
 class Direction(IntEnum):
