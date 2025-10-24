@@ -2,6 +2,14 @@
 
 This project contains 3d models (mostly board game inserts) and helper tools for their creation based on the [build123d](https://github.com/gumyr/build123d) framework.
 
+## Installation
+
+Install the required dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
 ### Viewing 3D Models with F3D
 
 This project uses [F3D](https://f3d.app/) as the recommended viewer for generated 3D models. It provides an opportunity to automatically reload model upon file changes. Having export operation as the last step of your script will let you see the changes after each execution:
