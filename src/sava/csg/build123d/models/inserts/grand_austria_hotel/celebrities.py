@@ -62,13 +62,13 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions):
 
     token_box = SmartBox(dim.tokens_length + dim.gap, dim.tokens_width + dim.gap, dim.tokens_height)
 
-    token_box.addNotch(Direction.S, dim.token_notch_depth, dim.token_notch_length)
+    token_box.add_notch(Direction.S, dim.token_notch_depth, dim.token_notch_length)
     token_box.align_xy(cube_box).align_z(cube_box, Alignment.LL)
     token_box.fillet_z(dim.token_fillet_radius)
 
-    outer_box.addCutout(Direction.S, dim.cube_cut_length, dim.cube_cut_fillet_radius_bottom, None, None, dim.cube_cut_fillet_height, cube_box.x_mid - outer_box.x_mid)
+    outer_box.add_cutout(Direction.S, dim.cube_cut_length, dim.cube_cut_fillet_radius_bottom, None, None, dim.cube_cut_fillet_height, cube_box.x_mid - outer_box.x_mid)
 
-    outer_box.addCutout(Direction.W, dim.cards_cut_length, dim.cube_cut_fillet_radius_bottom, width=dim.cards_cut_width)
+    outer_box.add_cutout(Direction.W, dim.cards_cut_length, dim.cube_cut_fillet_radius_bottom, width=dim.cards_cut_width)
 
     return outer_box.solid - card_box.solid - cube_box.solid - token_box.solid
 

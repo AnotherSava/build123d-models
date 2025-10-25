@@ -12,115 +12,115 @@ class Pencil:
         self.start = start
         self.location = start
 
-    def checkDestination(self, destination: Vector) -> Vector:
+    def check_destination(self, destination: Vector) -> Vector:
         tolerance = 1e-7
         return self.start if (destination - self.start).length < tolerance else destination
 
-    def doubleArc(self, destination: Vector, shift_coefficient: float = 0.5, angle: float = None):
+    def double_arc(self, destination: Vector, shift_coefficient: float = 0.5, angle: float = None):
         angle_actual = 180 - degrees(2 * atan(destination.Y / destination.X)) if angle is None else angle
         angle_actual = advanced_mod(angle_actual, 360, -180)
-        return self.arcWithDestination(destination * (1 - shift_coefficient), -angle_actual).arcWithDestination(destination * shift_coefficient, angle_actual)
+        return self.arc_with_destination(destination * (1 - shift_coefficient), -angle_actual).arc_with_destination(destination * shift_coefficient, angle_actual)
 
-    def arcWithRadius(self, radius: float, centreAngle: float, arcDegrees: float):
-        centre = shift_vector(self.location, radius, centreAngle)
-        degreesDestinationFromCentre = ((arcDegrees + centreAngle + 180) % 360)
-        degreesMiddleFromCentre = ((arcDegrees / 2 + centreAngle + 180) % 360)
-        destination = self.checkDestination(shift_vector(centre, radius, degreesDestinationFromCentre))
-        middle = shift_vector(centre, radius, degreesMiddleFromCentre)
-        return self.arcAbs(middle, destination)
+    def arc_with_radius(self, radius: float, centre_angle: float, arc_degrees: float):
+        centre = shift_vector(self.location, radius, centre_angle)
+        degrees_destination_from_centre = ((arc_degrees + centre_angle + 180) % 360)
+        degrees_middle_from_centre = ((arc_degrees / 2 + centre_angle + 180) % 360)
+        destination = self.check_destination(shift_vector(centre, radius, degrees_destination_from_centre))
+        middle = shift_vector(centre, radius, degrees_middle_from_centre)
+        return self.arc_abs(middle, destination)
 
-    def arcAbs(self, midpoint: Vector, destination: Vector):
+    def arc_abs(self, midpoint: Vector, destination: Vector):
         self.curves.append(ThreePointArc(self.location, midpoint, destination))
         self.location = destination
         return self
 
-    def arcFromStart(self, midpointVector: Vector, destinationVector: Vector):
-        return self.arcAbs(self.start + midpointVector, self.start + destinationVector)
+    def arc_from_start(self, midpoint_vector: Vector, destination_vector: Vector):
+        return self.arc_abs(self.start + midpoint_vector, self.start + destination_vector)
 
-    def arc(self, midpointVector: Vector, destinationVector: Vector):
-        return self.arcAbs(self.location + midpointVector, self.location + destinationVector)
+    def arc(self, midpoint_vector: Vector, destination_vector: Vector):
+        return self.arc_abs(self.location + midpoint_vector, self.location + destination_vector)
 
-    def arcWithAngleToCentre(self, angleToCentre: float, destinationVector: Vector):
-        return self.arcWithCentreDirection(create_vector(1, angleToCentre), destinationVector)
+    def arc_with_angle_to_centre(self, angle_to_centre: float, destination_vector: Vector):
+        return self.arc_with_centre_direction(create_vector(1, angle_to_centre), destination_vector)
 
-    def arcWithVectorToIntersection(self, vectorToTangentsIntersection: Vector, angle: float):
-        direction_to_centre = get_angle(vectorToTangentsIntersection) + 90 * (-1 if angle % 360 < 180 else 1)
-        radius = vectorToTangentsIntersection.length * tan(radians(angle / 2))
-        return self.arcWithRadius(radius, direction_to_centre, angle - 180)
+    def arc_with_vector_to_intersection(self, vector_to_tangents_intersection: Vector, angle: float):
+        direction_to_centre = get_angle(vector_to_tangents_intersection) + 90 * (-1 if angle % 360 < 180 else 1)
+        radius = vector_to_tangents_intersection.length * tan(radians(angle / 2))
+        return self.arc_with_radius(radius, direction_to_centre, angle - 180)
 
-    def arcWithAngleToCentreAbs(self, angleToCentre: float, destination: Vector):
-        return self.arcWithCentreDirectionAbs(create_vector(1, angleToCentre), destination)
+    def arc_with_angle_to_centre_abs(self, angle_to_centre: float, destination: Vector):
+        return self.arc_with_centre_direction_abs(create_vector(1, angle_to_centre), destination)
 
-    def arcWithCentreDirection(self, centreDirection: Vector, destinationVector: Vector):
+    def arc_with_centre_direction(self, centre_direction: Vector, destination_vector: Vector):
         # Create copies and normalize to preserve original vectors
         # Calculate an angle between vectors using dot product
-        dotProduct = Vector(centreDirection).normalized().dot(Vector(destinationVector).normalized())
+        dot_product = Vector(centre_direction).normalized().dot(Vector(destination_vector).normalized())
         # Clamp dot product to [-1, 1] to handle floating point precision errors
-        dotProduct = max(-1.0, min(1.0, dotProduct))
-        a = degrees(acos(dotProduct))
+        dot_product = max(-1.0, min(1.0, dot_product))
+        a = degrees(acos(dot_product))
 
-        return self.arcWithDestination(destinationVector, 2 * a - 180)
+        return self.arc_with_destination(destination_vector, 2 * a - 180)
 
-    def arcWithCentreDirectionAbs(self, centreDirection: Vector, destination: Vector):
-        return self.arcWithCentreDirection(centreDirection, destination - self.location)
+    def arc_with_centre_direction_abs(self, centre_direction: Vector, destination: Vector):
+        return self.arc_with_centre_direction(centre_direction, destination - self.location)
 
     # create arc with specific destination and angle measure
-    def arcWithDestinationAbs(self, destination: Vector, angle: float):
+    def arc_with_destination_abs(self, destination: Vector, angle: float):
         # Calculate chord (straight line distance between start and end)
-        destination = self.checkDestination(destination)
+        destination = self.check_destination(destination)
         chord = destination - self.location
-        chordLength = chord.length
+        chord_length = chord.length
         
-        chordMidpoint = (self.location + destination) / 2
+        chord_midpoint = (self.location + destination) / 2
         
         # Calculate radius using chord length and arc angle
         # For an arc with angle θ, radius = chord_length / (2 * sin(θ/2))
-        halfAngleRad = radians(abs(angle) / 2)
-        if halfAngleRad == 0:
-            return self.jumpTo(destination)  # Straight line for 0° angle
+        half_angle_rad = radians(abs(angle) / 2)
+        if half_angle_rad == 0:
+            return self.jump_to(destination)  # Straight line for 0° angle
             
-        radius = chordLength / (2 * sin(halfAngleRad))
+        radius = chord_length / (2 * sin(half_angle_rad))
         
         # Distance from chord midpoint to arc center
-        centerDistance = radius * cos(halfAngleRad)
+        center_distance = radius * cos(half_angle_rad)
         
         # Direction perpendicular to chord (for center calculation)
         # Positive angle goes counter-clockwise (left side of chord)
-        perpDirection = Vector(-chord.Y, chord.X).normalized()
+        perp_direction = Vector(-chord.Y, chord.X).normalized()
         if angle < 0:
-            perpDirection = -perpDirection  # Clockwise for negative angles
+            perp_direction = -perp_direction  # Clockwise for negative angles
             
-        center = chordMidpoint + perpDirection * centerDistance
+        center = chord_midpoint + perp_direction * center_distance
         
         # Calculate midpoint of arc for Part.Arc
         # The arc midpoint is on the arc, perpendicular to the chord at center
-        arcMidpoint = center - perpDirection * radius
+        arc_midpoint = center - perp_direction * radius
         
-        return self.arcAbs(arcMidpoint, destination)
+        return self.arc_abs(arc_midpoint, destination)
 
     # create arc with specific destination and angle measure
-    def arcWithDestinationFromStart(self, destinationVector: Vector, angle: float):
-        return self.arcWithDestinationAbs(destinationVector + self.start, angle)
+    def arc_with_destination_from_start(self, destination_vector: Vector, angle: float):
+        return self.arc_with_destination_abs(destination_vector + self.start, angle)
 
     # create arc with specific destination and angle measure
-    def arcWithDestination(self, destinationVector: Vector, angle: float):
-        return self.arcWithDestinationAbs(destinationVector + self.location, angle)
+    def arc_with_destination(self, destination_vector: Vector, angle: float):
+        return self.arc_with_destination_abs(destination_vector + self.location, angle)
 
-    def jumpTo(self, absDestination: Vector):
-        absDestination = self.checkDestination(absDestination)
-        self.curves.append(Line(self.location, absDestination))
-        self.location = absDestination
+    def jump_to(self, abs_destination: Vector):
+        abs_destination = self.check_destination(abs_destination)
+        self.curves.append(Line(self.location, abs_destination))
+        self.location = abs_destination
         return self
 
     def jump(self, destination: Vector):
-        return self.jumpTo(destination + self.location)
+        return self.jump_to(destination + self.location)
 
-    def jumpFromStart(self, destination: Vector):
-        return self.jumpTo(destination + self.start)
+    def jump_from_start(self, destination: Vector):
+        return self.jump_to(destination + self.start)
 
     def draw(self, length: float, angle: float):
-        absDestination = shift_vector(self.location, length, angle)
-        return self.jumpTo(absDestination)
+        abs_destination = shift_vector(self.location, length, angle)
+        return self.jump_to(abs_destination)
 
     def up(self, length: float):
         return self.draw(length, 0)
@@ -135,40 +135,40 @@ class Pencil:
         return self.draw(length, -90)
 
     def extrude(self, height: float):
-        face = self.createFace()
+        face = self.create_face()
         return extrude(face, height)
 
-    def extrudeX(self, height: float, transpose: Vector = Vector()):
+    def extrude_x(self, height: float, transpose: Vector = Vector()):
         solid = self.extrude(height)
         solid.orientation = (90, 90, 0)
         solid.position = transpose
         return solid
 
-    def extrudeY(self, height: float, transpose: Vector = Vector()):
+    def extrude_y(self, height: float, transpose: Vector = Vector()):
         solid = self.extrude(height)
         solid.orientation = (90, 180, 0)
         solid.position = transpose
         return solid
 
-    def createFace(self) -> Face:
-        return Face(self.createWire())
+    def create_face(self) -> Face:
+        return Face(self.create_wire())
 
-    def createWire(self) -> Wire:
+    def create_wire(self) -> Wire:
         curves = self.curves.copy()
         if self.location != self.start:
             curves.append(Line(self.location, self.start))
 
         return Wire(curves)
 
-    def extrudeMirrored(self, height: float, direction: Direction):
-        face = self.createMirroredFace(direction)
+    def extrude_mirrored(self, height: float, direction: Direction):
+        face = self.create_mirrored_face(direction)
         return extrude(face, height)
 
-    def createMirroredFace(self, axis: Axis) -> Compound:
-        return make_face([self.createWire(), self.mirrorWire(axis)])
+    def create_mirrored_face(self, axis: Axis) -> Compound:
+        return make_face([self.create_wire(), self.mirror_wire(axis)])
 
-    def mirrorWire(self, axis: Axis) -> Wire:
-        wire = self.createWire()
+    def mirror_wire(self, axis: Axis) -> Wire:
+        wire = self.create_wire()
         match axis:
             case Axis.Y:
                 return mirror(wire, Plane.YZ).move(Location(Vector(self.location.X * 2, 0)))

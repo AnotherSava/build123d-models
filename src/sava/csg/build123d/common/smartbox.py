@@ -12,7 +12,7 @@ class SmartBox(SmartSolid):
 
         self.solid = Solid.make_box(width if flip_xy else length, length if flip_xy else width, height)
 
-    def addCutout(self, direction: Direction, length: float, radius_bottom: float = 0, radius_top: float | None = None, width: float | None = None, height: float | None = None, shift: float = 0) -> 'SmartBox':
+    def add_cutout(self, direction: Direction, length: float, radius_bottom: float = 0, radius_top: float | None = None, width: float | None = None, height: float | None = None, shift: float = 0) -> 'SmartBox':
         assert width is not None or height is not None, "Either width or height must be specified"
 
         width_actual = width or self.get_other_side_length(direction)

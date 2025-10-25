@@ -87,17 +87,17 @@ class SmartSolid:
     def z_size(self) -> float:
         return self.bound_box.size.Z
 
-    def create_positional_fiter_axis(self, axis: Axis, inclusive: tuple[bool, bool] = None) -> 'PositionalFilter':
+    def create_positional_filter_axis(self, axis: Axis, inclusive: tuple[bool, bool] = None) -> 'PositionalFilter':
         return PositionalFilter(axis, self.get_from(axis), self.get_to(axis), (True, True) if inclusive is None else inclusive)
 
     def create_positional_filters_plane(self, plane: Plane, inclusive: tuple[bool, bool] = None) -> Iterable['PositionalFilter']:
         result = []
         if plane in [Plane.XZ, Plane.ZX, Plane.XY, Plane.YX]:
-            result.append(self.create_positional_fiter_axis(Axis.X, inclusive))
+            result.append(self.create_positional_filter_axis(Axis.X, inclusive))
         if plane in [Plane.YX, Plane.YZ, Plane.XY, Plane.ZY]:
-            result.append(self.create_positional_fiter_axis(Axis.Y, inclusive))
+            result.append(self.create_positional_filter_axis(Axis.Y, inclusive))
         if plane in [Plane.ZX, Plane.ZY, Plane.XZ, Plane.YZ]:
-            result.append(self.create_positional_fiter_axis(Axis.Z, inclusive))
+            result.append(self.create_positional_filter_axis(Axis.Z, inclusive))
         return result
 
     def get_size(self, axis: Axis):
@@ -247,7 +247,7 @@ class SmartSolid:
         self.solid = self.solid.intersect(get_solid(shape))
         return self
 
-    def addNotch(self, direction: Direction, depth: float, length: float):
+    def add_notch(self, direction: Direction, depth: float, length: float):
         notch_height = depth / length * self.get_side_length(direction)
 
         pencil = Pencil().up(notch_height).left(self.get_side_length(direction))

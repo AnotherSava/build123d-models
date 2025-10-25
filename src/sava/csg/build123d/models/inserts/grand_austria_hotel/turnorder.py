@@ -66,7 +66,7 @@ class TurnOrder:
             for i in range(3):
                 for direction in [-1, 1]:
                     shift = self.dim.insert_width / 2 - self.dim.wall_thickness * (i + 1) - self.dim.turn_order_box_width * (i + 0.5)
-                    box.addCutout(side, self.dim.turn_order_cutout_length, self.dim.turn_order_cutout_radius, None, self.dim.turn_order_cutout_width, None, shift * direction)
+                    box.add_cutout(side, self.dim.turn_order_cutout_length, self.dim.turn_order_cutout_radius, None, self.dim.turn_order_cutout_width, None, shift * direction)
 
         return box
 
@@ -88,7 +88,7 @@ class TurnOrder:
         shape2d = shape2d.scale((self.dim.key_length + self.dim.gap * 2) / shape2d.bounding_box().size.X)
         extruded_key = extrude(shape2d, self.dim.turn_order_height, Vector(0, 0, 1))
         solid = SmartSolid(scale(extruded_key, (1, self.dim.key_scale_y, 1)))
-        solid.addNotch(Direction.E, self.dim.key_notch_depth, self.dim.key_notch_length)
+        solid.add_notch(Direction.E, self.dim.key_notch_depth, self.dim.key_notch_length)
 
         return solid.orient((0, 0, self.dim.key_rotation))
 

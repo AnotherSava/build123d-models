@@ -1,4 +1,4 @@
-from build123d import Vector, mirror, Plane, Solid, Axis
+from build123d import Vector, mirror, Plane, Solid, Axis, Text, extrude
 
 from sava.csg.build123d.common.exporter import Exporter, show_green
 from sava.csg.build123d.common.geometry import create_vector, Alignment
@@ -31,13 +31,21 @@ class ProngDimensions:
 
     height: float = 10
 
+class TextDimensions:
+    text: str = "Travel Adapter Set"
+    font_size: float = 20
+    font: str = "Liberation Sans"
+    height: float = 4.0
+
 class PowerAdapterBoxDimensions:
     recess: RecessDimensions = RecessDimensions()
     prongs: ProngDimensions = ProngDimensions()
+    text: TextDimensions = TextDimensions()
 
     socket_side: float = 36.0
-    socket_padding: float = 5.0
-    box_length_padding: float = 3
+    # socket_padding: float = 5.0
+    socket_padding: float = 4.0
+    box_length_padding: float = 6
     # sockets_per_row: int = 6
     sockets_per_row: int = 1
     floor_thickness: float = 2
@@ -47,11 +55,10 @@ class PowerAdapterBoxDimensions:
     lid_fillet_radius: float = 0.3
     box_taper_diff: float = 0.6
 
-    # lid_internal_height: float = 57.0
-    lid_internal_height: float = 40.0
+    lid_internal_height: float = 57.0
     lid_ceiling_thickness: float = 1.2
     lid_cutout_thickness: float = 1.2
-    lock_gap: float = 0.1
+    lock_gap: float = 0.3
 
     lock_length: float = 20.0
     lock_length_bottom: float = 16.0
@@ -62,6 +69,7 @@ class PowerAdapterBoxDimensions:
     lock_cantilever_attachment_height: float = 15
     lock_cantilever_thickness: float = 2
     lock_slot_thickness_coefficient: float = 1.1
+    lock_slot_radius: float = 2.5
 
     lock_hardening_height: float = 20.0
     lock_hardening_thickness: float = 1.5
@@ -86,8 +94,7 @@ class PowerAdapterBoxDimensions:
 
     @property
     def box_width(self):
-        # return self.get_side_length(2)
-        return 40
+        return self.get_side_length(2)
 
     @property
     def box_height(self):
@@ -112,6 +119,14 @@ class PowerAdapterBox:
         show_green(prongs)
 
         return outer.cut(recess).fuse(prongs)
+
+    def create_text(self) -> SmartSolid:
+        # Create a wire object for text using direct API
+        text_wire = Text(self.dim.text.text, font_size=self.dim.text.font_size, font=self.dim.text.font)
+
+        # You can immediately extrude this wire to make a 3D object
+        solid_text = extrude(text_wire, amount=self.dim.text.height)
+        return SmartSolid(solid_text)
 
     def create_lid(self) -> SmartSolid:
 
@@ -152,19 +167,20 @@ class PowerAdapterBox:
 
         # show_red(snap)
         # show_green(box)
+        # show_green(lid)
 
-        # return box
-        return lid
+        return box
+        # return lid
 
     def create_snap_thinning(self) -> SmartSolid:
         pencil = Pencil(Vector(5, 0))
         pencil.right(self.dim.lock_length_bottom / 2)
         pencil.up(self.dim.box_height)
-        pencil.doubleArc(Vector((self.dim.lock_length - self.dim.lock_length_bottom) / 2, (self.dim.lock_cantilever_attachment_height - self.dim.lock_tip_height)))
+        pencil.double_arc(Vector((self.dim.lock_length - self.dim.lock_length_bottom) / 2, (self.dim.lock_cantilever_attachment_height - self.dim.lock_tip_height)))
         pencil.up(self.dim.lid_height - self.dim.lock_cantilever_attachment_height)
         pencil.left(1) # no idea why single left doesn't work here
         pencil.left(self.dim.lock_length / 2 - 1)
-        return SmartSolid(pencil.extrudeMirrored(self.dim.box_length, Axis.Y))
+        return SmartSolid(pencil.extrude_mirrored(self.dim.box_length, Axis.Y))
 
     def create_snap(self) -> SmartSolid:
         pencil = Pencil()
@@ -173,32 +189,31 @@ class PowerAdapterBox:
         pencil.left(self.dim.lock_tip_thickness)
         pencil.up(self.dim.lock_tip_distance)
 
-        arcDestinationVector = Vector(self.dim.lock_tip_thickness, self.dim.lock_cantilever_attachment_height - self.dim.lid_cutout_height)
-        pencil.doubleArc(arcDestinationVector)
+        arc_destination_vector = Vector(self.dim.lock_tip_thickness, self.dim.lock_cantilever_attachment_height - self.dim.lid_cutout_height)
+        pencil.double_arc(arc_destination_vector)
 
         pencil.up(self.dim.lock_height - self.dim.lock_cantilever_attachment_height + self.dim.lock_hardening_height / 2)
         pencil.left(self.dim.lid_wall_thickness)
-        pencil.doubleArc(Vector(-self.dim.lock_hardening_thickness, -self.dim.lock_hardening_height / 2))
-        pencil.doubleArc(Vector(self.dim.lock_hardening_thickness - self.dim.lock_cantilever_thickness + self.dim.lid_wall_thickness, -self.dim.lock_hardening_height / 2))
+        pencil.double_arc(Vector(-self.dim.lock_hardening_thickness, -self.dim.lock_hardening_height / 2))
+        pencil.double_arc(Vector(self.dim.lock_hardening_thickness - self.dim.lock_cantilever_thickness + self.dim.lid_wall_thickness, -self.dim.lock_hardening_height / 2))
 
         pencil.down(self.dim.lock_height - self.dim.lock_cantilever_attachment_height - self.dim.lock_hardening_height / 2)
 
-        pencil.doubleArc(-arcDestinationVector, 0.57)
+        pencil.double_arc(-arc_destination_vector, 0.57)
 
-        return SmartSolid(pencil.extrudeY(self.dim.lock_length))
+        return SmartSolid(pencil.extrude_y(self.dim.lock_length))
 
     def create_lock_slot(self) -> SmartSolid:
         pencil = Pencil()
 
-        radius = self.dim.protrusion_fillet_radius
-        pencil.arcWithRadius(radius, 180, 90)
-        pencil.down(self.dim.lock_tip_distance - self.dim.lock_gap - radius)
+        pencil.arc_with_radius(self.dim.lock_slot_radius, 180, 90)
+        pencil.down(self.dim.lock_tip_distance - self.dim.lock_gap - self.dim.lock_slot_radius)
         pencil.right(self.dim.lock_tip_thickness)
         pencil.down(self.dim.box_height - self.dim.lock_tip_distance + self.dim.lock_gap)
         pencil.left((self.dim.lock_tip_thickness * 2 + self.dim.lock_cantilever_thickness) * self.dim.lock_slot_thickness_coefficient)
         pencil.up(self.dim.box_height)
 
-        return SmartSolid(pencil.extrudeY(self.dim.lock_length_bottom + self.dim.box_taper_diff * 2))
+        return SmartSolid(pencil.extrude_y(self.dim.lock_length_bottom + self.dim.box_taper_diff * 2))
 
 
     def create_protrusion(self, filleted: bool):
@@ -219,16 +234,15 @@ class PowerAdapterBox:
 
         box = SmartSolid(box_top.solid + box_bottom.solid + box_protrusion.solid)
 
-        # recess_row = self.create_row(self.create_socket_recess())
-        # recess_row.fuse(recess_row.mirrored().align_y(recess_row, Alignment.RR, self.dim.socket_padding))
-        # recess_row.align_xy(box).align_z(box, Alignment.RL)
-        #
-        # box.cut(recess_row)
-        #
-        # for orientation, alignment in [[0, Alignment.LR], [180, Alignment.RL]]:
-        #     prongs_row = self.create_row(self.create_prongs()).orient((0, 0, orientation))
-        #     prongs_row.align_x(recess_row).align_z(recess_row, Alignment.LR).align_y(recess_row, alignment, alignment.shift_towards_centre(self.dim.prongs.bottom_shift_y))
-        #     box.fuse(prongs_row)
+        recess_row = self.create_row(self.create_socket_recess())
+        recess_row.fuse(recess_row.mirrored().align_y(recess_row, Alignment.RR, self.dim.socket_padding))
+        recess_row.align_xy(box).align_z(box, Alignment.RL)
+        box.cut(recess_row)
+
+        for orientation, alignment in [[0, Alignment.LR], [180, Alignment.RL]]:
+            prongs_row = self.create_row(self.create_prongs()).orient((0, 0, orientation))
+            prongs_row.align_x(recess_row).align_z(recess_row, Alignment.LR).align_y(recess_row, alignment, alignment.shift_towards_centre(self.dim.prongs.bottom_shift_y))
+            box.fuse(prongs_row)
 
         return box
 
@@ -238,9 +252,9 @@ class PowerAdapterBox:
     def create_socket_recess(self):
         pencil = Pencil()
         pencil.right(self.dim.recess.top_length_flat / 2)
-        pencil.arcWithVectorToIntersection(Vector((self.dim.recess.top_length - self.dim.recess.top_length_flat) / 2, 0, 0), self.dim.recess.top_angle)
-        pencil.arcWithDestination(create_vector(self.dim.recess.side_flat_length, self.dim.recess.top_angle + 90), self.dim.recess.side_angle)
-        pencil.arcWithVectorToIntersection(create_vector((self.dim.recess.bottom_length - self.dim.recess.bottom_length_flat) / 2, self.dim.recess.top_angle + 90), 180 - self.dim.recess.top_angle)
+        pencil.arc_with_vector_to_intersection(Vector((self.dim.recess.top_length - self.dim.recess.top_length_flat) / 2, 0, 0), self.dim.recess.top_angle)
+        pencil.arc_with_destination(create_vector(self.dim.recess.side_flat_length, self.dim.recess.top_angle + 90), self.dim.recess.side_angle)
+        pencil.arc_with_vector_to_intersection(create_vector((self.dim.recess.bottom_length - self.dim.recess.bottom_length_flat) / 2, self.dim.recess.top_angle + 90), 180 - self.dim.recess.top_angle)
         pencil.left(pencil.location.X)
         solid = pencil.extrude(self.dim.recess.depth)
         return SmartSolid(solid, mirror(solid, Plane.YZ))
@@ -263,7 +277,8 @@ class PowerAdapterBox:
 
 dimensions = PowerAdapterBoxDimensions()
 power_adapter_box = PowerAdapterBox(dimensions)
-Exporter(power_adapter_box.create_lid()).export()
+Exporter(power_adapter_box.create_text()).export()
+# Exporter(power_adapter_box.create_lid()).export()
 # Exporter(power_adapter_box.create_snap_thinning()).export()
 # Exporter(power_adapter_box.create_box()).export()
 # Exporter(power_adapter_box.create_single()).export()
