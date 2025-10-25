@@ -1,9 +1,9 @@
 from math import radians, degrees, acos, sin, cos, tan, atan
 
-from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire
+from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Compound, Axis, make_face
 
 from sava.csg.build123d.common.advanced_math import advanced_mod
-from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle
+from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle, Direction
 
 
 class Pencil:
@@ -159,3 +159,19 @@ class Pencil:
             curves.append(Line(self.location, self.start))
 
         return Wire(curves)
+
+    def extrudeMirrored(self, height: float, direction: Direction):
+        face = self.createMirroredFace(direction)
+        return extrude(face, height)
+
+    def createMirroredFace(self, axis: Axis) -> Compound:
+        return make_face([self.createWire(), self.mirrorWire(axis)])
+
+    def mirrorWire(self, axis: Axis) -> Wire:
+        wire = self.createWire()
+        match axis:
+            case Axis.Y:
+                return mirror(wire, Plane.YZ).move(Location(Vector(self.location.X * 2, 0)))
+            case Axis.X:
+                return mirror(wire, Plane.XZ).move(Location(Vector(0, self.location.Y * 2)))
+        raise "Invalid axis"
