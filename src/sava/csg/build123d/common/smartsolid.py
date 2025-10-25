@@ -1,10 +1,19 @@
 from copy import copy
+from dataclasses import dataclass
 from typing import Iterable
 
-from build123d import Vector, fillet, Axis, Location, Shape, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror
+from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList
 
-from sava.csg.build123d.common.geometry import Alignment, shift_vector, Direction
+from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position
 from sava.csg.build123d.common.pencil import Pencil
+
+
+@dataclass
+class PositionalFilter:
+    axis: Axis
+    minimum: float = None
+    maximum: float = None
+    inclusive: tuple[bool, bool] = None
 
 
 def get_solid(element):
@@ -78,6 +87,19 @@ class SmartSolid:
     def z_size(self) -> float:
         return self.bound_box.size.Z
 
+    def create_positional_fiter_axis(self, axis: Axis, inclusive: tuple[bool, bool] = None) -> 'PositionalFilter':
+        return PositionalFilter(axis, self.get_from(axis), self.get_to(axis), (True, True) if inclusive is None else inclusive)
+
+    def create_positional_filters_plane(self, plane: Plane, inclusive: tuple[bool, bool] = None) -> Iterable['PositionalFilter']:
+        result = []
+        if plane in [Plane.XZ, Plane.ZX, Plane.XY, Plane.YX]:
+            result.append(self.create_positional_fiter_axis(Axis.X, inclusive))
+        if plane in [Plane.YX, Plane.YZ, Plane.XY, Plane.ZY]:
+            result.append(self.create_positional_fiter_axis(Axis.Y, inclusive))
+        if plane in [Plane.ZX, Plane.ZY, Plane.XZ, Plane.YZ]:
+            result.append(self.create_positional_fiter_axis(Axis.Z, inclusive))
+        return result
+
     def get_size(self, axis: Axis):
         match axis:
             case Axis.X:
@@ -87,17 +109,6 @@ class SmartSolid:
             case Axis.Z:
                 return self.z_size
         raise RuntimeError(f"Invalid axis: {axis}")
-
-    @property
-    def parent(self):
-        return self.solid.parent
-
-    @parent.setter
-    def parent(self, parent: Shape):
-        self.solid.parent = parent
-
-    def move_in_direction(self, *args: float):
-        return self.move_vector(shift_vector(Vector(), *args))
 
     def move_vector(self, vector: Vector):
         return self.move(vector.X, vector.Y, vector.Z)
@@ -153,7 +164,7 @@ class SmartSolid:
         return self
 
     def align_axis(self, solid: 'SmartSolid | None', axis: Axis, alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
-        distance = SmartSolid._calculate_position(solid.get_from(axis) if solid else 0, solid.get_to(axis) if solid else 0, self.get_size(axis), alignment) + shift - self.get_from(axis)
+        distance = calculate_position(solid.get_from(axis) if solid else 0, solid.get_to(axis) if solid else 0, self.get_size(axis), alignment) + shift - self.get_from(axis)
         return self.move_vector(axis.direction * distance)
 
     def align_x(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
@@ -179,20 +190,32 @@ class SmartSolid:
 
     def _fillet(self, axis_orientational: Axis, radius: float, axis_positional: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] | None = None) -> 'SmartSolid':
         edges = self.solid.edges().filter_by(axis_orientational)
-        if axis_positional is not None:
-            if minimum is None:
-                actual_min = self.get_from(axis_positional)
-                actual_max = self.get_to(axis_positional)
-                actual_inclusive = (False, False) if inclusive is None else inclusive
-            else:
-                actual_min = minimum
-                actual_max = actual_min if maximum is None else maximum
-                actual_inclusive = (True, True) if inclusive is None else inclusive
-
-            edges = edges.filter_by_position(axis_positional, actual_min, actual_max, actual_inclusive)
-
+        edges = self._filter_positional(edges, PositionalFilter(axis_positional, minimum, maximum, inclusive))
         self.solid = fillet(edges, radius)
         return self
+
+    def fillet_positional(self, axis_orientational: Axis, radius: float, *position_filters: PositionalFilter) -> 'SmartSolid':
+        edges = self.solid.edges().filter_by(axis_orientational)
+        for position_filter in position_filters:
+            edges = self._filter_positional(edges, position_filter)
+        print(f"Edges filleted: {len(edges)}")
+        self.solid = fillet(edges, radius)
+        return self
+
+    def _filter_positional(self, edges: ShapeList[Edge], positional_filter: PositionalFilter) -> ShapeList[Edge]:
+        if positional_filter.axis is None:
+            return edges
+
+        if positional_filter.minimum is None:
+            actual_min = self.get_from(positional_filter.axis)
+            actual_max = self.get_to(positional_filter.axis)
+            actual_inclusive = (False, False) if positional_filter.inclusive is None else positional_filter.inclusive
+        else:
+            actual_min = positional_filter.minimum
+            actual_max = actual_min if positional_filter.maximum is None else positional_filter.maximum
+            actual_inclusive = (True, True) if positional_filter.inclusive is None else positional_filter.inclusive
+
+        return edges.filter_by_position(positional_filter.axis, actual_min, actual_max, actual_inclusive)
 
     def fillet_x(self, radius: float, axis: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] = (True, True)) -> 'SmartSolid':
         return self._fillet(Axis.X, radius, axis, minimum, maximum, inclusive)
@@ -270,26 +293,3 @@ class SmartSolid:
 
     def mirrored(self, about: Plane = Plane.XZ) -> 'SmartSolid':
         return SmartSolid(mirror(self.solid, about))
-
-    @classmethod
-    def _calculate_position(cls, left: float, right: float, self_size: float, alignment: Alignment):
-        match alignment:
-            case Alignment.LL:
-                return left - self_size
-            case Alignment.L:
-                return left - self_size / 2
-            case Alignment.LR:
-                return left
-            case Alignment.CL:
-                return (left + right) / 2 - self_size
-            case Alignment.C:
-                return (left + right - self_size) / 2
-            case Alignment.CR:
-                return (left + right) / 2
-            case Alignment.RL:
-                return right - self_size
-            case Alignment.R:
-                return right - self_size / 2
-            case Alignment.RR:
-                return right
-        raise RuntimeError(f"Invalid alignment: {alignment.name} = {alignment.value}")

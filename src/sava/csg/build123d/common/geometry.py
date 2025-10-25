@@ -22,6 +22,29 @@ class Alignment(IntEnum):
         return value if self in (Alignment.LL, Alignment.LR, Alignment.CL) else -value
 
 
+def calculate_position(left: float, right: float, self_size: float, alignment: Alignment):
+    match alignment:
+        case Alignment.LL:
+            return left - self_size
+        case Alignment.L:
+            return left - self_size / 2
+        case Alignment.LR:
+            return left
+        case Alignment.CL:
+            return (left + right) / 2 - self_size
+        case Alignment.C:
+            return (left + right - self_size) / 2
+        case Alignment.CR:
+            return (left + right) / 2
+        case Alignment.RL:
+            return right - self_size
+        case Alignment.R:
+            return right - self_size / 2
+        case Alignment.RR:
+            return right
+    raise RuntimeError(f"Invalid alignment: {alignment.name} = {alignment.value}")
+
+
 class Direction(IntEnum):
     S = 180
     E = 270
