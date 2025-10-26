@@ -145,32 +145,21 @@ class PowerAdapterBox:
 
         lid.fillet_positional(Axis.X, self.dim.lid_fillet_radius, *box_protrusion.create_positional_filters_plane(Plane.YZ))
 
-        box = self.create_box()
-        box.align_xy(lid).align_z(lid, Alignment.LR, self.dim.lid_cutout_height - self.dim.box_height)
-
         snap = self.create_snap()
 
         snap_thinning = self.create_snap_thinning().orient((90, 90, 0))
-        snap_thinning.align(lid).align_z(box, Alignment.LR)
+        snap_thinning.align(lid).align_z(lid, Alignment.LR, self.dim.lock_gap - self.dim.box_height + self.dim.lid_cutout_height)
 
         for orientation, alignment in [[180, Alignment.LR], [0, Alignment.RL]]:
             snap.orient((90, orientation, 0))
-            snap.align_x(lid, alignment).align_y(lid).align_z(box, Alignment.LR, self.dim.lock_gap)
-            lid.solid += snap.solid & snap_thinning.solid
-
-        slot = self.create_lock_slot()
-        for orientation, alignment in [[180, Alignment.LR], [0, Alignment.RL]]:
-            slot.orient((90, orientation, 0))
-            slot.align_x(lid, alignment).align_y(lid).align_z(box, Alignment.LR)
-            # show_red(slot)
-            box.cut(slot)
+            snap.align_x(lid, alignment).align_y(lid).align_z(snap_thinning, Alignment.LR)
+            lid.fuse(snap.intersected(snap_thinning))
 
         # show_red(snap)
-        # show_green(box)
         # show_green(lid)
 
-        return box
-        # return lid
+        # return box
+        return lid
 
     def create_snap_thinning(self) -> SmartSolid:
         pencil = Pencil(Vector(5, 0))
@@ -232,7 +221,7 @@ class PowerAdapterBox:
         box_bottom = SmartBox(self.dim.box_length, self.dim.box_width, self.dim.box_height - self.dim.lid_cutout_height).fillet_z(self.dim.box_fillet_radius)
         box_bottom.align_xy(box_top).align_z(box_top, Alignment.LL)
 
-        box = SmartSolid(box_top.solid + box_bottom.solid + box_protrusion.solid)
+        box = SmartSolid(box_top, box_bottom, box_protrusion)
 
         recess_row = self.create_row(self.create_socket_recess())
         recess_row.fuse(recess_row.mirrored().align_y(recess_row, Alignment.RR, self.dim.socket_padding))
@@ -244,10 +233,17 @@ class PowerAdapterBox:
             prongs_row.align_x(recess_row).align_z(recess_row, Alignment.LR).align_y(recess_row, alignment, alignment.shift_towards_centre(self.dim.prongs.bottom_shift_y))
             box.fuse(prongs_row)
 
+        slot = self.create_lock_slot()
+        for orientation, alignment in [[180, Alignment.LR], [0, Alignment.RL]]:
+            slot.orient((90, orientation, 0))
+            slot.align_x(box, alignment).align_y(box).align_z(box, Alignment.LR)
+            box.cut(slot)
+
         return box
 
     def create_row(self, element: SmartSolid) -> SmartSolid:
-        return SmartSolid(element.copy().move((self.dim.socket_side + self.dim.socket_padding) * i) for i in range(self.dim.sockets_per_row))
+        x = list((element.copy().move((self.dim.socket_side + self.dim.socket_padding) * i) for i in range(self.dim.sockets_per_row)))
+        return SmartSolid(x)
 
     def create_socket_recess(self):
         pencil = Pencil()
@@ -277,8 +273,8 @@ class PowerAdapterBox:
 
 dimensions = PowerAdapterBoxDimensions()
 power_adapter_box = PowerAdapterBox(dimensions)
-Exporter(power_adapter_box.create_text()).export()
+# Exporter(power_adapter_box.create_text()).export()
 # Exporter(power_adapter_box.create_lid()).export()
 # Exporter(power_adapter_box.create_snap_thinning()).export()
-# Exporter(power_adapter_box.create_box()).export()
+Exporter(power_adapter_box.create_box()).export()
 # Exporter(power_adapter_box.create_single()).export()

@@ -70,7 +70,7 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions):
 
     outer_box.add_cutout(Direction.W, dim.cards_cut_length, dim.cube_cut_fillet_radius_bottom, width=dim.cards_cut_width)
 
-    return outer_box.solid - card_box.solid - cube_box.solid - token_box.solid
+    return outer_box.cut(card_box, cube_box, token_box)
 
 dimensions = CelebritiesBoxDimensions()
 celebrities_box = create_celebrities_box(dimensions)

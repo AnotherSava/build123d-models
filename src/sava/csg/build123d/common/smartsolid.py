@@ -2,7 +2,7 @@ from copy import copy
 from dataclasses import dataclass
 from typing import Iterable
 
-from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList
+from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape
 
 from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position
 from sava.csg.build123d.common.pencil import Pencil
@@ -19,16 +19,24 @@ class PositionalFilter:
 def get_solid(element):
     return element.solid if isinstance(element, SmartSolid) else element
 
+def fuse_two(shape1: Shape | None, shape2: Shape | None):
+    if shape1 is None:
+        return shape2
+    if shape2 is None:
+        return shape1
+    return shape2 + shape1 if isinstance(shape1, ShapeList) else shape1 + shape2
+
 def fuse(*args):
-    elements = []
+    result = None
 
     for arg in args:
         if isinstance(arg, Iterable):
-            elements += [get_solid(sub_arg) for sub_arg in arg]
+            result = fuse_two(result, fuse(*arg))
         else:
-            elements.append(get_solid(arg))
+            solid = get_solid(arg)
+            result = fuse_two(result, solid)
 
-    return elements[0] if len(elements) == 1 else Compound(elements)
+    return Compound(result) if type(result) == ShapeList else result
 
 
 class SmartSolid:
@@ -155,8 +163,8 @@ class SmartSolid:
                 return self.bound_box.min.Z, self.bound_box.max.Z
         raise RuntimeError(f"Invalid axis: {axis}")
 
-    def cut(self, element) -> 'SmartSolid':
-        self.solid -= get_solid(element)
+    def cut(self, *args) -> 'SmartSolid':
+        self.solid -= fuse(args)
         return self
 
     def fuse(self, *args) -> 'SmartSolid':
@@ -244,8 +252,11 @@ class SmartSolid:
         return self
 
     def intersect(self, shape) -> 'SmartSolid':
-        self.solid = self.solid.intersect(get_solid(shape))
+        self.solid = self.solid & get_solid(shape)
         return self
+
+    def intersected(self, shape) -> 'SmartSolid':
+        return SmartSolid(self.solid & get_solid(shape))
 
     def add_notch(self, direction: Direction, depth: float, length: float):
         notch_height = depth / length * self.get_side_length(direction)

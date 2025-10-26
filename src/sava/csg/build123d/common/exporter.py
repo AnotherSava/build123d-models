@@ -24,6 +24,10 @@ def set_color(shape: Shape, color: str = "yellow") -> Iterable[Solid]:
         solid.color = Color(color)
         solid.label = color
         result.append(solid.clean())
+
+    if len(result) > 1:
+        print(f"{color}: {len(result)} shapes")
+
     return result
 
 def get_project_root_folder():
