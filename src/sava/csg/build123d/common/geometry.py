@@ -1,7 +1,7 @@
 from enum import IntEnum, auto
 from math import cos, sin, radians, atan2, degrees
 
-from build123d import Vector, Axis
+from build123d import Vector, Axis, Wire, Face, extrude, Part, Polyline
 
 
 # Ways to align one 2d vector (or another else) to another
@@ -94,3 +94,10 @@ def shift_vector(vector: Vector, *args: float) -> Vector:
 
 def get_angle(vector: Vector):
     return -degrees(atan2(vector.X, vector.Y))
+
+def extrude_wire(wire: Wire, height: float) -> Part:
+    face = Face(wire)
+    return extrude(face, height, Vector(0, 0, 1))
+
+def create_closed_wire(*points) -> Wire:
+    return Polyline(*points, points[0])

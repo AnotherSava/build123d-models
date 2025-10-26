@@ -3,7 +3,7 @@ from build123d import Location, loft, Face, fillet, Wire
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
-def create_tapered_box(bottom_length: float, bottom_width: float, height: float, top_length: float, top_width: float, radius = None):
+def create_tapered_box(bottom_length: float, bottom_width: float, height: float, top_length: float, top_width: float, radius = None) -> SmartSolid:
     bottom = create_filleted_rect(bottom_length, bottom_width, radius)
     top = create_filleted_rect(top_length, top_width, radius).move(Location((0, 0, height)))
 
