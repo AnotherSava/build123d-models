@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from build123d import Vector, Solid, Part, Plane, Compound
+from traitlets import HasTraits, Float, Int, TraitError, validate
 
 from sava.csg.build123d.common.advanced_math import advanced_round
 from sava.csg.build123d.common.geometry import Alignment
@@ -14,41 +15,47 @@ from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 @dataclass
-class MeshLidDimensions:
-    handle_radius: float
-    wall_thickness: float
-    grid_thickness: float
+class MeshLidHandleDimensions:
     minimal_mesh_height: float
     recess_length_coefficient: float
     recess_width_coefficient: float
     slope_length_coefficient: float
     slope_width_coefficient: float
-    length: float
-    width: float
-    height: float
-    position: Vector
+    handle_radius: float
+    minimal_mesh_height: float
     beautify_handle: bool = True
-    fill_corners: bool = False
     fill_handle_sides: bool = False
-    hex_count_length: int = None # how many hexes length fit
-    max_grid_short_diagonal: float = None
-    inner_space_height: float = None
-    wall_height: float = None
+    wall_height: float = None # handle might be taller than the wall
 
-    def __post_init__(self):
-        assert self.hex_count_length is None or self.hex_count_length % 2 == 0
-        assert (self.hex_count_length is None) + (self.max_grid_short_diagonal is None) == 1
 
-        self.wall_height = self.wall_height or self.height
+# @dataclass
+class MeshLidDimensions(HasTraits):
+    width = Float(default_value=None)
+    height = Float(default_value=None)
+    wall_thickness = Float(default_value=None)
+    grid_thickness = Float(default_value=None)
+    hex_count_length = Int(default_value=None) # how many hexes does the length fit
+    length = Float(default_value=None)
+    inner_space_height: float=0.0
+    fill_corners: bool =False
+    handle: MeshLidHandleDimensions = None
 
-    def get_hex_count_length(self) -> int:
-        return self.hex_count_length or advanced_round((self.length - self.wall_thickness * 2 + self.grid_thickness) / (self.max_grid_short_diagonal + self.grid_thickness), 2, 0)
+    @validate('hex_count_length')
+    def _validate_hex_count_length(self, proposal):
+        value = proposal['value']
+        if value is not None and value % 2 != 0:
+            raise TraitError(f"hex_count_length must be even, got {value}")
+        return value
+
+    @property
+    def wall_height(self):
+        return self.height if self.handle is None or self.handle.wall_height is None else self.handle.wall_height
 
     def get_mesh_height(self):
         return self.wall_height - (self.inner_space_height or 0)
 
     def get_hex_short_diagonal(self):
-        return (self.length - self.wall_thickness * 2 - self.grid_thickness * (self.get_hex_count_length() - 1)) / self.get_hex_count_length()
+        return (self.length - self.wall_thickness * 2 - self.grid_thickness * (self.hex_count_length - 1)) / self.hex_count_length
 
 
 class MeshLid(SmartBox):
@@ -58,17 +65,8 @@ class MeshLid(SmartBox):
         self.dimensions = dimensions
 
         self.internal_mesh = SmartBox(self.dimensions.length - self.dimensions.wall_thickness * 2, self.dimensions.width - self.dimensions.wall_thickness * 2, self.dimensions.get_mesh_height())
-        self.internal_mesh.move_vector(self.dimensions.position).move(self.dimensions.wall_thickness, self.dimensions.wall_thickness, self.dimensions.height - self.dimensions.wall_height)
+        self.internal_mesh.move(self.dimensions.wall_thickness, self.dimensions.wall_thickness, self.dimensions.height - self.dimensions.wall_height)
 
-        self.outer_mesh = SmartBox(self.dimensions.length, self.dimensions.width, self.dimensions.get_mesh_height())
-        self.outer_mesh.move_vector(self.dimensions.position).move(0, 0, self.dimensions.height - self.dimensions.wall_height)
-
-        self.space_below = None
-        if self.dimensions.inner_space_height:
-            self.space_below = SmartBox(self.dimensions.length - self.dimensions.wall_thickness * 2, self.dimensions.width - self.dimensions.wall_thickness * 2, self.dimensions.inner_space_height)
-            self.space_below.align(self).align_z(self, Alignment.RL)
-
-        self.external_box = SmartBox(self.dimensions.length, self.dimensions.width, self.dimensions.height).move_vector(self.dimensions.position)
         self.internal_mesh_hex = Hexagon(self.dimensions.get_hex_short_diagonal(), self.dimensions.get_mesh_height())
 
         base_distance_y = get_distance_y(self.dimensions.get_hex_short_diagonal(), self.dimensions.grid_thickness)
@@ -78,7 +76,6 @@ class MeshLid(SmartBox):
         offset_y = self.distance_y - base_distance_y
 
         self.hexes_covered_y = None
-
         self.hex_configuration = HexagonConfiguration().with_rays(offset_y, HexTileVertices.N, HexTileVertices.S)
 
     def create_mesh_hex(self, row: int = 0, column: int = 0) -> Part:
@@ -94,31 +91,41 @@ class MeshLid(SmartBox):
         return Vector(x, y, self.internal_mesh.z_min)
 
     def create_lid_mesh(self) -> SmartSolid:
-        print(f"Mesh lid: rows = {self.full_row_count}, columns = {self.dimensions.get_hex_count_length()}")
+        print(f"Mesh lid: rows = {self.full_row_count}, columns = {self.dimensions.hex_count_length}")
         solid = self.create_mesh_hex()
         hexes = []
         for row in range(self.full_row_count + 1):
-            for column in range(self.dimensions.get_hex_count_length() + 1):
-                if not self.dimensions.fill_corners or row not in [0, self.full_row_count] or column not in [0, self.dimensions.get_hex_count_length()]:
+            for column in range(self.dimensions.hex_count_length + 1):
+                if not self.dimensions.fill_corners or row not in [0, self.full_row_count] or column not in [0, self.dimensions.hex_count_length]:
                     solid_copy = copy(solid)
                     solid_copy.position = self.create_hex_coordinates(row, column)
                     hexes.append(solid_copy)
 
-        compound = Compound(hexes)
-        # return SmartSolid(compound)
-        return SmartSolid(self.outer_mesh).cut(self.space_below, compound & self.internal_mesh.solid)
+        return self.internal_mesh.intersected(Compound(hexes))
 
     def create_lid(self) -> SmartSolid:
-        recess_inner, handle = self.create_handle()
+        lid = SmartBox(self.dimensions.length, self.dimensions.width, self.dimensions.wall_height)
+        lid.align_xy(self).align_z(self, Alignment.LR, self.dimensions.height - self.dimensions.wall_height)
 
-        return SmartSolid(self.create_lid_mesh()).cut(recess_inner).fuse(handle)
+        if self.dimensions.inner_space_height:
+            space_below = SmartBox(self.dimensions.length - self.dimensions.wall_thickness * 2, self.dimensions.width - self.dimensions.wall_thickness * 2, self.dimensions.inner_space_height)
+            space_below.align(self).align_z(self, Alignment.RL)
+            lid.cut(space_below)
+
+        lid.cut(self.create_lid_mesh())
+
+        if self.dimensions.handle:
+            recess_inner, handle = self.create_handle()
+            lid.cut(recess_inner).fuse(handle)
+
+        return lid
 
     def create_recess(self, length: float, width: float, height) -> SmartSolid:
-        base_slope_length = length * self.dimensions.slope_length_coefficient
+        base_slope_length = length * self.dimensions.handle.slope_length_coefficient
         full_hexes_covered_x = max(1, int(2 * base_slope_length / self.internal_mesh_hex.short_diagonal))
         slopeLength = full_hexes_covered_x * (self.internal_mesh_hex.short_diagonal + self.dimensions.grid_thickness) / 2 - self.dimensions.grid_thickness / 2
 
-        base_slope_width = width * self.dimensions.slope_width_coefficient
+        base_slope_width = width * self.dimensions.handle.slope_width_coefficient
         hexes_covered_y = int(base_slope_width / self.distance_y)
         rest = base_slope_width - hexes_covered_y * self.distance_y
 
@@ -135,19 +142,19 @@ class MeshLid(SmartBox):
         slope_width = hexes_covered_y * self.distance_y + half_hexes_covered_y * self.internal_mesh_hex.get_side()
         taper_box = create_tapered_box(length, width, height, length - slopeLength * 2, width - slope_width * 2)
 
-        return taper_box.move_vector(self.dimensions.position).move_vector(Vector(self.dimensions.length / 2, self.dimensions.width / 2, self.dimensions.height - self.dimensions.wall_height))
+        return taper_box.move_vector(Vector(self.dimensions.length / 2, self.dimensions.width / 2, self.dimensions.height - self.dimensions.wall_height))
 
     def get_recess_dimensions(self) -> Tuple[float, float]:
-        base_recess_length = self.dimensions.length * self.dimensions.recess_length_coefficient
-        base_recess_width = self.dimensions.width * self.dimensions.recess_width_coefficient
+        base_recess_length = self.dimensions.length * self.dimensions.handle.recess_length_coefficient
+        base_recess_width = self.dimensions.width * self.dimensions.handle.recess_width_coefficient
 
-        if not self.dimensions.beautify_handle:
+        if not self.dimensions.handle.beautify_handle:
             return base_recess_length, base_recess_width
 
-        self.hexes_covered_y = advanced_round(base_recess_width / self.distance_y, 4, self.dimensions.get_hex_count_length() * 2 + self.full_row_count + 2, 0, self.full_row_count - 1)
+        self.hexes_covered_y = advanced_round(base_recess_width / self.distance_y, 4, self.dimensions.hex_count_length * 2 + self.full_row_count + 2, 0, self.full_row_count - 1)
         recess_width = self.hexes_covered_y * self.distance_y + self.internal_mesh_hex.side
 
-        hexes_covered_x = min(advanced_round(base_recess_length / (self.internal_mesh_hex.short_diagonal + self.dimensions.grid_thickness), 2, 1), self.dimensions.get_hex_count_length())
+        hexes_covered_x = min(advanced_round(base_recess_length / (self.internal_mesh_hex.short_diagonal + self.dimensions.grid_thickness), 2, 1), self.dimensions.hex_count_length)
         recess_length = hexes_covered_x * (self.internal_mesh_hex.short_diagonal + self.dimensions.grid_thickness) - self.dimensions.grid_thickness
 
         return recess_length, recess_width
@@ -155,28 +162,28 @@ class MeshLid(SmartBox):
     def create_handle(self) -> Tuple[SmartSolid, SmartSolid]:
         recess_length, recess_width = self.get_recess_dimensions()
 
-        recess = self.create_recess(recess_length, recess_width, self.dimensions.get_mesh_height() - self.dimensions.minimal_mesh_height)
+        recess = self.create_recess(recess_length, recess_width, self.dimensions.get_mesh_height() - self.dimensions.handle.minimal_mesh_height)
 
         handle_width = recess_width + self.internal_mesh_hex.get_side()
-        handle_starting_position = Vector(self.x_size / 2, (self.dimensions.width - handle_width) / 2, self.dimensions.handle_radius / 3 * 2) + self.dimensions.position
+        handle_starting_position = Vector(self.x_size / 2, (self.dimensions.width - handle_width) / 2, self.dimensions.handle.handle_radius / 3 * 2)
 
-        rounded_handle = SmartSolid(Solid.make_sphere(self.dimensions.handle_radius).translate(Vector(0, shiftY, 0)) for shiftY in [0, handle_width])
-        rounded_handle.fuse(Solid.make_cylinder(self.dimensions.handle_radius, handle_width, Plane.XZ))
+        rounded_handle = SmartSolid(Solid.make_sphere(self.dimensions.handle.handle_radius).translate(Vector(0, shiftY, 0)) for shiftY in [0, handle_width])
+        rounded_handle.fuse(Solid.make_cylinder(self.dimensions.handle.handle_radius, handle_width, Plane.XZ))
         rounded_handle.move_vector(handle_starting_position)
-        rounded_handle.intersect(self.external_box.solid)
+        rounded_handle.intersect(self.solid)
 
-        handle = SmartBox(self.dimensions.wall_thickness, handle_width, self.external_box.z_size)
-        handle.move(-handle.x_size / 2, 0, -self.dimensions.handle_radius / 3 * 2)
+        handle = SmartBox(self.dimensions.wall_thickness, handle_width, self.z_size)
+        handle.move(-handle.x_size / 2, 0, -self.dimensions.handle.handle_radius / 3 * 2)
         handle.move_vector(handle_starting_position)
 
         full_handle = SmartSolid(handle, rounded_handle)
 
         delta_hexes = (self.full_row_count - self.hexes_covered_y) / 2
-        hex_bottom = self.create_mesh_hex(delta_hexes - 1, math.floor(self.dimensions.get_hex_count_length() / 2))
-        hex_top = self.create_mesh_hex(self.full_row_count - delta_hexes + 1, math.floor(self.dimensions.get_hex_count_length() / 2))
+        hex_bottom = self.create_mesh_hex(delta_hexes - 1, self.dimensions.hex_count_length / 2)
+        hex_top = self.create_mesh_hex(self.full_row_count - delta_hexes + 1, self.dimensions.hex_count_length / 2)
 
-        if self.dimensions.fill_handle_sides:
-            full_handle.fuse(hex_top, hex_bottom).intersect(self.external_box)
+        if self.dimensions.handle.fill_handle_sides:
+            full_handle.fuse(hex_top, hex_bottom).intersect(self)
         else:
             full_handle.cut(hex_top, hex_bottom)
 
