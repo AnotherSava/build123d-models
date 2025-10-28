@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterable
 
-from build123d import Shape, Color, Mesher, Solid
+from build123d import Shape, Color, Mesher, Solid, ShapeList
 
 from sava.csg.build123d.common.smartsolid import get_solid
 
@@ -20,13 +20,13 @@ def show_green(shape):
 
 def set_color(shape: Shape, color: str = "yellow") -> Iterable[Solid]:
     result = []
-    for solid in get_solid(shape).solids(): # see https://github.com/gumyr/build123d/issues/929
-        solid.color = Color(color)
-        solid.label = color
-        result.append(solid.clean())
+    solid = get_solid(shape)
+    for item in solid if isinstance(solid, ShapeList) else ShapeList(solid):
+        if not item.color:
+            item.color = Color(color)
+            item.label = color
 
-    if len(result) > 1:
-        print(f"{color}: {len(result)} shapes")
+        result.append(item.clean())
 
     return result
 
@@ -42,18 +42,33 @@ def get_path(path_from_project_root: str) -> str:
 
 class Exporter:
     def __init__(self, *shapes):
+        self.color_counts = {}
         self.exporter = Mesher()
         for shape in shapes:
             self.add(shape)
 
     def add(self, shape: Shape, color: str = "yellow"):
-        self.exporter.add_shape(set_color(shape, color))
+        colored_shapes = set_color(shape, color)
+        self._add_shapes(colored_shapes)
+
+    def _add_shapes(self, shapes: Iterable[Shape]):
+        for shape in shapes:
+            color = shape.label
+            self.color_counts[color] = (self.color_counts[color] if color in self.color_counts else 0) + 1
+
+        self.exporter.add_shape(shapes)
+
+    def report_colors(self):
+        for color, count in self.color_counts.items():
+            print(f"{color + ':':<7} {count} shape(s)")
 
     def export(self, location: str = None):
-        for shape in extra_shapes:
-            self.exporter.add_shape(shape)
+        self._add_shapes(extra_shapes)
 
         actual_location = location or get_path(CURRENT_MODEL_LOCATION)
-        print(f"Exporting to {actual_location}")
+        print(f"\nExporting to {actual_location}\n")
+        self.report_colors()
+
         self.exporter.write(actual_location)
-        print("Done")
+
+        print(f"\nDone")

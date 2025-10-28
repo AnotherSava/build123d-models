@@ -2,7 +2,7 @@ from copy import copy
 from dataclasses import dataclass
 from typing import Iterable
 
-from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape
+from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color
 
 from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position
 from sava.csg.build123d.common.pencil import Pencil
@@ -14,7 +14,6 @@ class PositionalFilter:
     minimum: float = None
     maximum: float = None
     inclusive: tuple[bool, bool] = None
-
 
 def get_solid(element):
     return element.solid if isinstance(element, SmartSolid) else element
@@ -38,6 +37,10 @@ def fuse(*args):
 
     return Compound(result) if type(result) == ShapeList else result
 
+def list_shapes(*args) -> 'SmartSolid':
+    result = SmartSolid()
+    result.solid = ShapeList(get_solid(arg) for arg in args)
+    return result
 
 class SmartSolid:
     def __init__(self, *args):
@@ -118,6 +121,14 @@ class SmartSolid:
                 return self.z_size
         raise RuntimeError(f"Invalid axis: {axis}")
 
+    def color(self, color: str):
+        self.solid.color = Color(color) if color else None
+        self.solid.label = color
+        return self
+
+    def same_color(self, element):
+        return self.color(get_solid(element).label)
+
     def move_vector(self, vector: Vector):
         return self.move(vector.X, vector.Y, vector.Z)
 
@@ -183,6 +194,9 @@ class SmartSolid:
 
     def align_z(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
         return self.align_axis(solid, Axis.Z, alignment, shift)
+
+    def align_zxy(self, solid: 'SmartSolid', alignment_z: Alignment = Alignment.LR, shift_z: float = 0, alignment_x: Alignment = Alignment.C, shift_x: float = 0, alignment_y: Alignment = Alignment.C, shift_y: float = 0) -> 'SmartSolid':
+        return self.align_z(solid, alignment_z, shift_z).align_x(solid, alignment_x, shift_x).align_y(solid, alignment_y, shift_y)
 
     def align_xy(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0) -> 'SmartSolid':
         return self.align_x(solid, alignment, shift_x).align_y(solid, alignment, shift_y)

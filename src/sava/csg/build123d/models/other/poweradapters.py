@@ -1,11 +1,12 @@
-from build123d import Vector, mirror, Plane, Solid, Axis, Text, extrude
+from build123d import Vector, mirror, Plane, Solid, Axis
 
-from sava.csg.build123d.common.exporter import Exporter, show_green
+from sava.csg.build123d.common.exporter import Exporter
 from sava.csg.build123d.common.geometry import create_vector, Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_tapered_box
 from sava.csg.build123d.common.smartbox import SmartBox
-from sava.csg.build123d.common.smartsolid import SmartSolid
+from sava.csg.build123d.common.smartsolid import SmartSolid, list_shapes
+from sava.csg.build123d.common.text import TextDimensions, create_text
 
 
 class RecessDimensions:
@@ -31,23 +32,24 @@ class ProngDimensions:
 
     height: float = 10
 
-class TextDimensions:
-    text: str = "Travel Adapter Set"
-    font_size: float = 20
-    font: str = "Liberation Sans"
-    height: float = 4.0
 
 class PowerAdapterBoxDimensions:
     recess: RecessDimensions = RecessDimensions()
     prongs: ProngDimensions = ProngDimensions()
-    text: TextDimensions = TextDimensions()
 
+    text: TextDimensions = TextDimensions(
+        font_size = 20,
+        font = "Liberation Sans",
+        height = 0.8,
+    )
+
+    label: str = "Travel Adapter Set"
     socket_side: float = 36.0
     # socket_padding: float = 5.0
     socket_padding: float = 4.0
     box_length_padding: float = 6
-    # sockets_per_row: int = 6
-    sockets_per_row: int = 1
+    sockets_per_row: int = 6
+    # sockets_per_row: int = 1
     floor_thickness: float = 2
     box_fillet_radius: float = 5.0
     protrusion_side_delta = 4.0
@@ -55,7 +57,7 @@ class PowerAdapterBoxDimensions:
     lid_fillet_radius: float = 0.3
     box_taper_diff: float = 0.6
 
-    lid_internal_height: float = 57.0
+    lid_internal_height: float = 58.0
     lid_ceiling_thickness: float = 1.2
     lid_cutout_thickness: float = 1.2
     lock_gap: float = 0.3
@@ -107,27 +109,6 @@ class PowerAdapterBox:
     def __init__(self, dim: PowerAdapterBoxDimensions):
         self.dim = dim
 
-    def create_single(self):
-        recess = self.create_socket_recess()
-
-        prongs = self.create_prongs()
-        prongs.align_x(recess).align_z(recess, Alignment.LR).align_y(recess, Alignment.LR, self.dim.prongs.bottom_shift_y)
-
-        outer = recess.padded(1.6, 1.6, 0.8)
-        outer.align_xy(recess).align_z(recess, Alignment.RL, -0.8)
-
-        show_green(prongs)
-
-        return outer.cut(recess).fuse(prongs)
-
-    def create_text(self) -> SmartSolid:
-        # Create a wire object for text using direct API
-        text_wire = Text(self.dim.text.text, font_size=self.dim.text.font_size, font=self.dim.text.font)
-
-        # You can immediately extrude this wire to make a 3D object
-        solid_text = extrude(text_wire, amount=self.dim.text.height)
-        return SmartSolid(solid_text)
-
     def create_lid(self) -> SmartSolid:
 
         lid = SmartBox(self.dim.box_length, self.dim.box_width, self.dim.lid_height)
@@ -155,11 +136,12 @@ class PowerAdapterBox:
             snap.align_x(lid, alignment).align_y(lid).align_z(snap_thinning, Alignment.LR)
             lid.fuse(snap.intersected(snap_thinning))
 
-        # show_red(snap)
-        # show_green(lid)
+        text = create_text(self.dim.text, self.dim.label, "red")
+        text.align_zxy(lid, Alignment.RL)
 
-        # return box
-        return lid
+        lid.cut(text)
+
+        return list_shapes(lid, text.connected())
 
     def create_snap_thinning(self) -> SmartSolid:
         pencil = Pencil(Vector(5, 0))
