@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterable
 
-from build123d import Shape, Color, Mesher, Solid, ShapeList
+from build123d import Shape, Color, Mesher, Solid
 
 from sava.csg.build123d.common.smartsolid import get_solid
 
@@ -21,7 +21,7 @@ def show_green(shape):
 def set_color(shape: Shape, color: str = "yellow") -> Iterable[Solid]:
     result = []
     solid = get_solid(shape)
-    for item in solid if isinstance(solid, ShapeList) else ShapeList(solid):
+    for item in solid if isinstance(solid, Iterable) else [solid]:
         if not item.color:
             item.color = Color(color)
             item.label = color

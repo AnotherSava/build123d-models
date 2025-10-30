@@ -1,9 +1,10 @@
+from math import asin
 from math import radians, degrees, acos, sin, cos, tan, atan
 
 from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Compound, Axis, make_face
 
 from sava.csg.build123d.common.advanced_math import advanced_mod
-from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle, Direction
+from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle
 
 
 class Pencil:
@@ -50,6 +51,10 @@ class Pencil:
 
     def arc_with_angle_to_centre_abs(self, angle_to_centre: float, destination: Vector):
         return self.arc_with_centre_direction_abs(create_vector(1, angle_to_centre), destination)
+
+    def arc_with_destination_and_radius(self, destinationVector: Vector, radius: float):
+        angle = 2 * degrees(asin(destinationVector.length / 2 / radius))
+        return self.arc_with_destination(destinationVector, angle)
 
     def arc_with_centre_direction(self, centre_direction: Vector, destination_vector: Vector):
         # Create copies and normalize to preserve original vectors
@@ -153,22 +158,29 @@ class Pencil:
     def create_face(self) -> Face:
         return Face(self.create_wire())
 
-    def create_wire(self) -> Wire:
+    def create_wire(self, enclose: bool = True) -> Wire:
         curves = self.curves.copy()
-        if self.location != self.start:
+        if enclose and self.location != self.start:
             curves.append(Line(self.location, self.start))
 
         return Wire(curves)
 
-    def extrude_mirrored(self, height: float, direction: Direction):
-        face = self.create_mirrored_face(direction)
+    def extrude_mirrored(self, height: float, axis: Axis = Axis.Y):
+        face = self.create_mirrored_face(axis)
         return extrude(face, height)
 
+    def complete_wire_for_mirror(self, axis: Axis):
+        if Axis.Y == axis and self.location.X != self.start.X:
+            self.right(self.start.X - self.location.X)
+        if Axis.X == axis and self.location.Y != self.start.Y:
+            self.up(self.start.Y - self.location.Y)
+
     def create_mirrored_face(self, axis: Axis) -> Compound:
-        return make_face([self.create_wire(), self.mirror_wire(axis)])
+        self.complete_wire_for_mirror(axis)
+        return make_face([self.create_wire(False), self.mirror_wire(axis)])
 
     def mirror_wire(self, axis: Axis) -> Wire:
-        wire = self.create_wire()
+        wire = self.create_wire(False)
         match axis:
             case Axis.Y:
                 return mirror(wire, Plane.YZ).move(Location(Vector(self.location.X * 2, 0)))

@@ -38,7 +38,7 @@ class PowerAdapterBoxDimensions:
     prongs: ProngDimensions = ProngDimensions()
 
     text: TextDimensions = TextDimensions(
-        font_size = 20,
+        font_size = 24,
         font = "Liberation Sans",
         height = 0.8,
     )

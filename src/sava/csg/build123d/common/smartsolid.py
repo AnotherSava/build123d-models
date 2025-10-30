@@ -318,3 +318,8 @@ class SmartSolid:
 
     def mirrored(self, about: Plane = Plane.XZ) -> 'SmartSolid':
         return SmartSolid(mirror(self.solid, about))
+
+    def molded(self, padding: float = 2) -> 'SmartSolid':
+        outer = self.padded(padding)
+        outer.align_zxy(self, Alignment.RL)
+        return outer.cut(self)
