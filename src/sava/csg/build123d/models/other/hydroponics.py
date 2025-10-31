@@ -5,10 +5,21 @@ from math import tan
 
 from build123d import Solid, Trapezoid, Circle, sweep, Edge, Plane, Location, fillet, Box, loft
 
-from sava.csg.build123d.common.exporter import Exporter
+from sava.csg.build123d.common.exporter import Exporter, show_red, show_green
 from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.pencil import Pencil
+from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
+
+@dataclass
+class HoseHolderDimensions:
+    def __init__(self):
+        self.slope_radius = 45
+        self.thickness = 1.2
+        self.diameter_inner = 19
+
+    pass
 
 @dataclass
 class HoseConnectorDimensions:
@@ -50,15 +61,17 @@ class HydroponicsDimensions:
     _etches: TubeEtchesDimensions = None
 
     hose: HoseConnectorDimensions = None
+    hose_holder: HoseHolderDimensions = None
     tube_internal_diameter: float = 142
     tube_wall_thickness: float = 4
     pot_wall_thickness: float = 3.1
     edge_angle: float = 45.0
 
-    test_height: float = 13
+    test_height: float = 40
 
     def __post_init__(self):
         self.hose = self.hose or HoseConnectorDimensions()
+        self.hose_holder = self.hose_holder or HoseHolderDimensions()
 
         self._etches = self._etches or TubeEtchesDimensions()
         self.etches_inner = self._etches.pad_inner()
@@ -78,14 +91,26 @@ class Hydroponics:
         tube_inside = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2, self.dim.test_height))
         tube.cut(tube_inside.align(tube))
 
-        cut = self.create_side_cut_height()
+        cut = self.create_side_cut_angle()
         cut.align_zxy(tube, Alignment.RL)
         tube.cut(cut)
 
         etches = self.create_etches()
         etches.align_z(tube, Alignment.RL, -self.dim.etches_inner.distance_from_top)
+        tube.fuse(etches)
 
-        return tube.fuse(etches)
+        connector = self.create_hose_connector().orient((-90, 0, 0))
+        connector.align_z(tube, Alignment.LR).align_y(tube, Alignment.RL)
+
+        extension = SmartBox(30, 30, 90)
+        extension.align_z(tube)
+        extension.align_z(tube, Alignment.LL, 30).align_y(tube, Alignment.RR).align_x(tube)
+
+        show_green(extension)
+
+        show_red(connector)
+
+        return tube
 
     def create_etches(self):
         trapezoid = Trapezoid(self.dim.etches_inner.outer_width, self.dim.etches_inner.thickness, self.dim.etches_inner.side_angle)
@@ -149,11 +174,25 @@ class Hydroponics:
         internal = SmartSolid(Solid.make_cylinder(dim.diameter_outer / 2 - dim.thickness, result.z_size))
         return result.cut(internal.align(result))
 
+    def create_hose_holder(self) -> SmartSolid:
+        dim = self.dim.hose_holder
+
+        pencil = Pencil(plane=Plane.YZ)
+        pencil.arc_with_radius(dim.diameter_inner / 2, -90, 180)
+        pencil.right(dim.thickness)
+        pencil.arc_with_radius(dim.diameter_inner / 2 + dim.thickness, 90, -180)
+
+        path = pencil.create_sweep_path(Plane.XZ)
+        path.arc_with_radius(dim.slope_radius,0, 90)
+
+        return SmartSolid(path.sweep())
+
 
 dimensions = HydroponicsDimensions()
 hydroponics = Hydroponics(dimensions)
 
 # component = hydroponics.create_stand()
-component = hydroponics.create_hose_connector()
+component = hydroponics.create_hose_holder()
+# component = hydroponics.create_hose_connector()
 print(component.bound_box.size)
 Exporter(component).export()

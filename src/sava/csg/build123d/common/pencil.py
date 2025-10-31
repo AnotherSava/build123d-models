@@ -1,17 +1,19 @@
 from math import asin
 from math import radians, degrees, acos, sin, cos, tan, atan
 
-from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Compound, Axis, make_face
+from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Compound, Axis, make_face, sweep, Part
 
 from sava.csg.build123d.common.advanced_math import advanced_mod
 from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle
 
 
 class Pencil:
-    def __init__(self, start: Vector = Vector(0, 0)):
+    sweep_path_for: 'Pencil'  # pencil we are creating a sweep path for (if any)
+    def __init__(self, start: Vector = Vector(0, 0), plane: Plane = Plane.XY):
         self.curves = []
         self.start = start
         self.location = start
+        self.plane = plane
 
     def check_destination(self, destination: Vector) -> Vector:
         tolerance = 1e-7
@@ -163,7 +165,7 @@ class Pencil:
         if enclose and self.location != self.start:
             curves.append(Line(self.location, self.start))
 
-        return Wire(curves)
+        return self.plane.from_local_coords(Wire(curves))
 
     def extrude_mirrored(self, height: float, axis: Axis = Axis.Y):
         face = self.create_mirrored_face(axis)
@@ -187,3 +189,14 @@ class Pencil:
             case Axis.X:
                 return mirror(wire, Plane.XZ).move(Location(Vector(0, self.location.Y * 2)))
         raise "Invalid axis"
+
+    def create_sweep_path(self, plane: Plane = Plane.YZ) -> 'Pencil':
+        pencil = Pencil(self.start, plane)
+        pencil.sweep_path_for = self
+        return pencil
+
+    def sweep(self) -> Part:
+        face = self.sweep_path_for.create_face()
+        path = self.create_wire(False)
+
+        return sweep(face, path)
