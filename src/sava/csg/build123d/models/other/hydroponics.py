@@ -11,6 +11,14 @@ from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 @dataclass
+class HoseConnectorDimensions:
+    diameter_outer: float = 17.5
+    thickness: float = 2
+    length: float = 20.0
+    segment_count: int = 3
+    diameter_delta: float = 1.5 # diameter gradient will be [diameter_outer - diameter_delta; diameter_outer + diameter_delta]
+
+@dataclass
 class TubeEtchesDimensions:
     thickness: float = 2.9
     outer_width: float = 7.5
@@ -41,6 +49,7 @@ class TubeEtchesDimensions:
 class HydroponicsDimensions:
     _etches: TubeEtchesDimensions = None
 
+    hose: HoseConnectorDimensions = None
     tube_internal_diameter: float = 142
     tube_wall_thickness: float = 4
     pot_wall_thickness: float = 3.1
@@ -49,6 +58,8 @@ class HydroponicsDimensions:
     test_height: float = 13
 
     def __post_init__(self):
+        self.hose = self.hose or HoseConnectorDimensions()
+
         self._etches = self._etches or TubeEtchesDimensions()
         self.etches_inner = self._etches.pad_inner()
         self.etches_outer = self._etches.pad_outer()
@@ -67,7 +78,7 @@ class Hydroponics:
         tube_inside = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2, self.dim.test_height))
         tube.cut(tube_inside.align(tube))
 
-        cut = self.create_side_angle_cut()
+        cut = self.create_side_cut_height()
         cut.align_zxy(tube, Alignment.RL)
         tube.cut(cut)
 
@@ -91,17 +102,19 @@ class Hydroponics:
 
         return SmartSolid(single_edge.oriented((0, 0, i * 120)) for i in range(3))
 
-    def create_side_angle_cut(self, bottom_radius: float = None, top_radius: float = None, angle: float = None):
+    def create_side_cut_height(self, bottom_radius: float = None, top_radius: float = None, height: float = None):
+        bottom = Circle(bottom_radius)
+        top = Circle(top_radius).move(Location((0, 0, height)))
+
+        return SmartSolid(loft([bottom, top]))
+
+    def create_side_cut_angle(self, bottom_radius: float = None, top_radius: float = None, angle: float = None):
         bottom_radius = self.dim.tube_internal_diameter / 2 if bottom_radius is None else bottom_radius
         top_radius = self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness if top_radius is None else top_radius
         angle = self.dim.etches_inner.side_angle if angle is None else angle
 
         height = (top_radius - bottom_radius) / tan(radians(angle))
-
-        bottom = Circle(bottom_radius)
-        top = Circle(top_radius).move(Location((0, 0, height)))
-
-        return SmartSolid(loft([bottom, top]))
+        return self.create_side_cut_height(bottom_radius, top_radius, height)
 
     def create_handles(self):
         shapes = []
@@ -112,10 +125,35 @@ class Hydroponics:
 
         return SmartSolid(shapes)
 
+    def create_hose_connector(self):
+        dim = self.dim.hose
+
+        result = None
+
+        segment_length = dim.length / dim.segment_count
+        print(segment_length)
+        for i in range(dim.segment_count):
+            diameter_min = dim.diameter_outer - dim.diameter_delta * (1 - i / dim.segment_count)
+            diameter_max = dim.diameter_outer + dim.diameter_delta * i / dim.segment_count
+            segment = self.create_side_cut_height(diameter_min / 2, diameter_max / 2, segment_length)
+
+            if result is None:
+                result = segment
+            else:
+                segment.align_zxy(result, Alignment.RR)
+                result.fuse(segment)
+
+        cap = SmartSolid(Solid.make_cylinder(dim.diameter_outer / 2 + dim.diameter_delta * 2, dim.diameter_delta * 2))
+        result.fuse(cap.align_zxy(result, Alignment.RR))
+
+        internal = SmartSolid(Solid.make_cylinder(dim.diameter_outer / 2 - dim.thickness, result.z_size))
+        return result.cut(internal.align(result))
 
 
 dimensions = HydroponicsDimensions()
 hydroponics = Hydroponics(dimensions)
 
-component = hydroponics.create_stand()
+# component = hydroponics.create_stand()
+component = hydroponics.create_hose_connector()
+print(component.bound_box.size)
 Exporter(component).export()
