@@ -53,10 +53,12 @@ class Exporter:
 
     def _add_shapes(self, shapes: Iterable[Shape]):
         for shape in shapes:
-            color = shape.label
-            self.color_counts[color] = (self.color_counts[color] if color in self.color_counts else 0) + 1
-
-        self.exporter.add_shape(shapes)
+            if isinstance(shape, Iterable):
+                self._add_shapes(shape)
+            else:
+                color = shape.label
+                self.color_counts[color] = (self.color_counts[color] if color in self.color_counts else 0) + 1
+                self.exporter.add_shape(shape)
 
     def report_colors(self):
         for color, count in self.color_counts.items():

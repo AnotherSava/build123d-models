@@ -158,6 +158,9 @@ class SmartSolid:
         self.solid.orientation = rotations
         return self
 
+    def oriented(self, rotations: VectorLike) -> 'SmartSolid':
+        return self.copy().orient(rotations)
+
     def get_side_length(self, direction: Direction):
         return self.y_size if direction.horizontal else self.x_size
 
