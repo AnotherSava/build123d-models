@@ -25,6 +25,9 @@ def fuse_two(shape1: Shape | None, shape2: Shape | None):
         return shape1
     return shape2 + shape1 if isinstance(shape1, ShapeList) else shape1 + shape2
 
+def wrap(element):
+    return Compound(element) if isinstance(element, ShapeList) else element
+
 def fuse(*args):
     result = None
 
@@ -35,7 +38,7 @@ def fuse(*args):
             solid = get_solid(arg)
             result = fuse_two(result, solid)
 
-    return Compound(result) if type(result) == ShapeList else result
+    return wrap(result)
 
 def list_shapes(*args) -> 'SmartSolid':
     result = SmartSolid()
@@ -45,6 +48,7 @@ def list_shapes(*args) -> 'SmartSolid':
 class SmartSolid:
     def __init__(self, *args):
         self.solid = fuse(*args) if len(args) > 0 else None
+        self.assert_valid()
 
     @property
     def bound_box(self) -> BoundBox:
@@ -97,6 +101,9 @@ class SmartSolid:
     @property
     def z_size(self) -> float:
         return self.bound_box.size.Z
+
+    def assert_valid(self):
+        assert self.solid is None or self.solid.is_valid(), "Shape is invalid"
 
     def create_positional_filter_axis(self, axis: Axis, inclusive: tuple[bool, bool] = None) -> 'PositionalFilter':
         return PositionalFilter(axis, self.get_from(axis), self.get_to(axis), (True, True) if inclusive is None else inclusive)
@@ -178,12 +185,20 @@ class SmartSolid:
         raise RuntimeError(f"Invalid axis: {axis}")
 
     def cut(self, *args) -> 'SmartSolid':
-        self.solid -= fuse(args)
+        self.solid = wrap(self.solid - fuse(args))
+        self.assert_valid()
         return self
+
+    def cutted(self, *args) -> 'SmartSolid':
+        return self.copy().cut(*args)
 
     def fuse(self, *args) -> 'SmartSolid':
         self.solid = fuse(self.solid, *args)
+        self.assert_valid()
         return self
+
+    def fused(self, *args) -> 'SmartSolid':
+        return self.copy().fuse(*args)
 
     def align_axis(self, solid: 'SmartSolid | None', axis: Axis, alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
         distance = calculate_position(solid.get_from(axis) if solid else 0, solid.get_to(axis) if solid else 0, self.get_size(axis), alignment) + shift - self.get_from(axis)
@@ -269,7 +284,8 @@ class SmartSolid:
         return self
 
     def intersect(self, shape) -> 'SmartSolid':
-        self.solid = self.solid & get_solid(shape)
+        self.solid = wrap(self.solid & get_solid(shape))
+        self.assert_valid()
         return self
 
     def intersected(self, shape) -> 'SmartSolid':
