@@ -4,12 +4,13 @@ from math import radians, cos, sin
 from math import tan
 from typing import Tuple
 
-from build123d import Solid, Trapezoid, Circle, sweep, Edge, Plane, Location, fillet, Box, loft, extrude, Face, Sphere
+from build123d import Solid, Trapezoid, Circle, Plane, Location, fillet, Box, loft, extrude, Face, Sphere, revolve, Axis
 
-from sava.csg.build123d.common.exporter import Exporter
-from sava.csg.build123d.common.geometry import Alignment, Direction
+from sava.csg.build123d.common.exporter import Exporter, show_blue, show_green
+from sava.csg.build123d.common.geometry import Alignment, Direction, create_plane
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartsolid import SmartSolid
+from sava.csg.build123d.common.sweepsolid import SweepSolid
 
 
 @dataclass
@@ -23,6 +24,10 @@ class PipeDimensions:
     @property
     def diameter_outer(self) -> float:
         return self.diameter_inner + self.wall_thickness * 2
+
+    @property
+    def radius_outer(self) -> float:
+        return self.diameter_outer / 2
 
 
 @dataclass
@@ -92,12 +97,14 @@ class HydroponicsDimensions:
     pipe: PipeDimensions = None
     tube_internal_diameter: float = 142
     tube_floor_sphere_radius: float = 400
+    tube_floor_angle: float = 15
     tube_floor_thickness: float = 3
     tube_wall_thickness: float = 4
     pot_wall_thickness: float = 3.1
     edge_angle: float = 45.0
 
-    test_height: float = 60
+    tube_height: float = 80
+    support_free_angle: float = 35
 
     def __post_init__(self):
         self.hose = self.hose or HoseConnectorDimensions()
@@ -113,7 +120,7 @@ class HydroponicsDimensions:
     @property
     def pipe_extra_distance(self) -> float:
         dim = self.pipe
-        return dim.bend_radius / tan(radians(dim.intake_pipe_bend_angle)) + dim.diameter_outer / 2 / tan(radians(dim.intake_pipe_bend_angle)) + self.pot_wall_thickness / sin(radians(dim.intake_pipe_bend_angle)) * 2.5
+        return dim.bend_radius / tan(radians(dim.intake_pipe_bend_angle)) + dim.radius_outer / tan(radians(dim.intake_pipe_bend_angle)) + self.pot_wall_thickness / sin(radians(dim.intake_pipe_bend_angle)) * 2.5
 
 
 class Hydroponics:
@@ -121,32 +128,52 @@ class Hydroponics:
         self.dim = dim
 
     def create_stand(self) -> SmartSolid:
-        tube = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness, self.dim.test_height))
+        tube = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness, self.dim.tube_height))
 
-        tube_inside = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2, self.dim.test_height))
-        top_cut = self.create_side_cut_angle().align_zxy(tube, Alignment.RL)
+        tube_inside = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2, self.dim.tube_height))
+        # top_cut = self.create_side_cut_angle().align_zxy(tube, Alignment.RL)
 
-        handles = self.create_handles(tube)
-        etches = self.create_etches(tube)
+        # handles = self.create_handles(tube)
+        # etches = self.create_etches(tube)
+
+
 
         inlet_connector_bottom = self.create_connector_bottom(tube, Direction.S)
+
         inlet_pipe_inner, inlet_pipe_outer = self.create_pipe(inlet_connector_bottom)
         inlet_connector_top = self.create_inlet_connector_top(inlet_pipe_outer)
 
         outlet_connector_bottom = self.create_connector_bottom(tube, Direction.N)
         outlet_pipe_inner, outlet_pipe_outer = self.create_pipe(outlet_connector_bottom)
 
-        sphere_outer, sphere_inner = self.create_spheres(outlet_connector_bottom)
-        floor = sphere_outer.cut(sphere_inner).intersect(tube)
+        # sphere_outer, sphere_inner = self.create_spheres(outlet_connector_bottom)
+        # floor = sphere_outer.cut(sphere_inner).intersect(tube)
 
-        pipe_cover = self.create_pipe_cover(inlet_pipe_outer, outlet_pipe_outer, tube)
+        # pipe_cover = self.create_pipe_cover(inlet_pipe_outer, outlet_pipe_outer, tube)
 
-        outlet_hole = self.create_outlet_hole(outlet_pipe_inner, sphere_inner)
+        # outlet_hole = self.create_outlet_hole(outlet_pipe_inner, sphere_inner)
 
-        tube.fuse(pipe_cover, outlet_pipe_outer)
-        tube.cut(tube_inside, top_cut)
-        tube.fuse(handles, floor, etches, inlet_pipe_outer, inlet_connector_top, inlet_connector_bottom, outlet_connector_bottom)
-        tube.cut(inlet_pipe_inner, outlet_pipe_inner, outlet_hole)
+        # surface = self.create_magic_surface(tube)
+        # self.create_magic_surface(tube)
+
+        # show_red(surface)
+
+        # surface.intersect(sphere_inner, SmartSolid(tube_inside,pipe_cover), sphere_inner)
+        # surface.intersect(sphere_inner, sphere_inner)
+
+        # show_blue(surface)
+
+        # tube.fuse(pipe_cover, outlet_pipe_outer)
+        tube.fuse(outlet_pipe_outer)
+        # tube.cut(tube_inside, top_cut)
+        tube.cut(tube_inside)
+        # tube.fuse(surface, handles, floor, etches, inlet_pipe_outer, inlet_connector_top, inlet_connector_bottom, outlet_connector_bottom)
+        tube.fuse(inlet_connector_bottom, inlet_pipe_outer, outlet_connector_bottom, inlet_connector_top)
+        # tube.cut(inlet_pipe_inner, outlet_pipe_inner, outlet_hole)
+        tube.cut(inlet_pipe_inner, outlet_pipe_inner)
+        # tube.fuse(surface.intersect(outlet_hole))
+
+
 
         return tube
 
@@ -160,7 +187,7 @@ class Hydroponics:
 
     def create_pipe_cover(self, inlet_pipe_outer: SmartSolid, outlet_pipe_outer: SmartSolid, tube: SmartSolid) -> SmartSolid:
         pencil = Pencil(plane=Plane.XZ)
-        pencil.arc_with_radius(self.dim.pipe.bend_radius + self.dim.pipe.diameter_outer / 2, -90, -self.dim.pipe.intake_pipe_bend_angle)
+        pencil.arc_with_radius(self.dim.pipe.bend_radius + self.dim.pipe.radius_outer, -90, -self.dim.pipe.intake_pipe_bend_angle)
         pencil.draw(self.dim.pipe_extra_distance, -self.dim.pipe.intake_pipe_bend_angle)
         pencil.down(pencil.location.Y)
         wire = pencil.create_wire()
@@ -177,36 +204,41 @@ class Hydroponics:
         wire = pencil.create_wire()
 
         wider_part = SmartSolid(extrude(Face(wire), outlet_pipe_outer.y_max - inlet_pipe_outer.y_min, (0, 1, 0)))
-        wider_part.align_x(middle_part, Alignment.LR, self.dim.pipe.diameter_outer / 2)
+        wider_part.align_x(middle_part, Alignment.LR, self.dim.pipe.radius_outer)
         wider_part.align_z(middle_part, Alignment.LR)
         wider_part.align_y(inlet_pipe_outer, Alignment.LR)
 
         return wider_part.fuse(middle_part).intersect(tube.scaled(2, 2, 1))
 
-    def create_inlet_connector_top(self, inlet_pipe_outer: SmartSolid) -> SmartSolid:
+    def create_inlet_connector_top(self, inlet_pipe_outer: SweepSolid) -> SmartSolid:
         connector_top = self.create_hose_connector(3)
-        connector_top.orient((0, -180 + self.dim.pipe.intake_pipe_bend_angle, 0))
-        connector_top.align_z(inlet_pipe_outer, Alignment.RR, - self.dim.pipe.diameter_outer * sin(radians(self.dim.pipe.intake_pipe_bend_angle)))
-        connector_top.align_x(inlet_pipe_outer, Alignment.RR, - self.dim.pipe.diameter_outer * cos(radians(self.dim.pipe.intake_pipe_bend_angle)))
-        connector_top.align_y(inlet_pipe_outer)
+
+        plane = inlet_pipe_outer.create_plane_end()
+
+        connector_top.solid.location = Location(plane)
+        connector_top.rotate((180, 0, 0), plane)
+        connector_top.align_z(inlet_pipe_outer, Alignment.RR, 0, plane)
+
         return connector_top
 
-    def create_pipe(self, inlet_connector_bottom: SmartSolid) -> tuple[SmartSolid, SmartSolid]:
+    def create_pipe(self, inlet_connector_bottom: SmartSolid) -> tuple[SweepSolid, SweepSolid]:
         dim = self.dim.pipe
 
-        pencil = Pencil(plane=Plane.XZ)
-        pencil.arc_with_radius(dim.bend_radius, -90, -dim.intake_pipe_bend_angle)
-        pencil.draw(self.dim.pipe_extra_distance, - dim.intake_pipe_bend_angle)
-        path = pencil.create_wire(False)
+        plane = create_plane((0, 0, 0), (-inlet_connector_bottom.x_mid, -inlet_connector_bottom.y_mid, 0), (0, 0, 1))
 
-        inlet_pipe_outer = SmartSolid(sweep(Circle(dim.diameter_outer / 2), path))
+        path = Pencil(plane=plane)
+        path.arc_with_radius(dim.bend_radius, -90, -dim.intake_pipe_bend_angle)
+        path.draw(self.dim.pipe_extra_distance, -dim.intake_pipe_bend_angle)
+        wire = path.create_wire(False)
 
-        inlet_pipe_outer.align_x(inlet_connector_bottom, Alignment.CR, -self.dim.pipe.diameter_outer / 2)
+        inlet_pipe_outer = SweepSolid(Circle(dim.radius_outer), wire, plane)
+
+        inlet_pipe_outer.align_x(inlet_connector_bottom, Alignment.CR, -dim.radius_outer, plane)
         inlet_pipe_outer.align_z(inlet_connector_bottom, Alignment.RR)
-        inlet_pipe_outer.align_y(inlet_connector_bottom)
 
-        inlet_pipe_inner = SmartSolid(sweep(Circle(dim.diameter_inner / 2), path))
+        inlet_pipe_inner = SweepSolid(Circle(dim.diameter_inner / 2), wire, plane)
         inlet_pipe_inner.solid.position = inlet_pipe_outer.solid.position
+
         return inlet_pipe_inner, inlet_pipe_outer
 
     def create_connector_bottom(self, tube: SmartSolid, direction: Direction) -> SmartSolid:
@@ -227,20 +259,19 @@ class Hydroponics:
         trapezoid.orientation = (90, 0, -90)
         trapezoid.position = ((self.dim.etches_inner.thickness - self.dim.tube_internal_diameter) / 2, 0, 0)
 
-        path = Edge.make_circle(self.dim.tube_internal_diameter / 2, Plane.XY, 180, 180 + self.dim.etches_inner.angle_measure)
-        single_edge = SmartSolid(sweep(trapezoid, path=path))
-        etches = SmartSolid(single_edge.oriented((0, 0, i * 120)) for i in range(3))
+        single_edge = SmartSolid(revolve(trapezoid, Axis.Z, self.dim.etches_inner.angle_measure))
+        etches = SmartSolid(single_edge.oriented((0, 0, i * 120 + 60 - self.dim.etches_inner.angle_measure / 2)) for i in range(3))
 
         return etches.align_z(tube, Alignment.RL, -self.dim.etches_inner.distance_from_top)
 
 
-    def create_side_cut_height(self, bottom_radius: float = None, top_radius: float = None, height: float = None):
+    def create_side_cut_height(self, bottom_radius: float = None, top_radius: float = None, height: float = None) -> SmartSolid:
         bottom = Circle(bottom_radius)
         top = Circle(top_radius).move(Location((0, 0, height)))
 
         return SmartSolid(loft([bottom, top]))
 
-    def create_side_cut_angle(self, bottom_radius: float = None, top_radius: float = None, angle: float = None):
+    def create_side_cut_angle(self, bottom_radius: float = None, top_radius: float = None, angle: float = None) -> SmartSolid:
         bottom_radius = self.dim.tube_internal_diameter / 2 if bottom_radius is None else bottom_radius
         top_radius = self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness if top_radius is None else top_radius
         angle = self.dim.etches_inner.side_angle if angle is None else angle
@@ -251,7 +282,7 @@ class Hydroponics:
     def create_handles(self, tube: SmartSolid):
         shapes = []
         for i in range(6):
-            box = Box(self.dim.tube_internal_diameter + self.dim.tube_wall_thickness * 3, self.dim.tube_wall_thickness, self.dim.test_height)
+            box = Box(self.dim.tube_internal_diameter + self.dim.tube_wall_thickness * 3, self.dim.tube_wall_thickness, self.dim.tube_height)
             box.orientation = (0, 0, i * 30)
             shapes.append(box)
 
@@ -289,7 +320,7 @@ class Hydroponics:
         internal = SmartSolid(Solid.make_cylinder(dim.diameter_inner / 2, result.z_size))
         return result.cut(internal.align(result))
 
-    def create_hose_holder(self) -> SmartSolid:
+    def create_hose_holder(self) -> SweepSolid:
         dim = self.dim.hose_holder
 
         pencil = Pencil(plane=Plane.YZ)
@@ -300,7 +331,7 @@ class Hydroponics:
         path = pencil.create_sweep_path(Plane.XZ)
         path.arc_with_radius(dim.slope_radius,0, 90)
 
-        return SmartSolid(path.sweep())
+        return path.sweep()
 
     def create_outlet_hole(self, outlet_pipe_inner: SmartSolid, sphere_inner: SmartSolid):
         pencil = Pencil(plane=Plane.XZ)
@@ -314,14 +345,65 @@ class Hydroponics:
         middle_part.align_y(outlet_pipe_inner)
 
         return middle_part.intersect(sphere_inner)
+    #
+    # def create_magic_surface(self):
+    #     pencil = Pencil(plane=Plane.XZ)
+    #     inner_radius = self.dim.hose_holder.diameter_inner / 2 + self.dim.hose_holder.thickness
+    #     pencil.right(inner_radius)
+    #     radius = self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness + self.dim.hose.connector_offset_x - inner_radius
+    #
+    #     destination = Vector(radius, -self.dim.tube_height + self.dim.tube_floor_thickness)
+    #     pencil.arc_with_destination(destination, 30)
+    #     pencil.left()
+    #
+    #     return SmartSolid(pencil.revolve(axis=Axis.Z))
+
+    def create_magic_surface(self, tube: SmartSolid):
+
+        inner_radius = self.dim.hose_holder.diameter_inner / 2 + self.dim.hose_holder.thickness
+        radius = self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness + self.dim.hose.connector_offset_x
+
+        bottom = self.create_side_cut_angle(radius, inner_radius, -90 + self.dim.support_free_angle)
+        bottom.align_zxy(tube, Alignment.LR, self.dim.tube_floor_thickness)
+
+        top = SmartSolid(Solid.make_cylinder(inner_radius, self.dim.tube_height))
+        top.align_zxy(bottom, Alignment.RR)
+        top.intersect(tube)
+
+        surface = top.fuse(bottom)
+
+        show_blue(surface)
+
+        invert = self.create_empty_cone(self.dim.support_free_angle, radius, self.dim.tube_floor_thickness)
+        invert.orient((0, 180 - self.dim.tube_floor_angle, 0))
+
+        invert.align_x(tube, Alignment.LR)
+        invert.align_y(surface)
+        invert.align_z(surface, Alignment.LL, invert.x_size * tan(radians(self.dim.tube_floor_angle)))
+        # invert.align_z(surface, Alignment.LL)
+
+        show_green(invert)
+
+        return surface.fuse(invert)
+
+    def create_empty_cone(self, angle: float, radius: float, thickness: float) -> SmartSolid:
+        pencil = Pencil(plane=Plane.XZ)
+        pencil.draw(thickness * tan(radians(angle)) + radius / cos(radians(angle)), 90 + angle)
+        pencil.draw(thickness, 180 + angle)
+        pencil.draw(radius / cos(radians(angle)), 270 + angle)
+        return SmartSolid(pencil.revolve(axis=Axis.Z, enclose=False))
 
 
 dimensions = HydroponicsDimensions()
 hydroponics = Hydroponics(dimensions)
 
 component = hydroponics.create_stand()
+# component = hydroponics.create_empty_cone(30, 50, 5)
+# component = hydroponics.create_magic_surface()
 # component = hydroponics.create_pipe(dimensions.pipe.countertop_thickness)
 # component = hydroponics.create_hose_holder()
+solid = component.solid
+# solid.orientation = (90, 0, -90)
 # component = hydroponics.create_hose_connector(2, 23)
 print(component.bound_box.size)
 Exporter(component).export()

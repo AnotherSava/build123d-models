@@ -4,8 +4,8 @@ from typing import Iterable
 
 from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color
 
-from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position
-from sava.csg.build123d.common.pencil import Pencil
+from sava.common.common import flatten
+from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation
 
 
 @dataclass
@@ -31,14 +31,10 @@ def wrap(element):
 def fuse(*args):
     result = None
 
-    for arg in args:
-        if isinstance(arg, Iterable):
-            result = fuse_two(result, fuse(*arg))
-        else:
-            solid = get_solid(arg)
-            result = fuse_two(result, solid)
+    for arg in flatten(args):
+        result = fuse_two(result, get_solid(arg))
 
-    return wrap(result)
+    return result
 
 def list_shapes(*args) -> 'SmartSolid':
     result = SmartSolid()
@@ -52,7 +48,16 @@ class SmartSolid:
 
     @property
     def bound_box(self) -> BoundBox:
-        return self.solid.bounding_box()
+        return self.wrap_solid().bounding_box()
+
+    def get_bound_box(self, plane: Plane = Plane.XY) -> BoundBox:
+        solid = self.wrap_solid()
+        if plane == Plane.XY:
+            return solid.bounding_box()
+        
+        # Transform solid to the plane's coordinate system
+        transformed = solid.moved(plane.location.inverse())
+        return transformed.bounding_box()
 
     @property
     def x_min(self) -> float:
@@ -103,7 +108,7 @@ class SmartSolid:
         return self.bound_box.size.Z
 
     def assert_valid(self):
-        assert self.solid is None or self.solid.is_valid(), "Shape is invalid"
+        assert self.solid is None or self.wrap_solid().is_valid(), "Shape is invalid"
 
     def create_positional_filter_axis(self, axis: Axis, inclusive: tuple[bool, bool] = None) -> 'PositionalFilter':
         return PositionalFilter(axis, self.get_from(axis), self.get_to(axis), (True, True) if inclusive is None else inclusive)
@@ -118,16 +123,6 @@ class SmartSolid:
             result.append(self.create_positional_filter_axis(Axis.Z, inclusive))
         return result
 
-    def get_size(self, axis: Axis):
-        match axis:
-            case Axis.X:
-                return self.x_size
-            case Axis.Y:
-                return self.y_size
-            case Axis.Z:
-                return self.z_size
-        raise RuntimeError(f"Invalid axis: {axis}")
-
     def color(self, color: str):
         self.solid.color = Color(color) if color else None
         self.solid.label = color
@@ -140,29 +135,52 @@ class SmartSolid:
         return self.move(vector.X, vector.Y, vector.Z)
 
     def move(self, x: float, y: float = 0, z: float = 0) -> 'SmartSolid':
-        self.solid.move(Location(Vector(x, y, z)))
+        # Move each shape separately if it's a ShapeList, otherwise move the single shape
+        location = Location(Vector(x, y, z))
+        
+        if isinstance(self.solid, ShapeList):
+            # Move each shape in the list separately
+            moved_shapes = []
+            for shape in self.solid:
+                moved_shapes.append(shape.move(location))
+            self.solid = ShapeList(moved_shapes)
+        else:
+            # Move single shape
+            self.solid = self.solid.move(location)
+        
         return self
 
     def move_x(self, x: float) -> 'SmartSolid':
-        self.solid.move(Location(Vector(x, 0, 0)))
-        return self
+        return self.move(x, 0, 0)
 
     def move_y(self, y: float) -> 'SmartSolid':
-        self.solid.move(Location(Vector(0, y, 0)))
-        return self
+        return self.move(0, y, 0)
 
     def move_z(self, z: float) -> 'SmartSolid':
-        self.solid.move(Location(Vector(0, 0, z)))
-        return self
+        return self.move(0, 0, z)
 
     def get_from(self, axis: Axis) -> float:
-        return self.get_bounds(axis)[0]
+        return self.get_bounds_along_axis(axis)[0]
 
     def get_to(self, axis: Axis) -> float:
-        return self.get_bounds(axis)[1]
+        return self.get_bounds_along_axis(axis)[1]
 
     def orient(self, rotations: VectorLike) -> 'SmartSolid':
         self.solid.orientation = rotations
+        return self
+
+    # Orientation in build123d works a bit weird:
+    # (a, b, c) input does rotate "a" degrees around axis X, then "b" degrees around axis Y, then "c" degrees around axis Z.
+    # But those axes are not in the original coordinate system (plane), but in a coordinate system attached to the object itself.
+    # Let's assume that the object original plane matches a standard one, and input param is (90, 90, 0)
+    # First, it will rotate 90 degrees around X axis - as expected. After that it will rotate 90 degree around Y axis.
+    # But it will not be the Y axis in the global coordinate system - it will be Y axis of the object, which after the first rotation turned to match Z axis in the global coordinate system.
+    # Also, orientation is not incremental, it just sets to specified value each time.
+    # This method helps to navigate those complexities with the following set of rules:
+    #  - while following the same order of rotations, axis are not attached to the object, but fixed to a plane specified as a parameter
+    #  - rotations are incremental, and (0,0,0) param will not change orientation no matter what
+    def rotate(self, rotations: VectorLike, plane: Plane = Plane.XY) -> 'SmartSolid':
+        self.orient(rotate_orientation(self.solid.orientation, rotations, plane))
         return self
 
     def oriented(self, rotations: VectorLike) -> 'SmartSolid':
@@ -174,18 +192,35 @@ class SmartSolid:
     def get_other_side_length(self, direction: Direction):
         return self.x_size if direction.horizontal else self.y_size
 
-    def get_bounds(self, axis: Axis) -> tuple[float, float]:
-        match axis:
-            case Axis.X:
-                return self.bound_box.min.X, self.bound_box.max.X
-            case Axis.Y:
-                return self.bound_box.min.Y, self.bound_box.max.Y
-            case Axis.Z:
-                return self.bound_box.min.Z, self.bound_box.max.Z
-        raise RuntimeError(f"Invalid axis: {axis}")
+    def get_bounds_along_axis(self, axis: Axis) -> tuple[float, float]:
+        """Get min and max coordinates of the solid along the specified axis direction.
+        
+        This method creates a plane where the axis direction becomes the Z-axis,
+        then uses get_bound_box() to get bounds in that coordinate system.
+        
+        Args:
+            axis: Axis defining the direction to measure bounds along
+            
+        Returns:
+            Tuple of (min_coord, max_coord) along the axis direction
+        """
+        if self.solid is None:
+            raise RuntimeError("Cannot get bounds of None solid")
+            
+        # Create a plane where the axis direction becomes the Z-axis
+        axis_direction = axis.direction.normalized()
+        
+        # Create plane with axis origin and axis direction as Z-axis
+        plane = Plane(axis.position, z_dir=axis_direction)
+        
+        # Get bounding box in the plane's coordinate system
+        bound_box = self.get_bound_box(plane)
+        
+        # Return Z bounds since the axis direction is aligned with Z in this plane
+        return bound_box.min.Z, bound_box.max.Z
 
     def cut(self, *args) -> 'SmartSolid':
-        self.solid = wrap(self.solid - fuse(args))
+        self.solid = self.solid - fuse(args)
         self.assert_valid()
         return self
 
@@ -201,32 +236,36 @@ class SmartSolid:
         return self.copy().fuse(*args)
 
     def align_axis(self, solid: 'SmartSolid | None', axis: Axis, alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
-        distance = calculate_position(solid.get_from(axis) if solid else 0, solid.get_to(axis) if solid else 0, self.get_size(axis), alignment) + shift - self.get_from(axis)
+        self_from, self_to = self.get_bounds_along_axis(axis)
+        solid_from, solid_to = solid.get_bounds_along_axis(axis)
+
+        distance = calculate_position(solid_from if solid else 0, solid_to if solid else 0, self_to - self_from, alignment) + shift - self_from
+
         return self.move_vector(axis.direction * distance)
 
-    def align_x(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
-        return self.align_axis(solid, Axis.X, alignment, shift)
+    def align_x(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+        return self.align_axis(solid, Axis(plane.location.position, plane.x_dir), alignment, shift)
 
-    def align_y(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
-        return self.align_axis(solid, Axis.Y, alignment, shift)
+    def align_y(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+        return self.align_axis(solid, Axis(plane.location.position, plane.y_dir), alignment, shift)
 
-    def align_z(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
-        return self.align_axis(solid, Axis.Z, alignment, shift)
+    def align_z(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+        return self.align_axis(solid, Axis(plane.location.position, plane.z_dir), alignment, shift)
 
-    def align_zxy(self, solid: 'SmartSolid', alignment_z: Alignment = Alignment.LR, shift_z: float = 0, alignment_x: Alignment = Alignment.C, shift_x: float = 0, alignment_y: Alignment = Alignment.C, shift_y: float = 0) -> 'SmartSolid':
-        return self.align_z(solid, alignment_z, shift_z).align_x(solid, alignment_x, shift_x).align_y(solid, alignment_y, shift_y)
+    def align_zxy(self, solid: 'SmartSolid', alignment_z: Alignment = Alignment.LR, shift_z: float = 0, alignment_x: Alignment = Alignment.C, shift_x: float = 0, alignment_y: Alignment = Alignment.C, shift_y: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+        return self.align_z(solid, alignment_z, shift_z, plane).align_x(solid, alignment_x, shift_x, plane).align_y(solid, alignment_y, shift_y, plane)
 
-    def align_xy(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0) -> 'SmartSolid':
-        return self.align_x(solid, alignment, shift_x).align_y(solid, alignment, shift_y)
+    def align_xy(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+        return self.align_x(solid, alignment, shift_x, plane).align_y(solid, alignment, shift_y, plane)
 
-    def align_xz(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_z: float = 0) -> 'SmartSolid':
-        return self.align_x(solid, alignment, shift_x).align_z(solid, alignment, shift_z)
+    def align_xz(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+        return self.align_x(solid, alignment, shift_x, plane).align_z(solid, alignment, shift_z, plane)
 
-    def align_yz(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_y: float = 0, shift_z: float = 0) -> 'SmartSolid':
-        return self.align_y(solid, alignment, shift_y).align_z(solid, alignment, shift_z)
+    def align_yz(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_y: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+        return self.align_y(solid, alignment, shift_y, plane).align_z(solid, alignment, shift_z, plane)
 
-    def align(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0, shift_z: float = 0) -> 'SmartSolid':
-        return self.align_x(solid, alignment, shift_x).align_y(solid, alignment, shift_y).align_z(solid, alignment, shift_z)
+    def align(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+        return self.align_x(solid, alignment, shift_x, plane).align_y(solid, alignment, shift_y, plane).align_z(solid, alignment, shift_z, plane)
 
     def _fillet(self, axis_orientational: Axis, radius: float, axis_positional: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] | None = None) -> 'SmartSolid':
         edges = self.solid.edges().filter_by(axis_orientational)
@@ -283,8 +322,9 @@ class SmartSolid:
         self.solid = fillet(edges, radius)
         return self
 
-    def intersect(self, shape) -> 'SmartSolid':
-        self.solid = wrap(self.solid & get_solid(shape))
+    def intersect(self, *args) -> 'SmartSolid':
+        for shape in args:
+            self.solid = self.solid & get_solid(shape)
         self.assert_valid()
         return self
 
@@ -292,17 +332,18 @@ class SmartSolid:
         return SmartSolid(self.solid & get_solid(shape))
 
     def add_notch(self, direction: Direction, depth: float, length: float):
-        notch_height = depth / length * self.get_side_length(direction)
-
-        pencil = Pencil().up(notch_height).left(self.get_side_length(direction))
-        notch = SmartSolid(pencil.extrude(self.get_side_length(direction)))
-        notch.orient((90, 90 + direction.value, 0))
-        notch.align_z(self, Alignment.LR, -depth).align_axis(self, direction.axis, direction.alignment_closer).align_axis(self, direction.orthogonal_axis)
-
-        extended_shape = self.scaled(1, 1, depth / self.z_size)
-        extended_shape.align_xy(self).align_z(self, Alignment.LL)
-
-        self.fuse(notch.intersect(extended_shape))
+        raise NotImplementedError("Remove dependency on pencil")
+        # notch_height = depth / length * self.get_side_length(direction)
+        #
+        # pencil = Pencil().up(notch_height).left(self.get_side_length(direction))
+        # notch = SmartSolid(pencil.extrude(self.get_side_length(direction)))
+        # notch.orient((90, 90 + direction.value, 0))
+        # notch.align_z(self, Alignment.LR, -depth).align_axis(self, direction.axis, direction.alignment_closer).align_axis(self, direction.orthogonal_axis)
+        #
+        # extended_shape = self.scaled(1, 1, depth / self.z_size)
+        # extended_shape.align_xy(self).align_z(self, Alignment.LL)
+        #
+        # self.fuse(notch.intersect(extended_shape))
 
     def copy(self):
         return SmartSolid(copy(self.solid))
@@ -342,3 +383,6 @@ class SmartSolid:
         outer = self.padded(padding)
         outer.align_zxy(self, Alignment.RL)
         return outer.cut(self)
+
+    def wrap_solid(self):
+        return Compound(self.solid) if isinstance(self.solid, ShapeList) else self.solid

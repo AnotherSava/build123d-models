@@ -1,10 +1,11 @@
 from math import asin
 from math import radians, degrees, acos, sin, cos, tan, atan
 
-from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Compound, Axis, make_face, sweep, Part
+from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Compound, Axis, make_face, Part, revolve
 
 from sava.csg.build123d.common.advanced_math import advanced_mod
 from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle
+from sava.csg.build123d.common.sweepsolid import SweepSolid
 
 
 class Pencil:
@@ -129,16 +130,20 @@ class Pencil:
         abs_destination = shift_vector(self.location, length, angle)
         return self.jump_to(abs_destination)
 
-    def up(self, length: float):
+    def up(self, length: float = None):
+        length = length or self.start.Y - self.location.Y
         return self.draw(length, 0)
 
-    def left(self, length: float):
+    def left(self, length: float = None):
+        length = length or self.location.X - self.start.X
         return self.draw(length, 90)
 
-    def down(self, length: float):
+    def down(self, length: float = None):
+        length = length or self.location.Y - self.start.Y
         return self.draw(length, 180)
 
-    def right(self, length: float):
+    def right(self, length: float = None):
+        length = length or self.start.X - self.location.X
         return self.draw(length, -90)
 
     def extrude(self, height: float):
@@ -157,8 +162,8 @@ class Pencil:
         solid.position = transpose
         return solid
 
-    def create_face(self) -> Face:
-        return Face(self.create_wire())
+    def create_face(self, enclose: bool = True) -> Face:
+        return Face(self.create_wire(enclose))
 
     def create_wire(self, enclose: bool = True) -> Wire:
         curves = self.curves.copy()
@@ -195,8 +200,9 @@ class Pencil:
         pencil.sweep_path_for = self
         return pencil
 
-    def sweep(self) -> Part:
+    def sweep(self) -> SweepSolid:
         face = self.sweep_path_for.create_face()
-        path = self.create_wire(False)
+        return SweepSolid(face, self.create_wire(False), self.plane)
 
-        return sweep(face, path)
+    def revolve(self, angle: float = 360, axis: Axis = Axis.Y, enclose: bool = True) -> Part:
+        return revolve(self.create_face(enclose), axis, angle)
