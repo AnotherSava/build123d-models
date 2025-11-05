@@ -77,3 +77,10 @@ Inline imports only allowed for:
 - **Conditional imports** - when import depends on runtime conditions
 - **Performance-critical lazy loading** - when import is expensive and rarely used
 - **Type checking only** - imports only needed for type hints
+
+## Refactoring Safety
+
+- **When changing field names or function names/signatures, always check all usages (including tests) and update accordingly**
+- Use search tools (Grep, Task) to find all references before making breaking changes
+- Update tests, documentation, and any dependent code in the same change
+- Run all tests after refactoring to verify nothing is broken

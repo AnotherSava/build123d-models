@@ -237,34 +237,34 @@ class SmartSolid:
 
     def align_axis(self, solid: 'SmartSolid | None', axis: Axis, alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
         self_from, self_to = self.get_bounds_along_axis(axis)
-        solid_from, solid_to = solid.get_bounds_along_axis(axis)
+        solid_from, solid_to = (0, 0) if solid is None else solid.get_bounds_along_axis(axis)
 
-        distance = calculate_position(solid_from if solid else 0, solid_to if solid else 0, self_to - self_from, alignment) + shift - self_from
+        distance = calculate_position(solid_from, solid_to, self_to - self_from, alignment) + shift - self_from
 
         return self.move_vector(axis.direction * distance)
 
-    def align_x(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def align_x(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_axis(solid, Axis(plane.location.position, plane.x_dir), alignment, shift)
 
-    def align_y(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def align_y(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_axis(solid, Axis(plane.location.position, plane.y_dir), alignment, shift)
 
-    def align_z(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def align_z(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_axis(solid, Axis(plane.location.position, plane.z_dir), alignment, shift)
 
-    def align_zxy(self, solid: 'SmartSolid', alignment_z: Alignment = Alignment.LR, shift_z: float = 0, alignment_x: Alignment = Alignment.C, shift_x: float = 0, alignment_y: Alignment = Alignment.C, shift_y: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def align_zxy(self, solid: 'SmartSolid' = None, alignment_z: Alignment = Alignment.LR, shift_z: float = 0, alignment_x: Alignment = Alignment.C, shift_x: float = 0, alignment_y: Alignment = Alignment.C, shift_y: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_z(solid, alignment_z, shift_z, plane).align_x(solid, alignment_x, shift_x, plane).align_y(solid, alignment_y, shift_y, plane)
 
-    def align_xy(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def align_xy(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_x(solid, alignment, shift_x, plane).align_y(solid, alignment, shift_y, plane)
 
-    def align_xz(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def align_xz(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift_x: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_x(solid, alignment, shift_x, plane).align_z(solid, alignment, shift_z, plane)
 
-    def align_yz(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_y: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def align_yz(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift_y: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_y(solid, alignment, shift_y, plane).align_z(solid, alignment, shift_z, plane)
 
-    def align(self, solid: 'SmartSolid', alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def align(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_x(solid, alignment, shift_x, plane).align_y(solid, alignment, shift_y, plane).align_z(solid, alignment, shift_z, plane)
 
     def _fillet(self, axis_orientational: Axis, radius: float, axis_positional: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] | None = None) -> 'SmartSolid':

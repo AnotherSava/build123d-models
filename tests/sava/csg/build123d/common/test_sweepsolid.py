@@ -310,7 +310,7 @@ class TestSweepSolid(unittest.TestCase):
         
         # Debug: Check initial orientation values
         print(f"Initial solid orientation: {sweep_solid.solid.orientation}")
-        print(f"Initial stored orientation: {sweep_solid.initial_solid_orientation}")
+        print(f"Initial stored orientation: Vector(0, 0, 0) (always for swept solids)")
         
         # Get initial positions
         initial_solid_center = sweep_solid.solid.center()
@@ -326,9 +326,9 @@ class TestSweepSolid(unittest.TestCase):
         
         # Debug: Check orientation after rotation
         print(f"Rotated solid orientation: {sweep_solid.solid.orientation}")
-        rotation_offset = sweep_solid.solid.orientation - sweep_solid.initial_solid_orientation
-        print(f"Rotation offset: {rotation_offset}")
-        print(f"Rotation offset length: {rotation_offset.length}")
+        current_rotation = sweep_solid.solid.orientation  # Since initial was (0,0,0)
+        print(f"Current rotation: {current_rotation}")
+        print(f"Current rotation length: {current_rotation.length}")
         
         # Get rotated positions
         rotated_solid_center = sweep_solid.solid.center()
@@ -387,6 +387,157 @@ class TestSweepSolid(unittest.TestCase):
         
         # Should map back to origin consistently
         assertVectorAlmostEqual(self, local_coords_back, local_origin)
+
+
+class TestSweepSolidPathPlane(unittest.TestCase):
+
+    def test_create_path_plane_initial_state(self):
+        """Test that create_path_plane initially returns the original path plane"""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        original_path_plane = Plane.XY
+        sweep_solid = SweepSolid(sketch, wire, original_path_plane)
+        
+        # Get the path plane immediately after creation
+        path_plane = sweep_solid.create_path_plane()
+        
+        # Should match the original path plane
+        assertVectorAlmostEqual(self, path_plane.origin, original_path_plane.origin)
+        assertVectorAlmostEqual(self, path_plane.x_dir, original_path_plane.x_dir)
+        assertVectorAlmostEqual(self, path_plane.y_dir, original_path_plane.y_dir)
+        assertVectorAlmostEqual(self, path_plane.z_dir, original_path_plane.z_dir)
+
+    def test_create_path_plane_with_movement(self):
+        """Test that create_path_plane tracks movement correctly"""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        original_path_plane = Plane.XY
+        sweep_solid = SweepSolid(sketch, wire, original_path_plane)
+        
+        # Move the sweep solid
+        movement = Vector(5, 10, 15)
+        sweep_solid.move_vector(movement)
+        
+        # Get the path plane after movement
+        path_plane = sweep_solid.create_path_plane()
+        
+        # Origin should be moved, but directions should remain the same
+        expected_origin = original_path_plane.origin + movement
+        assertVectorAlmostEqual(self, path_plane.origin, expected_origin)
+        assertVectorAlmostEqual(self, path_plane.x_dir, original_path_plane.x_dir)
+        assertVectorAlmostEqual(self, path_plane.y_dir, original_path_plane.y_dir)
+        assertVectorAlmostEqual(self, path_plane.z_dir, original_path_plane.z_dir)
+
+    def test_create_path_plane_with_rotation(self):
+        """Test that create_path_plane tracks rotation correctly"""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        original_path_plane = Plane.XY
+        sweep_solid = SweepSolid(sketch, wire, original_path_plane)
+        
+        # Rotate the sweep solid 90 degrees around Z axis
+        sweep_solid.rotate((0, 0, 90))
+        
+        # Get the path plane after rotation
+        path_plane = sweep_solid.create_path_plane()
+        
+        # Origin should remain at origin since XY plane is centered at origin
+        assertVectorAlmostEqual(self, path_plane.origin, Vector(0, 0, 0))
+        
+        # X direction should become Y direction, Y direction should become -X direction
+        assertVectorAlmostEqual(self, path_plane.x_dir, Vector(0, 1, 0))
+        assertVectorAlmostEqual(self, path_plane.y_dir, Vector(-1, 0, 0))
+        assertVectorAlmostEqual(self, path_plane.z_dir, Vector(0, 0, 1))
+
+    def test_create_path_plane_with_offset_plane(self):
+        """Test create_path_plane with a path plane that has an offset origin"""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        # Create path plane with offset origin
+        original_path_plane = Plane(origin=(5, 5, 0), x_dir=(1, 0, 0), y_dir=(0, 1, 0))
+        sweep_solid = SweepSolid(sketch, wire, original_path_plane)
+        
+        # Rotate the sweep solid 90 degrees around Z axis
+        sweep_solid.rotate((0, 0, 90))
+        
+        # Get the path plane after rotation
+        path_plane = sweep_solid.create_path_plane()
+        
+        # The offset origin should be rotated around the solid center (0,0,0)
+        # (5, 5, 0) rotated 90° around Z becomes (-5, 5, 0)
+        assertVectorAlmostEqual(self, path_plane.origin, Vector(-5, 5, 0))
+        
+        # Directions should also be rotated
+        assertVectorAlmostEqual(self, path_plane.x_dir, Vector(0, 1, 0))
+        assertVectorAlmostEqual(self, path_plane.y_dir, Vector(-1, 0, 0))
+        assertVectorAlmostEqual(self, path_plane.z_dir, Vector(0, 0, 1))
+
+    def test_create_path_plane_with_combined_transformations(self):
+        """Test create_path_plane with both rotation and movement"""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        original_path_plane = Plane(origin=(2, 3, 0), x_dir=(1, 0, 0), y_dir=(0, 1, 0))
+        sweep_solid = SweepSolid(sketch, wire, original_path_plane)
+        
+        # Apply rotation first, then movement
+        sweep_solid.rotate((0, 0, 90))
+        sweep_solid.move(10, 20, 30)
+        
+        # Get the path plane after transformations
+        path_plane = sweep_solid.create_path_plane()
+        
+        # The offset origin (2, 3, 0) rotated 90° around Z becomes (-3, 2, 0)
+        # Then add movement (10, 20, 30) to get (7, 22, 30)
+        expected_origin = Vector(-3, 2, 0) + Vector(10, 20, 30)
+        assertVectorAlmostEqual(self, path_plane.origin, expected_origin)
+        
+        # Directions should be rotated
+        assertVectorAlmostEqual(self, path_plane.x_dir, Vector(0, 1, 0))
+        assertVectorAlmostEqual(self, path_plane.y_dir, Vector(-1, 0, 0))
+        assertVectorAlmostEqual(self, path_plane.z_dir, Vector(0, 0, 1))
+
+    @parameterized.expand([
+        # Test different rotation axes and combinations
+        ((90, 0, 0),),   # X rotation
+        ((0, 90, 0),),   # Y rotation  
+        ((0, 0, 90),),   # Z rotation
+        ((45, 45, 45),), # Combined rotation
+    ])
+    def test_create_path_plane_coordinate_consistency(self, rotation: VectorLike):
+        """Test that create_path_plane maintains coordinate system consistency"""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        sweep_solid = SweepSolid(sketch, wire, Plane.XY)
+        
+        # Apply rotation and movement
+        sweep_solid.rotate(rotation)
+        sweep_solid.move(5, 10, 15)
+        
+        # Get the path plane
+        path_plane = sweep_solid.create_path_plane()
+        
+        # Test that the plane's coordinate directions are orthonormal
+        x_dir, y_dir, z_dir = path_plane.x_dir, path_plane.y_dir, path_plane.z_dir
+        
+        # Each direction should be unit vector
+        self.assertAlmostEqual(x_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(y_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(z_dir.length, 1.0, places=5)
+        
+        # Directions should be orthogonal
+        self.assertAlmostEqual(x_dir.dot(y_dir), 0.0, places=5)
+        self.assertAlmostEqual(y_dir.dot(z_dir), 0.0, places=5)
+        self.assertAlmostEqual(z_dir.dot(x_dir), 0.0, places=5)
+        
+        # Should form a right-handed coordinate system
+        cross_product = x_dir.cross(y_dir)
+        assertVectorAlmostEqual(self, cross_product, z_dir)
 
 
 if __name__ == '__main__':

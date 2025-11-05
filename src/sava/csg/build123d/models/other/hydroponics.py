@@ -149,12 +149,11 @@ class Hydroponics:
         # sphere_outer, sphere_inner = self.create_spheres(outlet_connector_bottom)
         # floor = sphere_outer.cut(sphere_inner).intersect(tube)
 
-        # pipe_cover = self.create_pipe_cover(inlet_pipe_outer, outlet_pipe_outer, tube)
+        pipe_cover = self.create_pipe_cover(inlet_pipe_outer, outlet_pipe_outer, tube)
 
         # outlet_hole = self.create_outlet_hole(outlet_pipe_inner, sphere_inner)
 
-        # surface = self.create_magic_surface(tube)
-        # self.create_magic_surface(tube)
+        surface = self.create_magic_surface(tube, outlet_pipe_outer)
 
         # show_red(surface)
 
@@ -163,8 +162,8 @@ class Hydroponics:
 
         # show_blue(surface)
 
-        # tube.fuse(pipe_cover, outlet_pipe_outer)
-        tube.fuse(outlet_pipe_outer)
+        tube.fuse(pipe_cover, outlet_pipe_outer)
+        # tube.fuse(outlet_pipe_outer)
         # tube.cut(tube_inside, top_cut)
         tube.cut(tube_inside)
         # tube.fuse(surface, handles, floor, etches, inlet_pipe_outer, inlet_connector_top, inlet_connector_bottom, outlet_connector_bottom)
@@ -358,7 +357,7 @@ class Hydroponics:
     #
     #     return SmartSolid(pencil.revolve(axis=Axis.Z))
 
-    def create_magic_surface(self, tube: SmartSolid):
+    def create_magic_surface(self, tube: SmartSolid, outlet_pipe_outer: SweepSolid):
 
         inner_radius = self.dim.hose_holder.diameter_inner / 2 + self.dim.hose_holder.thickness
         radius = self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness + self.dim.hose.connector_offset_x
@@ -375,12 +374,14 @@ class Hydroponics:
         show_blue(surface)
 
         invert = self.create_empty_cone(self.dim.support_free_angle, radius, self.dim.tube_floor_thickness)
-        invert.orient((0, 180 - self.dim.tube_floor_angle, 0))
+        pipe_path_plane = outlet_pipe_outer.create_path_plane()
+        invert.rotate((0, 0, 180 + self.dim.tube_floor_angle), pipe_path_plane)
+        # invert.orient((0, 180 - self.dim.tube_floor_angle, 0))
 
-        invert.align_x(tube, Alignment.LR)
-        invert.align_y(surface)
+        invert.align_z(plane=pipe_path_plane)
+        # invert.align_y(surface)
         invert.align_z(surface, Alignment.LL, invert.x_size * tan(radians(self.dim.tube_floor_angle)))
-        # invert.align_z(surface, Alignment.LL)
+        # invert.align_z(tube, Alignment.LR)
 
         show_green(invert)
 
