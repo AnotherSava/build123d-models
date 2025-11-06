@@ -1,7 +1,7 @@
 from math import asin
 from math import radians, degrees, acos, sin, cos, tan, atan
 
-from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Compound, Axis, make_face, Part, revolve
+from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Compound, Axis, make_face, Part, revolve, VectorLike
 
 from sava.csg.build123d.common.advanced_math import advanced_mod
 from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle
@@ -10,9 +10,9 @@ from sava.csg.build123d.common.sweepsolid import SweepSolid
 
 class Pencil:
     sweep_path_for: 'Pencil'  # pencil we are creating a sweep path for (if any)
-    def __init__(self, start: Vector = Vector(0, 0), plane: Plane = Plane.XY):
+    def __init__(self, start: VectorLike = (0, 0), plane: Plane = Plane.XY):
         self.curves = []
-        self.start = start
+        self.start = start if isinstance(start, Vector) else Vector(*start)
         self.location = start
         self.plane = plane
 
