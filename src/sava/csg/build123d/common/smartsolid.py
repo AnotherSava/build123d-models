@@ -2,7 +2,7 @@ from copy import copy
 from dataclasses import dataclass
 from typing import Iterable
 
-from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color
+from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid
 
 from sava.common.common import flatten
 from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation
@@ -58,6 +58,11 @@ class SmartSolid:
         # Transform solid to the plane's coordinate system
         transformed = solid.moved(plane.location.inverse())
         return transformed.bounding_box()
+
+    def create_bound_box(self, plane: Plane = Plane.XY) -> 'SmartSolid':
+        bound_box = self.get_bound_box(plane)
+        box_solid = Solid.make_box(bound_box.size.X, bound_box.size.Y, bound_box.size.Z, plane)
+        return SmartSolid(box_solid).align(self, plane=plane)
 
     @property
     def x_min(self) -> float:

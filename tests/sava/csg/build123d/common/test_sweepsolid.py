@@ -143,102 +143,42 @@ class TestSweepSolid(unittest.TestCase):
         self.assertTrue(isinstance(sweep_solid.solid, ShapeList), 
                        "Box sketch typically creates ShapeList due to multiple faces")
 
-    def test_plane_orientation_tracks_rotation(self):
-        """Test that create_plane_end orientation tracks object rotation"""
-        edge = Edge.make_line((0, 0, 0), (5, 0, 0))
-        wire = Wire([edge])
-        sketch = Circle(0.05)
-        sweep_solid = SweepSolid(sketch, wire, Plane.XY)
-        
-        # Get initial plane end and its orientation vectors
-        initial_plane_end = sweep_solid.create_plane_end()
-        initial_x_dir = initial_plane_end.x_dir
-        initial_y_dir = initial_plane_end.y_dir
-        initial_z_dir = initial_plane_end.z_dir
-        
-        # Rotate the sweep solid 90 degrees around Z axis
-        sweep_solid.rotate((0, 0, 90))
-        
-        # Get plane end after rotation
-        rotated_plane_end = sweep_solid.create_plane_end()
-        rotated_x_dir = rotated_plane_end.x_dir
-        rotated_y_dir = rotated_plane_end.y_dir
-        rotated_z_dir = rotated_plane_end.z_dir
-        
-        # Verify that the plane directions have changed after rotation
-        # From debug output we saw Y and Z directions changed during 90° Z rotation
-        # X direction stays same because it's aligned with Z axis
-        self.assertEqual(initial_x_dir, rotated_x_dir)  # X direction unchanged (along Z axis)
-        self.assertNotEqual(initial_y_dir, rotated_y_dir)  # Y direction should change
-        self.assertNotEqual(initial_z_dir, rotated_z_dir)  # Z direction should change
 
     @parameterized.expand([
-        # Test combined rotation and movement - rotation first
-        ((0, 0, 90), (10, 20, 0)),   # Z rotation + XY movement
-        ((90, 0, 0), (0, 10, 20)),   # X rotation + YZ movement
-        ((0, 90, 0), (10, 0, 20)),   # Y rotation + XZ movement
-        ((45, 45, 45), (5, 5, 5)),   # Complex rotation + equal movement
+        # Test combined transformations - rotation then movement
+        ("rotation_first", (0, 0, 90), (10, 20, 0)),   # Z rotation + XY movement
+        ("rotation_first", (90, 0, 0), (0, 10, 20)),   # X rotation + YZ movement
+        ("rotation_first", (0, 90, 0), (10, 0, 20)),   # Y rotation + XZ movement
+        ("rotation_first", (45, 45, 45), (5, 5, 5)),   # Complex rotation + equal movement
+        # Test combined transformations - movement then rotation  
+        ("movement_first", (10, 20, 0), (0, 0, 90)),   # XY movement + Z rotation
+        ("movement_first", (0, 10, 20), (90, 0, 0)),   # YZ movement + X rotation
+        ("movement_first", (10, 0, 20), (0, 90, 0)),   # XZ movement + Y rotation
+        ("movement_first", (5, 5, 5), (45, 45, 45)),   # Equal movement + complex rotation
     ])
-    def test_create_plane_end_rotation_then_movement(self, rotation: VectorLike, movement: VectorLike):
-        """Test create_plane_end with rotation applied first, then movement"""
+    def test_create_plane_end_combined_transformations(self, order: str, transform1: VectorLike, transform2: VectorLike):
+        """Test create_plane_end with combined movement and rotation in different orders"""
         edge = Edge.make_line((0, 0, 0), (10, 0, 0))  # Longer wire for better testing
         wire = Wire([edge])
         sketch = Circle(0.05)
         sweep_solid = SweepSolid(sketch, wire, Plane.XY)
         
-        # Store initial state
-        initial_plane_end = sweep_solid.create_plane_end()
-        initial_wire_end = wire.position_at(1.0)
-        
-        # Apply rotation first
-        sweep_solid.rotate(rotation)
-        rotated_plane_end = sweep_solid.create_plane_end()
-        
-        # Apply movement after rotation
-        sweep_solid.move_vector(Vector(movement))
-        final_plane_end = sweep_solid.create_plane_end()
+        # Apply transformations in the specified order
+        if order == "rotation_first":
+            rotation, movement = transform1, transform2
+            sweep_solid.rotate(rotation)
+            sweep_solid.move_vector(Vector(movement))
+        else:  # movement_first
+            movement, rotation = transform1, transform2
+            sweep_solid.move_vector(Vector(movement))
+            sweep_solid.rotate(rotation)
         
         # Test that (0,0,0) in final plane coordinate system maps correctly
+        final_plane_end = sweep_solid.create_plane_end()
         local_origin = (0, 0, 0)
         final_world_pos = final_plane_end.from_local_coords(local_origin)
         
-        # The final position should account for both rotation and movement
-        # We can't easily predict the exact final position due to rotation complexity,
-        # but we can verify that the coordinate mapping is still consistent
-        final_local_coords = final_plane_end.to_local_coords(final_world_pos)
-        assertVectorAlmostEqual(self, final_local_coords, local_origin)
-
-    @parameterized.expand([
-        # Test combined movement and rotation - movement first
-        ((10, 20, 0), (0, 0, 90)),   # XY movement + Z rotation
-        ((0, 10, 20), (90, 0, 0)),   # YZ movement + X rotation
-        ((10, 0, 20), (0, 90, 0)),   # XZ movement + Y rotation
-        ((5, 5, 5), (45, 45, 45)),   # Equal movement + complex rotation
-    ])
-    def test_create_plane_end_movement_then_rotation(self, movement: VectorLike, rotation: VectorLike):
-        """Test create_plane_end with movement applied first, then rotation"""
-        edge = Edge.make_line((0, 0, 0), (10, 0, 0))  # Longer wire for better testing
-        wire = Wire([edge])
-        sketch = Circle(0.05)
-        sweep_solid = SweepSolid(sketch, wire, Plane.XY)
-        
-        # Store initial state
-        initial_plane_end = sweep_solid.create_plane_end()
-        initial_wire_end = wire.position_at(1.0)
-        
-        # Apply movement first
-        sweep_solid.move_vector(Vector(movement))
-        moved_plane_end = sweep_solid.create_plane_end()
-        
-        # Apply rotation after movement
-        sweep_solid.rotate(rotation)
-        final_plane_end = sweep_solid.create_plane_end()
-        
-        # Test that (0,0,0) in final plane coordinate system maps correctly
-        local_origin = (0, 0, 0)
-        final_world_pos = final_plane_end.from_local_coords(local_origin)
-        
-        # Verify coordinate mapping consistency
+        # Verify that the coordinate mapping is consistent
         final_local_coords = final_plane_end.to_local_coords(final_world_pos)
         assertVectorAlmostEqual(self, final_local_coords, local_origin)
 

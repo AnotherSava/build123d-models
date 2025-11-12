@@ -44,17 +44,26 @@ class TestRotateVector(unittest.TestCase):
         assertVectorAlmostEqual(self, result, expected)
 
     @parameterized.expand([
-        (Vector(1, 1, 1), Axis.X, 45),
-        (Vector(2, -1, 3), Axis.Y, 30),
-        (Vector(-1, 2, 0), Axis.Z, 60),
-        (Vector(0.5, 0.5, 0.5), Axis.X, 120),
+        # Single-axis rotation tests
+        ("single", Vector(1, 1, 1), Axis.X, 45),
+        ("single", Vector(2, -1, 3), Axis.Y, 30),
+        ("single", Vector(-1, 2, 0), Axis.Z, 60),
+        ("single", Vector(0.5, 0.5, 0.5), Axis.X, 120),
+        # Multi-axis rotation tests  
+        ("multi", Vector(1, 1, 1), Plane.XY, Vector(45, 30, 60)),
+        ("multi", Vector(2, -1, 3), Plane.XZ, Vector(90, 45, 30)),
+        ("multi", Vector(-1, 2, 0), Plane.YZ, Vector(60, 90, 45)),
     ])
-    def test_rotate_vector_preserves_magnitude(self, vector, axis, angle):
-        """Test that rotation preserves vector magnitude"""
+    def test_rotation_preserves_magnitude(self, rotation_type, vector, axis_or_plane, angle_or_rotations):
+        """Test that both single and multi-axis rotations preserve vector magnitude"""
         original_magnitude = sqrt(vector.X**2 + vector.Y**2 + vector.Z**2)
-        result = rotate_vector(vector, axis, angle)
-        result_magnitude = sqrt(result.X**2 + result.Y**2 + result.Z**2)
         
+        if rotation_type == "single":
+            result = rotate_vector(vector, axis_or_plane, angle_or_rotations)
+        else:  # multi
+            result = multi_rotate_vector(vector, axis_or_plane, angle_or_rotations)
+            
+        result_magnitude = sqrt(result.X**2 + result.Y**2 + result.Z**2)
         self.assertAlmostEqual(original_magnitude, result_magnitude, places=5)
 
     def test_rotate_vector_sequential_rotations(self):
@@ -143,18 +152,6 @@ class TestMultiRotateVector(unittest.TestCase):
         
         assertVectorAlmostEqual(self, result, expected)
 
-    @parameterized.expand([
-        (Vector(1, 1, 1), Plane.XY, Vector(45, 30, 60)),
-        (Vector(2, -1, 3), Plane.XZ, Vector(90, 45, 30)),
-        (Vector(-1, 2, 0), Plane.YZ, Vector(60, 90, 45)),
-    ])
-    def test_multi_rotate_vector_preserves_magnitude(self, vector, plane, rotations):
-        """Test that multi-rotation preserves vector magnitude"""
-        original_magnitude = sqrt(vector.X**2 + vector.Y**2 + vector.Z**2)
-        result = multi_rotate_vector(vector, plane, rotations)
-        result_magnitude = sqrt(result.X**2 + result.Y**2 + result.Z**2)
-        
-        self.assertAlmostEqual(original_magnitude, result_magnitude, places=5)
 
     def test_multi_rotate_vector_sequential_equivalence(self):
         """Test that multi_rotate_vector equals sequential single rotations"""

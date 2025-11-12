@@ -2,7 +2,7 @@ from copy import copy
 
 from build123d import sweep, Plane, SweepType, Wire, Vector, ShapeList
 
-from sava.csg.build123d.common.geometry import create_wire_tangent_plane, multi_rotate_vector
+from sava.csg.build123d.common.geometry import create_wire_tangent_plane, multi_rotate_vector, create_plane_from_planes
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
@@ -66,12 +66,14 @@ class SweepSolid(SmartSolid):
 
     def _create_plane_at_position(self, t: float) -> Plane:
         """Create a plane at position t along the wire with movement and rotation tracking.
+        X-axis is aligned with the path plane.
         
         Args:
             t: Position along wire (0.0 = start, 1.0 = end)
             
         Returns:
-            Plane positioned at the wire location, adjusted for object movement and rotation
+            Plane positioned at the wire location, adjusted for object movement and rotation,
+            with x-axis aligned to the path plane
         """
         plane = create_wire_tangent_plane(self.path, t)
         
@@ -94,15 +96,17 @@ class SweepSolid(SmartSolid):
         # Apply the rotation to the relative position
         rotated_relative_position = multi_rotate_vector(relative_wire_position, Plane.XY, current_rotation)
         
-        # Debug: print the rotation transformation (uncomment for debugging)
-        # print(f"Relative wire position: {relative_wire_position}")
-        # print(f"Rotated relative position: {rotated_relative_position}")
-        
         # Calculate the final wire position after rotation
         rotated_wire_position = rotation_center + rotated_relative_position
         
         # Apply rotation to the plane orientation as well
         plane = plane.rotated((current_rotation.X, current_rotation.Y, current_rotation.Z))
+        
+        # Get the transformed path plane for x-axis alignment
+        path_plane = self.create_path_plane()
+        
+        # Align x-axis with the path plane
+        plane = create_plane_from_planes(plane, path_plane)
         
         # The target position includes both rotation and movement
         target_position = rotated_wire_position + movement_offset

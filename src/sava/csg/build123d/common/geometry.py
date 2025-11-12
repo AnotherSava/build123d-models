@@ -120,6 +120,19 @@ def create_plane(origin: VectorLike = (0, 0, 0), x_axis: VectorLike = (1, 0, 0),
     
     return Plane(origin=origin, x_dir=x_dir, z_dir=z_dir)
 
+def create_plane_from_planes(plane_xy: Plane, axis_x: Plane):
+    """Create a plane that matches plane_xy position and z-direction,
+    but rotated so the x-axis aligns with the intersection of axis_x plane."""
+    # Get the intersection line between plane_xy and axis_x
+    # This line will become our new x-axis
+    x_direction = plane_xy.z_dir.cross(axis_x.z_dir).normalized()
+
+    assert x_direction.length > 1e-6, "Planes are parallel, cannot create plane with aligned x-axis"
+
+    # Create the new plane with the same position and z-direction as plane_xy,
+    # but with x-direction aligned to the intersection
+    return Plane(plane_xy.location.position, x_dir=x_direction, z_dir=plane_xy.z_dir)
+
 def create_wire_tangent_plane(wire: Wire, position_at: float) -> Plane:
     """Creates a plane at a specified position along a wire, orthogonal to the wire's direction.
     
