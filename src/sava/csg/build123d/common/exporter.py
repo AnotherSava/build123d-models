@@ -1,8 +1,9 @@
 from pathlib import Path
 from typing import Iterable
 
-from build123d import Shape, Color, Mesher, Solid
+from build123d import Shape, Color, Mesher, Solid, Plane
 
+from sava.csg.build123d.common.smartplane import SmartPlane
 from sava.csg.build123d.common.smartsolid import get_solid
 
 CURRENT_MODEL_LOCATION = "models/current_model.3mf"
@@ -20,7 +21,10 @@ def show_green(shape):
 
 def set_color(shape: Shape, color: str = "yellow") -> Iterable[Solid]:
     result = []
-    solid = get_solid(shape)
+    if isinstance(shape, Plane):
+        solid = SmartPlane(shape).solid
+    else:
+        solid = get_solid(shape)
     for item in solid if isinstance(solid, Iterable) else [solid]:
         if not item.color:
             item.color = Color(color)

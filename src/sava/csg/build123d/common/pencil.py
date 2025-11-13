@@ -20,7 +20,8 @@ class Pencil:
         tolerance = 1e-7
         return self.start if (destination - self.start).length < tolerance else destination
 
-    def double_arc(self, destination: Vector, shift_coefficient: float = 0.5, angle: float = None):
+    def double_arc(self, destination: VectorLike, shift_coefficient: float = 0.5, angle: float = None):
+        destination = destination if isinstance(destination, Vector) else Vector(destination)
         angle_actual = 180 - degrees(2 * atan(destination.Y / destination.X)) if angle is None else angle
         angle_actual = advanced_mod(angle_actual, 360, -180)
         return self.arc_with_destination(destination * (1 - shift_coefficient), -angle_actual).arc_with_destination(destination * shift_coefficient, angle_actual)
@@ -111,8 +112,9 @@ class Pencil:
         return self.arc_with_destination_abs(destination_vector + self.start, angle)
 
     # create arc with specific destination and angle measure
-    def arc_with_destination(self, destination_vector: Vector, angle: float):
-        return self.arc_with_destination_abs(destination_vector + self.location, angle)
+    def arc_with_destination(self, destination: VectorLike, angle: float):
+        destination = destination if isinstance(destination, Vector) else Vector(destination)
+        return self.arc_with_destination_abs(destination + self.location, angle)
 
     def jump_to(self, abs_destination: Vector):
         abs_destination = self.check_destination(abs_destination)
@@ -120,8 +122,8 @@ class Pencil:
         self.location = abs_destination
         return self
 
-    def jump(self, destination: Vector):
-        return self.jump_to(destination + self.location)
+    def jump(self, destination: VectorLike):
+        return self.jump_to((destination if isinstance(destination, Vector) else Vector(destination)) + self.location)
 
     def jump_from_start(self, destination: Vector):
         return self.jump_to(destination + self.start)
