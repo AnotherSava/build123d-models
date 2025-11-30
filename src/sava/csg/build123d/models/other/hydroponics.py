@@ -2,9 +2,8 @@ from copy import copy
 from dataclasses import dataclass
 from math import radians, sin, degrees, asin
 from math import tan
-from typing import Tuple
 
-from build123d import Solid, Trapezoid, Circle, Location, fillet, loft, extrude, Face, Sphere, revolve, Axis, Wire
+from build123d import Solid, Trapezoid, Circle, Location, fillet, loft, extrude, Face, revolve, Axis, Wire
 
 from sava.csg.build123d.common.exporter import Exporter
 from sava.csg.build123d.common.geometry import Alignment, Direction, create_plane, create_vector
@@ -18,8 +17,8 @@ from sava.csg.build123d.common.sweepsolid import SweepSolid
 class PipeDimensions:
     bend_radius: float = 15
     countertop_thickness: float = 45
-    bend_angle: float = 50
-    length_straight: float = 8
+    bend_angle: float = 55
+    length_straight: float = 15
     wall_thickness: float = 2
     diameter_inner: float = None
 
@@ -40,7 +39,7 @@ class PipeDimensions:
 class HoseHolder:
     bend_radius = 60
     diameter_outer = 20
-    central_holder_radius = 8
+    central_holder_radius = 10
     hole_radius = 1
     hole_distance = 8
 
@@ -112,7 +111,7 @@ class HydroponicsDimensions:
     hose_holder: HoseHolder = None
     pipe: PipeDimensions = None
     tube_internal_diameter: float = 142
-    tube_floor_sphere_radius: float = 400
+    tube_top_cut_offset: float = 1.3
     tube_floor_angle: float = 15
     tube_floor_thickness: float = 3
     tube_wall_thickness: float = 4
@@ -152,7 +151,7 @@ class Hydroponics:
         tube = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness, self.dim.tube_height))
 
         tube_inside = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2, self.dim.tube_height))
-        top_cut = self.create_side_cut_angle().align_zxy(tube, Alignment.RL)
+        top_cut = self.create_side_cut_angle().align_zxy(tube, Alignment.RL, self.dim.tube_top_cut_offset)
 
         handles = self.create_handles(tube)
         etches = self.create_etches(tube)
@@ -178,14 +177,6 @@ class Hydroponics:
         tube.cut(inlet_pipe_inner, outlet_pipe_inner, hose_holder)
 
         return tube
-
-    def create_spheres(self, outlet_connector_bottom: SmartSolid) -> Tuple[SmartSolid, SmartSolid]:
-        sphere_outer = SmartSolid(Sphere(self.dim.tube_floor_sphere_radius))
-        sphere_outer.align_zxy(outlet_connector_bottom, Alignment.RR, - self.dim.hose_connector.connector_offset_z)
-        sphere_inner = SmartSolid(Sphere(self.dim.tube_floor_sphere_radius - self.dim.tube_floor_thickness))
-        sphere_inner.align(sphere_outer)
-
-        return sphere_outer, sphere_inner
 
     def create_pipe_cover_face_middle(self, pipe: SweepSolid) -> Face:
         dim = self.dim.pipe
@@ -299,7 +290,7 @@ class Hydroponics:
         single_edge = SmartSolid(revolve(trapezoid, Axis.Z, self.dim.etches_inner.angle_measure))
         etches = SmartSolid(single_edge.oriented((0, 0, i * 120 + 60 - self.dim.etches_inner.angle_measure / 2)) for i in range(3))
 
-        return etches.align_z(tube, Alignment.RL, -self.dim.etches_inner.distance_from_top)
+        return etches.align_z(tube, Alignment.RL, -self.dim.etches_inner.distance_from_top + self.dim.tube_top_cut_offset)
 
 
     def create_side_cut_height(self, bottom_radius: float = None, top_radius: float = None, height: float = None) -> SmartSolid:
