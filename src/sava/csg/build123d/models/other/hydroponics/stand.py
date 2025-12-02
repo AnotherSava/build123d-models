@@ -8,9 +8,11 @@ from build123d import Solid, Trapezoid, Circle, Location, fillet, loft, extrude,
 from sava.csg.build123d.common.exporter import Exporter
 from sava.csg.build123d.common.geometry import Alignment, Direction, create_plane, create_vector
 from sava.csg.build123d.common.pencil import Pencil
+from sava.csg.build123d.common.primitives import create_cone_with_angle
 from sava.csg.build123d.common.smartcone import SmartCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.sweepsolid import SweepSolid
+from sava.csg.build123d.models.other.hydroponics.connector import HoseConnectorFactory, HoseConnectorDimensions
 
 
 @dataclass
@@ -42,31 +44,6 @@ class HoseHolder:
     central_holder_radius = 10
     hole_radius = 1
     hole_distance = 8
-
-
-@dataclass
-class HoseConnectorDimensions:
-    pipe_length: float = 0
-    diameter_outer: float = 18.0
-    thickness: float = 1.6
-    length: float = 20.0
-    segment_count: int = 3
-    diameter_delta: float = 1.5 # diameter gradient will be [diameter_outer - diameter_delta; diameter_outer + diameter_delta]
-    distance_between_connectors: float = 10
-    connector_offset_x: float = 5
-    connector_offset_z: float = -5
-
-    @property
-    def diameter_inner(self) -> float:
-        return self.diameter_outer - 2 * self.thickness - self.diameter_delta
-
-    @property
-    def diameter_outer_max(self) -> float:
-        return self.diameter_outer + self.diameter_delta
-
-    @property
-    def distance_between_pipe_centres(self):
-        return self.distance_between_connectors + self.diameter_outer_max
 
 
 @dataclass
@@ -103,7 +80,7 @@ class HandleDimensions:
     count = 12
 
 @dataclass
-class HydroponicsDimensions:
+class StandDimensions:
     _etches: TubeEtchesDimensions = None
 
     handles: HandleDimensions = None
@@ -143,15 +120,17 @@ class HydroponicsDimensions:
         return dim.bend_radius / tan(dim.bend_angle_rad) + dim.radius_outer / tan(radians(dim.bend_angle)) + self.pot_wall_thickness / sin(dim.bend_angle_rad) * 2.5
 
 
-class Hydroponics:
-    def __init__(self, dim: HydroponicsDimensions):
+class HydroponicsStand:
+    def __init__(self, dim: StandDimensions):
         self.dim = dim
+        self.host_connector_factory = HoseConnectorFactory(self.dim.hose_connector)
 
     def create_stand(self) -> SmartSolid:
         tube = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness, self.dim.tube_height))
 
         tube_inside = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2, self.dim.tube_height))
-        top_cut = self.create_side_cut_angle().align_zxy(tube, Alignment.RL, self.dim.tube_top_cut_offset)
+        top_cut = create_cone_with_angle(self.dim.tube_internal_diameter / 2, self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness, self.dim.etches_inner.side_angle)
+        top_cut.align_zxy(tube, Alignment.RL, self.dim.tube_top_cut_offset)
 
         handles = self.create_handles(tube)
         etches = self.create_etches(tube)
@@ -214,7 +193,7 @@ class Hydroponics:
         return wider_part.fuse(middle_part).intersect(tube.scaled(2, 2, 1))
 
     def create_inlet_connector_top(self, inlet_pipe_outer: SweepSolid) -> SmartSolid:
-        connector_top = self.create_hose_connector(3)
+        connector_top = self.host_connector_factory.create_hose_connector(self.dim.pipe.diameter_outer, 3)
 
         plane = inlet_pipe_outer.create_plane_end()
 
@@ -271,7 +250,7 @@ class Hydroponics:
 
     def create_connector_bottom(self, tube: SmartSolid, direction: Direction) -> SmartSolid:
         assert direction in [Direction.S, Direction.N]
-        inlet_connector_bottom = self.create_hose_connector(self.dim.hose_connector.pipe_length)
+        inlet_connector_bottom = self.host_connector_factory.create_hose_connector(self.dim.pipe.diameter_outer, self.dim.hose_connector.pipe_length)
         inlet_connector_bottom.align_z(tube, Alignment.LL, self.dim.hose_connector.connector_offset_z)
         inlet_connector_bottom.align_x(tube, Alignment.LL, -self.dim.hose_connector.connector_offset_x)
         inlet_connector_bottom.align_y(tube, Alignment.C, self.dim.hose_connector.distance_between_pipe_centres / 2 * (1 if direction == Direction.N else -1))
@@ -292,21 +271,6 @@ class Hydroponics:
 
         return etches.align_z(tube, Alignment.RL, -self.dim.etches_inner.distance_from_top + self.dim.tube_top_cut_offset)
 
-
-    def create_side_cut_height(self, bottom_radius: float = None, top_radius: float = None, height: float = None) -> SmartSolid:
-        bottom = Circle(bottom_radius)
-        top = Circle(top_radius).move(Location((0, 0, height)))
-
-        return SmartSolid(loft([bottom, top]))
-
-    def create_side_cut_angle(self, bottom_radius: float = None, top_radius: float = None, angle: float = None) -> SmartSolid:
-        bottom_radius = self.dim.tube_internal_diameter / 2 if bottom_radius is None else bottom_radius
-        top_radius = self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness if top_radius is None else top_radius
-        angle = self.dim.etches_inner.side_angle if angle is None else angle
-
-        height = (top_radius - bottom_radius) / tan(radians(angle))
-        return self.create_side_cut_height(bottom_radius, top_radius, height)
-
     def create_handles(self, tube: SmartSolid):
         shapes = []
         for i in range(self.dim.handles.count):
@@ -320,38 +284,6 @@ class Hydroponics:
             shapes.append(handle)
 
         return SmartSolid(shapes).align_zxy(tube, Alignment.LR).cut(tube)
-
-    def create_hose_connector(self, pipe_length: float = None, pipe_diameter: float = None):
-        dim = self.dim.hose_connector
-        pipe_diameter_actual = pipe_diameter or self.dim.pipe.diameter_outer
-
-        result = None
-
-        segment_length = dim.length / dim.segment_count
-        last_segment = None
-        for i in range(dim.segment_count):
-            diameter_min = dim.diameter_outer - dim.diameter_delta * (1 - i / (dim.segment_count - 1))
-            diameter_max = dim.diameter_outer + dim.diameter_delta * i / (dim.segment_count - 1)
-            segment = self.create_side_cut_height(diameter_min / 2, diameter_max / 2, segment_length)
-            cap = self.create_side_cut_angle(diameter_max / 2, min(pipe_diameter_actual, diameter_min) / 2, -45)
-
-            if result is None:
-                result = segment.copy() # segment shouldn't be modified (reused as last_segment)
-            else:
-                segment.align_zxy(last_segment, Alignment.RR)
-                result.fuse(segment)
-
-            cap.align_zxy(result, Alignment.RR)
-            result.fuse(cap)
-
-            last_segment = segment
-
-        if pipe_length:
-            cap = SmartSolid(Solid.make_cylinder(pipe_diameter_actual / 2, pipe_length))
-            result.fuse(cap.align_zxy(result, Alignment.RR))
-
-        internal = SmartSolid(Solid.make_cylinder(dim.diameter_inner / 2, result.z_size))
-        return result.cut(internal.align(result))
 
     def create_outlet_hole(self, outlet_pipe_inner: SweepSolid):
         skip_height = -self.dim.hose_connector.connector_offset_z
@@ -401,8 +333,8 @@ class Hydroponics:
         return top.fuse(bottom).intersect(above_floor).fuse(invert).cut(bottom_cut)
 
 
-dimensions = HydroponicsDimensions()
-hydroponics = Hydroponics(dimensions)
+dimensions = StandDimensions()
+hydroponics = HydroponicsStand(dimensions)
 
 component = hydroponics.create_stand()
 # component = hydroponics.create_empty_cone(30, 50, 5)

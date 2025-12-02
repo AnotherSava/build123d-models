@@ -1,4 +1,6 @@
-from build123d import Location, loft, Face, fillet, Wire
+from math import tan, radians
+
+from build123d import Location, loft, Face, fillet, Wire, Solid
 
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -14,3 +16,7 @@ def create_filleted_rect(length: float, width: float, radius: float) -> Face:
     if radius:
         wire = fillet(wire.vertices(), radius)
     return Face(wire)
+
+def create_cone_with_angle(bottom_radius: float, top_radius: float, angle: float) -> SmartSolid:
+    height = (top_radius - bottom_radius) / tan(radians(angle))
+    return SmartSolid(Solid.make_cone(bottom_radius, top_radius, height))

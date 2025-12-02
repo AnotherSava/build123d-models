@@ -113,7 +113,7 @@ class SmartSolid:
         return self.bound_box.size.Z
 
     def assert_valid(self):
-        assert self.solid is None or self.wrap_solid().is_valid(), "Shape is invalid"
+        assert self.solid is None or self.wrap_solid().is_valid, "Shape is invalid"
 
     def create_positional_filter_axis(self, axis: Axis, inclusive: tuple[bool, bool] = None) -> 'PositionalFilter':
         return PositionalFilter(axis, self.get_from(axis), self.get_to(axis), (True, True) if inclusive is None else inclusive)
