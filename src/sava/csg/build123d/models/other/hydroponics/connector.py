@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Tuple
 
 from build123d import Solid
 
@@ -11,7 +12,6 @@ from sava.csg.build123d.common.smartsolid import SmartSolid
 class HoseConnectorDimensions:
     pipe_length: float = 0
     diameter_outer: float = 18.0
-    thickness: float = 1.6
     length: float = 20.0
     segment_count: int = 3
     diameter_delta: float = 1.5 # diameter gradient will be [diameter_outer - diameter_delta; diameter_outer + diameter_delta]
@@ -19,9 +19,14 @@ class HoseConnectorDimensions:
     connector_offset_x: float = 5
     connector_offset_z: float = -5
 
-    @property
-    def diameter_inner(self) -> float:
-        return self.diameter_outer - 2 * self.thickness - self.diameter_delta
+    # either thickness or diameter_inner should be provided
+    thickness: float | None = 1.6
+    diameter_inner: float | None = None
+
+    def __post_init__(self):
+        assert (self.thickness is None) != (self.diameter_inner is None)
+
+        self.diameter_inner = self.diameter_inner or self.diameter_outer - 2 * self.thickness - self.diameter_delta
 
     @property
     def diameter_outer_max(self) -> float:
@@ -36,7 +41,11 @@ class HoseConnectorFactory:
     def __init__(self, dim: HoseConnectorDimensions):
         self.dim = dim
 
-    def create_hose_connector(self, pipe_diameter: float, pipe_length: float = None):
+    def create_hose_connector(self, pipe_diameter_outer: float, pipe_length: float = None) -> SmartSolid:
+        outer, inner = self.create_hose_connector_parts(pipe_diameter_outer, pipe_length)
+        return outer.cut(inner)
+
+    def create_hose_connector_parts(self, pipe_diameter_outer: float, pipe_length: float = None) -> Tuple[SmartSolid, SmartSolid]:
         result = None
 
         segment_length = self.dim.length / self.dim.segment_count
@@ -48,7 +57,7 @@ class HoseConnectorFactory:
             radius1 = diameter_max / 2
             segment = SmartSolid(Solid.make_cone(bottom_radius, radius1, segment_length))
             radius = diameter_max / 2
-            top_radius = min(pipe_diameter, diameter_min) / 2
+            top_radius = min(pipe_diameter_outer, diameter_min) / 2
             angle = -45
             cap = create_cone_with_angle(radius, top_radius, angle)
 
@@ -64,8 +73,9 @@ class HoseConnectorFactory:
             last_segment = segment
 
         if pipe_length:
-            cap = SmartSolid(Solid.make_cylinder(pipe_diameter / 2, pipe_length))
+            cap = SmartSolid(Solid.make_cylinder(pipe_diameter_outer / 2, pipe_length))
             result.fuse(cap.align_zxy(result, Alignment.RR))
 
-        internal = SmartSolid(Solid.make_cylinder(self.dim.diameter_inner / 2, result.z_size))
-        return result.cut(internal.align(result))
+        internal = SmartSolid(Solid.make_cylinder(self.dim.diameter_inner / 2, result.z_size)).align(result)
+
+        return result, internal

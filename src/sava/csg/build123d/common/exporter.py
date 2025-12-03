@@ -1,3 +1,4 @@
+from copy import copy
 from pathlib import Path
 from typing import Iterable
 
@@ -25,12 +26,14 @@ def set_color(shape: Shape, color: str = "yellow") -> Iterable[Solid]:
         solid = SmartPlane(shape).solid
     else:
         solid = get_solid(shape)
-    for item in solid if isinstance(solid, Iterable) else [solid]:
-        if not item.color:
-            item.color = Color(color)
-            item.label = color
-
-        result.append(item.clean())
+    if isinstance(solid, Iterable):
+        for item in solid:
+            result += set_color(item, color)
+    else:
+        solid_copy = copy(solid)
+        solid_copy.color = Color(color)
+        solid_copy.label = color
+        result.append(solid_copy.clean())
 
     return result
 
