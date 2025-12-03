@@ -52,8 +52,7 @@ class HydroponicsSplitterFactory:
         side_pipe_outer_z = (self.dim.pipe_length + self.dim.length) / 2
         side_pipe_outer.align_z(connector, Alignment.L, side_pipe_outer_z)
 
-        side_pipe_inner = SmartSolid(Solid.make_cylinder(self.dim.diameter_inner / 2, self.dim.side_pipe_length))
-        side_pipe_inner.solid.location = side_pipe_outer.solid.location
+        side_pipe_inner = SmartSolid(Solid.make_cylinder(self.dim.diameter_inner / 2, self.dim.side_pipe_length)).colocate(side_pipe_outer)
 
         thread_side = IsoThread(
             major_diameter=self.dim.diameter_inner,
@@ -66,8 +65,7 @@ class HydroponicsSplitterFactory:
         side_hole = SmartSolid(Solid.make_cylinder(thread_side.min_radius, pipe_diameter_outer / 2))
         side_hole.align_zxy(side_pipe_outer, Alignment.CL).align_x(side_pipe_outer, Alignment.C, self.dim.diameter_inner / 4)
 
-        thread_side.location = side_pipe_outer.solid.location
-        thread_side_solid = SmartSolid(thread_side).align_x(side_pipe_outer, Alignment.RL)
+        thread_side_solid = SmartSolid(thread_side).colocate(side_pipe_outer).align_x(side_pipe_outer, Alignment.RL)
 
         result = SmartSolid(thread_bottom_solid, connector, side_pipe_outer).cut(connector_inner, side_pipe_inner).fuse(thread_side_solid).cut(side_hole)
 

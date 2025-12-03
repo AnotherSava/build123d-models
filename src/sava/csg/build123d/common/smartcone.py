@@ -93,33 +93,27 @@ class SmartCone(SmartSolid):
 
     def create_outer_cone(self, radius: float = None, radius_top: float = None):
         cone = SmartCone.create_cone(self.cone_angle, radius or self.radius_outer, self.radius_top if radius_top is None else radius_top)
-        cone.solid.location = self.solid.location
-        return cone
+        return cone.colocate(self)
 
     def create_inner_cone(self, radius: float = None, radius_top: float = None):
         cone = SmartCone.create_cone(self.cone_angle, radius or self.radius_inner, self.radius_top if radius_top is None else radius_top)
-        cone.solid.location = self.solid.location
-        cone.move_vector(create_vector(self.height_higher_lower, self.create_axis().direction))
+        cone.colocate(self).move_vector(create_vector(self.height_higher_lower, self.create_axis().direction))
         return cone
-
-    def align_cone(self, cone_to_align_with: 'SmartCone') -> 'SmartCone':
-        self.solid.location = cone_to_align_with.solid.location
-        return self
 
     def scale_radius_outer(self, factor: float | None, radius: float = None):
         assert factor is None != radius is None
 
         new_radius = self.radius_outer * factor if factor else radius
-        cone = SmartCone.create_cone(self.cone_angle, new_radius, self.radius_top).align_cone(self)
-        return cone.move_vector(create_vector(self.height_higher_lower, self.create_axis().direction))
+        cone = SmartCone.create_cone(self.cone_angle, new_radius, self.radius_top)
+        return cone.colocate(self).move_vector(create_vector(self.height_higher_lower, self.create_axis().direction))
 
     def pad_outer(self, padding: float, radius: float = None):
         side_padding_x = padding / cos(self.cone_angle_rad)
         print(f"side_padding_x: {side_padding_x}")
         new_radius_top = self.radius_top - 2 * padding * tan(self.cone_angle_rad) + 2 * side_padding_x
         print(self.cone_angle, radius or (self.radius_outer - 2 * side_padding_x), new_radius_top)
-        cone = SmartCone.create_cone(self.cone_angle, radius or (self.radius_outer - 2 * side_padding_x), new_radius_top).align_cone(self)
-        cone.move_vector(self.create_axis().direction * (self.height_apex_higher - cone.height_apex_higher - padding))
+        cone = SmartCone.create_cone(self.cone_angle, radius or (self.radius_outer - 2 * side_padding_x), new_radius_top)
+        cone.colocate(self).move_vector(self.create_axis().direction * (self.height_apex_higher - cone.height_apex_higher - padding))
         return cone
 
     def create_axis(self, inner: bool = False):

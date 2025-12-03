@@ -50,6 +50,10 @@ class SmartSolid:
     def bound_box(self) -> BoundBox:
         return self.wrap_solid().bounding_box()
 
+    @property
+    def shapes(self) -> ShapeList:
+        return self.solid if isinstance(self.solid, ShapeList) else [self.solid]
+
     def get_bound_box(self, plane: Plane = Plane.XY) -> BoundBox:
         solid = self.wrap_solid()
         if plane == Plane.XY:
@@ -239,6 +243,17 @@ class SmartSolid:
 
     def fused(self, *args) -> 'SmartSolid':
         return self.copy().fuse(*args)
+
+    def is_simple(self):
+        return not isinstance(self.solid, ShapeList)
+
+    def colocate(self, solid: 'SmartSolid') -> 'SmartSolid':
+        assert solid.is_simple()
+
+        for shape in self.shapes:
+            shape.location = solid.solid.location
+
+        return self
 
     def align_axis(self, solid: 'SmartSolid | None', axis: Axis, alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
         self_from, self_to = self.get_bounds_along_axis(axis)
