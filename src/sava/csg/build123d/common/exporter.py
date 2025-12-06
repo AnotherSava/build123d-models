@@ -20,7 +20,7 @@ def show_blue(shape):
 def show_green(shape):
     extra_shapes.append(set_color(shape, "green"))
 
-def set_color(shape: Shape, color: str = "yellow") -> Iterable[Solid]:
+def set_color(shape: Shape, color: str = "yellow", label: str = None) -> Iterable[Solid]:
     result = []
     if isinstance(shape, Plane):
         solid = SmartPlane(shape).solid
@@ -32,7 +32,7 @@ def set_color(shape: Shape, color: str = "yellow") -> Iterable[Solid]:
     else:
         solid_copy = copy(solid)
         solid_copy.color = Color(color)
-        solid_copy.label = color
+        solid_copy.label = color if label is None else label
         result.append(solid_copy.clean())
 
     return result
@@ -54,9 +54,10 @@ class Exporter:
         for shape in shapes:
             self.add(shape)
 
-    def add(self, shape: Shape, color: str = "yellow"):
-        colored_shapes = set_color(shape, color)
+    def add(self, shape: Shape, color: str = "yellow", label: str = None) -> 'Exporter':
+        colored_shapes = set_color(shape, color, label)
         self._add_shapes(colored_shapes)
+        return self
 
     def _add_shapes(self, shapes: Iterable[Shape]):
         for shape in shapes:
