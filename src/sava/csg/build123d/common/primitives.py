@@ -20,3 +20,7 @@ def create_filleted_rect(length: float, width: float, radius: float) -> Face:
 def create_cone_with_angle(bottom_radius: float, top_radius: float, angle: float) -> SmartSolid:
     height = (top_radius - bottom_radius) / tan(radians(angle))
     return SmartSolid(Solid.make_cone(bottom_radius, top_radius, height))
+
+def create_cone_with_angle_and_height(bottom_radius: float, height: float, angle: float) -> SmartSolid:
+    top_radius = height * tan(radians(angle)) + bottom_radius
+    return SmartSolid(Solid.make_cone(bottom_radius, top_radius, height))
