@@ -5,7 +5,7 @@ from math import tan
 
 from build123d import Solid, Trapezoid, Circle, Location, fillet, loft, extrude, Face, revolve, Axis, Wire
 
-from sava.csg.build123d.common.exporter import Exporter
+from sava.csg.build123d.common.exporter import export, save_3mf
 from sava.csg.build123d.common.geometry import Alignment, Direction, create_plane, create_vector
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_cone_with_angle
@@ -343,4 +343,5 @@ component = hydroponics.create_stand()
 # solid.orientation = (90, 0, -90)
 # component = hydroponics.create_hose_connector(2, 23)
 print(component.bound_box.size)
-Exporter(component).export()
+export(component)
+save_3mf()

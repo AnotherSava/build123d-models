@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sava.csg.build123d.common.exporter import Exporter
+from sava.csg.build123d.common.exporter import export, save_3mf
 from sava.csg.build123d.common.geometry import Direction, Alignment
 from sava.csg.build123d.common.smartbox import SmartBox
 
@@ -75,4 +75,5 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions):
 dimensions = CelebritiesBoxDimensions()
 celebrities_box = create_celebrities_box(dimensions)
 
-Exporter(celebrities_box).export()
+export(celebrities_box)
+save_3mf()

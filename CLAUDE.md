@@ -68,11 +68,20 @@ src/sava/csg/build123d/
 **Creating and exporting a model:**
 ```python
 from sava.csg.build123d.common.smartbox import SmartBox
-from sava.csg.build123d.common.exporter import Exporter
+from sava.csg.build123d.common.exporter import export, save_3mf
 
 box = SmartBox(100, 50, 30)
 box.fillet_z(5)
-Exporter(box).export()
+export(box)
+save_3mf()
+```
+
+**Exporting multiple shapes with labels:**
+```python
+export(main_body, "body")
+export(screw, "screw")
+save_3mf()  # Single 3MF with all shapes
+save_stl()  # Separate STL files: body.stl, screw.stl
 ```
 
 **Alignment system:** Use `align_x`, `align_y`, `align_z`, or `align` to position solids relative to each other or to origin (pass `None` as reference).

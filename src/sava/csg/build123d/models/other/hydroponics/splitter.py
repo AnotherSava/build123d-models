@@ -4,7 +4,7 @@ from math import cos, radians
 from bd_warehouse.thread import IsoThread
 from build123d import Solid
 
-from sava.csg.build123d.common.exporter import Exporter
+from sava.csg.build123d.common.exporter import export, save_3mf
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -123,4 +123,6 @@ splitter_factory = HydroponicsSplitterFactory(dimensions)
 
 splitter = splitter_factory.create_splitter()
 screw = splitter_factory.create_screw().move_x(-30).align_z(splitter, Alignment.LR)
-Exporter().add(splitter, "yellow", "splitter").add(screw, "blue", "screw").export()
+export(splitter, "splitter")
+export(screw, "screw")
+save_3mf()

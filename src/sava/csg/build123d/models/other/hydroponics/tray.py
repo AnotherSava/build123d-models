@@ -5,7 +5,7 @@ from typing import Tuple
 from bd_warehouse.thread import IsoThread
 from build123d import Solid, Vector
 
-from sava.csg.build123d.common.exporter import Exporter
+from sava.csg.build123d.common.exporter import export, save_3mf
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_cone_with_angle, create_cone_with_angle_and_height
@@ -189,4 +189,5 @@ dimensions = TrayDimensions()
 tray_factory = TrayFactory(dimensions)
 
 tray_solid = tray_factory.create_tray()
-Exporter().add(tray_solid, "yellow", "tray").export()
+export(tray_solid, "tray")
+save_3mf()

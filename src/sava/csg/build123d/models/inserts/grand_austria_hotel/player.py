@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sava.csg.build123d.common.exporter import Exporter
+from sava.csg.build123d.common.exporter import export, save_3mf
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -42,4 +42,5 @@ dimensions = PlayerComponentsDimensions()
 player_components = PlayerComponents(dimensions)
 
 component = player_components.create_single_couple()
-Exporter(component.molded()).export()
+export(component.molded())
+save_3mf()

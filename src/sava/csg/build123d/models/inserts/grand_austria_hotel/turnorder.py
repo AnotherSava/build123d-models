@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from build123d import Vector, extrude, import_svg, scale
 
-from sava.csg.build123d.common.exporter import Exporter, get_path
+from sava.csg.build123d.common.exporter import export, save_3mf, get_path
 from sava.csg.build123d.common.geometry import Direction, Alignment
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -95,4 +95,5 @@ class TurnOrder:
 
 dimensions = TurnOrderBoxDimensions()
 key = TurnOrder(dimensions)
-Exporter(key.create_box()).export()
+export(key.create_box())
+save_3mf()
