@@ -1,3 +1,4 @@
+import os
 from copy import copy
 from pathlib import Path
 from typing import Iterable
@@ -7,7 +8,8 @@ from build123d import Shape, Color, Mesher, Plane
 from sava.csg.build123d.common.smartplane import SmartPlane
 from sava.csg.build123d.common.smartsolid import get_solid
 
-CURRENT_MODEL_LOCATION = "models/current_model.3mf"
+CURRENT_MODEL_LOCATION_3MF = "models/current_model.3mf"
+CURRENT_MODEL_LOCATION_STL = "models/current_model/"
 BASIC_COLORS = ["yellow", "blue", "green", "orange", "purple", "cyan", "magenta", "red"]
 
 # Module-level storage
@@ -97,8 +99,11 @@ def get_project_root_folder() -> Path:
     raise FileNotFoundError("Could not find project root")
 
 
-def get_path(path_from_project_root: str) -> str:
-    return str(get_project_root_folder() / path_from_project_root)
+def get_path(*path_from_project_root) -> str:
+    path = str(get_project_root_folder())
+    for subpath in path_from_project_root:
+        path += f"\\{subpath}"
+    return path
 
 
 def _report_labels() -> None:
@@ -110,7 +115,7 @@ def _report_labels() -> None:
 
 def save_3mf(location: str = None) -> None:
     """Save all shapes to a single 3MF file."""
-    actual_location = location or get_path(CURRENT_MODEL_LOCATION)
+    actual_location = location or get_path(CURRENT_MODEL_LOCATION_3MF)
     print(f"\nExporting to {actual_location}\n")
 
     mesher = Mesher()
@@ -123,13 +128,15 @@ def save_3mf(location: str = None) -> None:
     mesher.write(actual_location)
     print(f"\nDone")
 
+def create_file_path(label: str, subfolder: str) -> str:
+    path = get_path(subfolder, f"{label}.stl")
+    os.makedirs(os.path.dirname(path), exist_ok=True) # create a folder if needed
+    return path
 
 def save_stl(directory: str = None) -> None:
     """Save each label group to separate STL files."""
-    actual_directory = Path(directory) if directory else get_project_root_folder() / "models"
-    actual_directory.mkdir(parents=True, exist_ok=True)
 
-    print(f"\nExporting STL files to {actual_directory}\n")
+    print(f"\nExporting STL files to {get_path(directory or CURRENT_MODEL_LOCATION_STL)}\n")
 
     for label, shapes in _shapes.items():
         mesher = Mesher()
@@ -137,9 +144,8 @@ def save_stl(directory: str = None) -> None:
             for prepared in _prepare_shape(shape, label):
                 mesher.add_shape(prepared)
 
-        file_path = actual_directory / f"{label}.stl"
+        file_path = create_file_path(label, directory or CURRENT_MODEL_LOCATION_STL)
         mesher.write(str(file_path))
-        print(f"  {file_path.name}")
+        print(f"  - {os.path.basename(file_path)}")
 
-    _report_labels()
     print(f"\nDone")
