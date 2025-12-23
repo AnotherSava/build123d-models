@@ -39,6 +39,10 @@ class TrayDimensions:
     watering_hole_radius_wide: float = 8
     watering_hole_radius_narrow: float = 7.5
     watering_hole_angle: float = 4
+    watering_hole_cap_handle_radius: float = 2
+    watering_hole_cap_handle_height: float = 8
+    watering_hole_cap_handle_ball_radius: float = 3
+    watering_hole_cap_radius_delta: float = 0.4
 
     peg_hole_diameter: float = 10
     peg_hole_thread_diameter_delta = 0.8
@@ -192,10 +196,12 @@ class TrayFactory:
 
         return SmartSolid(pencil.extrude(self.dim.tray_height))
 
-    def create_watering_hole_parts(self) -> Tuple[SmartSolid, SmartSolid]:
-        cone_outer = create_cone_with_angle(self.dim.watering_hole_radius_wide + self.dim.basket_padding, self.dim.watering_hole_radius_narrow + self.dim.basket_padding, -self.dim.watering_hole_angle)
-        cone_inner = create_cone_with_angle(self.dim.watering_hole_radius_wide, self.dim.watering_hole_radius_narrow, -self.dim.watering_hole_angle)
-        ring = create_cone_with_angle_and_height(self.dim.watering_hole_radius_wide + self.dim.watering_hole_bevel + self.dim.basket_padding, self.dim.tray_height, -self.dim.basket_cap_angle)
+    def create_watering_hole_parts(self, radius_delta: float = 0) -> Tuple[SmartSolid, SmartSolid]:
+        radius_wide = self.dim.watering_hole_radius_wide - radius_delta
+        radius_narrow = self.dim.watering_hole_radius_narrow - radius_delta
+        cone_outer = create_cone_with_angle(radius_wide + self.dim.basket_padding, radius_narrow + self.dim.basket_padding, -self.dim.watering_hole_angle)
+        cone_inner = create_cone_with_angle(radius_wide, radius_narrow, -self.dim.watering_hole_angle)
+        ring = create_cone_with_angle_and_height(radius_wide + self.dim.watering_hole_bevel + self.dim.basket_padding, self.dim.tray_height, -self.dim.basket_cap_angle)
         ring.align_zxy(cone_inner, Alignment.LR)
         return cone_inner.fuse(ring), cone_outer
 
@@ -267,17 +273,28 @@ class TrayFactory:
 
         return core_screw.fuse(thread_screw_solid, cap_base)
 
+    def create_watering_hole_cap(self) -> SmartSolid:
+        watering_hole, watering_hole_external = self.create_watering_hole_parts(self.dim.watering_hole_cap_radius_delta)
+        watering_hole.mirror(Plane.XY)
+
+        handle = SmartSolid(Solid.make_cylinder(self.dim.watering_hole_cap_handle_radius, self.dim.watering_hole_cap_handle_height))
+        handle.align_zxy(watering_hole, Alignment.RR)
+
+        ball = SmartSolid(Solid.make_sphere(self.dim.watering_hole_cap_handle_ball_radius))
+        ball.align_zxy(handle, Alignment.RL, self.dim.watering_hole_cap_handle_ball_radius)
+
+        return watering_hole.fuse(handle, ball)
+
 
 dimensions = TrayDimensions()
 tray_factory = TrayFactory(dimensions)
 
 
-def export_3mf(tray: SmartSolid, peg: SmartSolid, peg_cap: SmartSolid):
+def export_3mf(tray: SmartSolid, peg: SmartSolid, peg_cap: SmartSolid, watering_hole_cap: SmartSolid):
     clear()
 
-    tray.mirror(Plane.XY)
-    peg.mirror(Plane.XY)
-    peg_cap.mirror(Plane.XY)
+    for shape in [tray, peg, peg_cap]:
+        shape.mirror(Plane.XY)
 
     export(tray, "tray")
 
@@ -291,16 +308,23 @@ def export_3mf(tray: SmartSolid, peg: SmartSolid, peg_cap: SmartSolid):
             peg_cap.align_zxy(peg, Alignment.RR, -dimensions.peg_cap_handle_height)
             export(peg_cap.copy(), "peg_cap")
 
+    watering_hole_cap.align_xy(tray, Alignment.C, dimensions.watering_hole_offset_x, dimensions.watering_hole_offset_y, plane)
+    watering_hole_cap.align_z(tray, Alignment.LR)
+    export(watering_hole_cap, "watering_hole_cap")
 
     save_3mf()
+    save_3mf("3mf/tray.3mf")
 
 tray_solid = tray_factory.create_tray()
 peg_solid = tray_factory.create_peg()
 peg_cap_solid = tray_factory.create_peg_cap()
+watering_hole_cap_solid = tray_factory.create_watering_hole_cap()
 
 export(tray_solid, "tray")
 export(peg_solid, "peg")
 export(peg_cap_solid, "peg_cap")
+export(watering_hole_cap_solid, "watering_hole_cap")
+
 save_stl("models\\hydroponic\\tray")
 
-export_3mf(tray_solid, peg_solid, peg_cap_solid)
+export_3mf(tray_solid, peg_solid, peg_cap_solid, watering_hole_cap_solid)
