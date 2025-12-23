@@ -293,8 +293,10 @@ class SmartSolid:
         self.solid = fillet(edges, radius)
         return self
 
-    def fillet_positional(self, axis_orientational: Axis, radius: float, *position_filters: PositionalFilter) -> 'SmartSolid':
-        edges = self.solid.edges().filter_by(axis_orientational)
+    def fillet_positional(self, radius: float, axis_orientational: Axis | None, *position_filters: PositionalFilter) -> 'SmartSolid':
+        edges = self.solid.edges()
+        if axis_orientational is not None:
+            edges = edges.filter_by(axis_orientational)
         for position_filter in position_filters:
             edges = self._filter_positional(edges, position_filter)
         print(f"Edges filleted: {len(edges)}")

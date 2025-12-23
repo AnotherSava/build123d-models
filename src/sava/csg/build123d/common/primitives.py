@@ -17,8 +17,8 @@ def create_filleted_rect(length: float, width: float, radius: float) -> Face:
         wire = fillet(wire.vertices(), radius)
     return Face(wire)
 
-def create_cone_with_angle(bottom_radius: float, top_radius: float, angle: float) -> SmartSolid:
-    height = (top_radius - bottom_radius) / tan(radians(angle))
+def create_cone_with_angle(bottom_radius: float = 0, top_radius: float = 0, angle: float = 45) -> SmartSolid:
+    height = abs((top_radius - bottom_radius) / tan(radians(angle)))
     return SmartSolid(Solid.make_cone(bottom_radius, top_radius, height))
 
 def create_cone_with_angle_and_height(bottom_radius: float, height: float, angle: float) -> SmartSolid:

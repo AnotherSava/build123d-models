@@ -3,14 +3,14 @@ from math import sin, radians, tan
 from typing import Tuple
 
 from bd_warehouse.thread import IsoThread
-from build123d import Solid, Vector
+from build123d import Solid, Vector, Axis, Plane
 
-from sava.csg.build123d.common.exporter import export, save_3mf
+from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_cone_with_angle, create_cone_with_angle_and_height
 from sava.csg.build123d.common.smartbox import SmartBox
-from sava.csg.build123d.common.smartsolid import SmartSolid, fuse
+from sava.csg.build123d.common.smartsolid import SmartSolid, fuse, PositionalFilter
 
 
 @dataclass
@@ -41,7 +41,23 @@ class TrayDimensions:
     watering_hole_angle: float = 4
 
     peg_hole_diameter: float = 10
+    peg_hole_thread_diameter_delta = 0.8
     peg_hole_pitch: float = 1
+
+    peg_height: float = 23
+    peg_fillet_radius: float = 0.2
+
+    peg_base_height: float = 2
+    peg_base_width_delta: float = 2
+    peg_base_fillet_radius: float = 0.5
+
+    peg_cap_hole_diameter: float = 5
+    peg_cap_hole_height: float = 5
+    peg_cap_hole_height_delta: float = 0.5
+    peg_cap_hole_pitch: float = 0.85
+    peg_cap_thread_diameter_delta = 0.2
+    peg_cap_handle_height: float = 5
+    peg_cap_fillet_radius: float = 0.2
 
     holder_thickness: float = 0.4
 
@@ -72,6 +88,23 @@ class TrayDimensions:
     def basket_bottom_diameter(self) -> float:
         return self.basket_outer_diameter - 2 * self.inner_height * tan(radians(self.basket_cap_angle))
 
+    @property
+    def watering_hole_offset_y(self) -> float:
+        # Position in 3rd column (index 2), middle between first basket_hole and wall
+        return (self.outer_width / 2 + self.basket_width * 1.5 + self.basket_distance_y) / 2
+
+    @property
+    def watering_hole_offset_x(self) -> float:
+        # Position in 3rd column (index 2), middle between first basket_hole and wall
+        return self.get_hole_offset(0, 2).X
+
+    @property
+    def peg_hole_offset_y(self) -> float:
+        return self.watering_hole_offset_y
+
+    @property
+    def peg_hole_offset_x(self) -> float:
+        return self.get_hole_offset(0, 0).X
 
     def get_hole_offset(self, row: int, column: int) -> Vector:
         step_y = self.basket_width + self.basket_distance_y
@@ -110,21 +143,15 @@ class TrayFactory:
         tray.cut(fuse(holes))
 
         watering_hole, watering_hole_external = self.create_watering_hole_parts()
-        # Position in 3rd column (index 2), middle between first basket_hole and wall
-        watering_shift_x = self.dim.get_hole_offset(0, 2).X
-        watering_shift_y = (self.dim.outer_width / 2 + self.dim.basket_width * 1.5 + self.dim.basket_distance_y) / 2
-
-        watering_hole.align_xy(tray, Alignment.C, watering_shift_x, watering_shift_y).align_z(tray, Alignment.LR)
+        watering_hole.align_xy(tray, Alignment.C, self.dim.watering_hole_offset_x, self.dim.watering_hole_offset_y).align_z(tray, Alignment.LR)
         watering_hole_external.align(watering_hole)
 
         tray.fuse(watering_hole_external).cut(watering_hole)
 
         peg_hole_inner, peg_hole_outer = self.create_peg_hole_parts()
-        peg_hole_shift_x = self.dim.get_hole_offset(0, 0).X
-
         for direction_x in [-1, 1]:
             for direction_y in [-1, 1]:
-                peg_hole_inner.align_xy(tray, Alignment.C, direction_x * peg_hole_shift_x, direction_y * watering_shift_y).align_z(tray, Alignment.LR)
+                peg_hole_inner.align_xy(tray, Alignment.C, direction_x * self.dim.peg_hole_offset_x, direction_y * self.dim.watering_hole_offset_y).align_z(tray, Alignment.LR)
                 peg_hole_outer.align(peg_hole_inner)
 
                 tray.cut(peg_hole_inner).fuse(peg_hole_outer)
@@ -134,7 +161,7 @@ class TrayFactory:
     def prepare_for_print(self, tray: SmartSolid):
         # return tray
 
-        tray.rotate((0, 0, 45))
+        tray.orient((0, 0, 45))
 
         print_size_x = 300
         print_size_y = 300
@@ -173,21 +200,107 @@ class TrayFactory:
         return cone_inner.fuse(ring), cone_outer
 
     def create_peg_hole_parts(self) -> Tuple[SmartSolid, SmartSolid]:
-        hole = Solid.make_cylinder(self.dim.peg_hole_diameter / 2, self.dim.tray_height)
+        return self.create_hole_parts(self.dim.peg_hole_diameter, self.dim.tray_height, self.dim.peg_hole_pitch)
+
+    def create_hole_parts(self, major_diameter: float, height: float, pitch: float) -> Tuple[SmartSolid, SmartSolid]:
+        hole = Solid.make_cylinder(major_diameter / 2, height)
         thread = IsoThread(
-            major_diameter=self.dim.peg_hole_diameter,
-            pitch=self.dim.peg_hole_pitch,
-            length=self.dim.tray_height,
+            major_diameter=major_diameter,
+            pitch=pitch,
+            length=height,
             external=False,
             end_finishes=("chamfer", "fade")
         )
+        print("hole ", thread.min_radius * 2, thread.root_radius * 2, thread.major_diameter, self.dim.peg_hole_diameter)
 
         return SmartSolid(hole), SmartSolid(thread)
+
+    def create_peg_thread(self, simple: bool = False) -> IsoThread:
+        return IsoThread(
+            major_diameter=self.dim.peg_hole_diameter - self.dim.peg_hole_thread_diameter_delta,
+            pitch=self.dim.peg_hole_pitch,
+            length=self.dim.tray_height,
+            external=True,
+            end_finishes=("fade", "fade")
+        )
+
+    def create_peg(self) -> SmartSolid:
+        thread = self.create_peg_thread()
+
+        core_screw = SmartSolid(Solid.make_cylinder(thread.min_radius, thread.length + self.dim.peg_height))
+        core_screw.fillet_positional(self.dim.peg_fillet_radius, None, PositionalFilter(Axis.Z, core_screw.z_min))
+
+        thread_screw_solid = SmartSolid(thread)
+        thread_screw_solid.align_zxy(core_screw, Alignment.RL)
+
+        peg_base = create_cone_with_angle(thread.min_radius, thread.min_radius + self.dim.peg_base_width_delta)
+        peg_base.align_zxy(core_screw, Alignment.RL, -thread.length)
+
+        cap_hole, cap_thread = self.create_hole_parts(self.dim.peg_cap_hole_diameter, self.dim.peg_cap_hole_height, self.dim.peg_cap_hole_pitch)
+        cap_hole.align_zxy(core_screw, Alignment.LR)
+        cap_thread.colocate(cap_hole)
+
+        cap_hole_cone = create_cone_with_angle(self.dim.peg_cap_hole_diameter / 2)
+        cap_hole_cone.align_zxy(cap_hole, Alignment.RR)
+
+        return core_screw.cut(cap_hole, cap_hole_cone).fuse(thread_screw_solid, cap_thread, peg_base)
+
+
+    def create_peg_cap(self) -> SmartSolid:
+        thread = IsoThread(
+            major_diameter=self.dim.peg_cap_hole_diameter - self.dim.peg_cap_thread_diameter_delta,
+            pitch=self.dim.peg_cap_hole_pitch,
+            length=self.dim.peg_cap_hole_height - self.dim.peg_cap_hole_height_delta,
+            external=True,
+            end_finishes=("fade", "fade")
+        )
+
+        core_screw = SmartSolid(Solid.make_cylinder(thread.min_radius, thread.length + self.dim.peg_cap_handle_height))
+
+        thread_screw_solid = SmartSolid(thread)
+        thread_screw_solid.align_zxy(core_screw, Alignment.RL, -0.1)
+
+        peg_radius = self.create_peg_thread(True).min_radius
+        cap_base = SmartSolid(Solid.make_cylinder(peg_radius, self.dim.peg_cap_handle_height))
+        cap_base.fillet_positional(self.dim.peg_cap_fillet_radius, None, PositionalFilter(Axis.Z, cap_base.z_min))
+        cap_base.align_zxy(core_screw, Alignment.LR)
+
+        return core_screw.fuse(thread_screw_solid, cap_base)
 
 
 dimensions = TrayDimensions()
 tray_factory = TrayFactory(dimensions)
 
+
+def export_3mf(tray: SmartSolid, peg: SmartSolid, peg_cap: SmartSolid):
+    clear()
+
+    tray.mirror(Plane.XY)
+    peg.mirror(Plane.XY)
+    peg_cap.mirror(Plane.XY)
+
+    export(tray, "tray")
+
+    plane = Plane.XY.rotated((0, 0, 45))
+    for direction_x in [-1, 1]:
+        for direction_y in [-1, 1]:
+            peg.align_xy(tray, Alignment.C, direction_x * dimensions.peg_hole_offset_x, direction_y * dimensions.watering_hole_offset_y, plane)
+            peg.align_z(tray, Alignment.RR, -dimensions.tray_height)
+            export(peg.copy(), "peg")
+
+            peg_cap.align_zxy(peg, Alignment.RR, -dimensions.peg_cap_handle_height)
+            export(peg_cap.copy(), "peg_cap")
+
+
+    save_3mf()
+
 tray_solid = tray_factory.create_tray()
+peg_solid = tray_factory.create_peg()
+peg_cap_solid = tray_factory.create_peg_cap()
+
 export(tray_solid, "tray")
-save_3mf()
+export(peg_solid, "peg")
+export(peg_cap_solid, "peg_cap")
+save_stl("models\\hydroponic\\tray")
+
+export_3mf(tray_solid, peg_solid, peg_cap_solid)
