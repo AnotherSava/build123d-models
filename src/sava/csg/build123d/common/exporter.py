@@ -1,4 +1,6 @@
 import os
+import shutil
+import tempfile
 from copy import copy
 from pathlib import Path
 from typing import Iterable
@@ -125,7 +127,19 @@ def save_3mf(location: str = None) -> None:
                 mesher.add_shape(prepared)
 
     _report_labels()
-    mesher.write(actual_location)
+
+    # Write to the temporary file first, then copy to the actual location
+    # Writing it to the actual location exactly may be slow enough for F3D viewer to close
+    with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.3mf') as temp_file:
+        temp_path = temp_file.name
+
+    try:
+        mesher.write(temp_path)
+        shutil.copy2(temp_path, actual_location)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
     print(f"\nDone")
 
 def create_file_path(label: str, subfolder: str) -> str:
