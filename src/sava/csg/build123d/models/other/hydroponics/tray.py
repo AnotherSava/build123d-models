@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from math import sin, radians, tan
-from typing import Tuple
+from math import sin, radians, tan, atan, sqrt, degrees
+from typing import Tuple, Iterable
 
 from bd_warehouse.thread import IsoThread
-from build123d import Solid, Vector, Axis, Plane
+from build123d import Solid, Vector, Axis, Plane, Wire
 
-from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
-from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
+from sava.csg.build123d.common.geometry import Alignment, create_vector
+from sava.csg.build123d.common.modelcutter import cut_with_wires, CutSpec
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_cone_with_angle, create_cone_with_angle_and_height
 from sava.csg.build123d.common.smartbox import SmartBox
@@ -18,7 +19,7 @@ class TrayDimensions:
     inner_length: float = 299
     inner_width: float = 165
     inner_height: float = 3
-    inner_fillet_radius: float = 34
+    inner_fillet_radius: float = 30
     outer_height: float = 1.2
     outer_padding: float = 2.5
 
@@ -100,7 +101,7 @@ class TrayDimensions:
     @property
     def watering_hole_offset_x(self) -> float:
         # Position in 3rd column (index 2), middle between first basket_hole and wall
-        return self.get_hole_offset(0, 2).X
+        return self.get_hole_offset(2, 0).X
 
     @property
     def peg_hole_offset_y(self) -> float:
@@ -110,12 +111,18 @@ class TrayDimensions:
     def peg_hole_offset_x(self) -> float:
         return self.get_hole_offset(0, 0).X
 
-    def get_hole_offset(self, row: int, column: int) -> Vector:
-        step_y = self.basket_width + self.basket_distance_y
-        step_x = (self.inner_length - self.basket_external_diameter) / (self.columns - 1)
+    @property
+    def hole_step_x(self):
+        return (self.inner_length - self.basket_external_diameter) / (self.columns - 1)
+
+    @property
+    def hole_step_y(self):
+        return self.basket_width + self.basket_distance_y
+
+    def get_hole_offset(self, column: int, row: int) -> Vector:
         rows = 3 if column % 2 == 0 else 4
-        shift_x = (column - (self.columns - 1) / 2) * step_x
-        shift_y = (row - (rows - 1) / 2) * step_y
+        shift_x = (column - (self.columns - 1) / 2) * self.hole_step_x
+        shift_y = (row - (rows - 1) / 2) * self.hole_step_y
         return Vector(shift_x, shift_y)
 
 
@@ -124,12 +131,12 @@ class TrayFactory:
     def __init__(self, dim: TrayDimensions):
         self.dim = dim
 
-    def create_tray(self) -> SmartSolid:
+    def create_tray(self) -> list[SmartSolid]:
         inner_tray = SmartBox(self.dim.inner_length, self.dim.inner_width, self.dim.inner_height)
         inner_tray.fillet_z(self.dim.inner_fillet_radius)
 
         outer_tray = SmartBox(self.dim.outer_length, self.dim.outer_width, self.dim.outer_height)
-        outer_tray.fillet_z(self .dim.inner_fillet_radius + self.dim.outer_padding)
+        outer_tray.fillet_z(self.dim.inner_fillet_radius + self.dim.outer_padding)
         outer_tray.align_zxy(inner_tray, Alignment.LL)
 
         tray = inner_tray.fuse(outer_tray)
@@ -143,7 +150,7 @@ class TrayFactory:
         for column in range(self.dim.columns):
             for row in range(3 if column % 2 == 0 else 4):
                 if column != self.dim.columns // 2 or row != 0:  # skip top basket_hole in middle column
-                    holes.append(basket_hole.copy().move_vector(self.dim.get_hole_offset(row, column)))
+                    holes.append(basket_hole.copy().move_vector(self.dim.get_hole_offset(column, row)))
         tray.cut(fuse(holes))
 
         watering_hole, watering_hole_external = self.create_watering_hole_parts()
@@ -160,7 +167,26 @@ class TrayFactory:
 
                 tray.cut(peg_hole_inner).fuse(peg_hole_outer)
 
-        return self.prepare_for_print(tray)
+        # Cut tray between columns 2 and 3
+        cutting_wire = self._create_cutting_wire(tray)
+        pieces = cut_with_wires(tray, CutSpec(cutting_wire, Plane.XZ, 0.2))
+
+        return pieces
+
+    def _create_cutting_wire(self, tray: SmartSolid) -> Wire:
+        angle = degrees(atan(self.dim.hole_step_y / (2 * self.dim.hole_step_x)))
+        l = sqrt(4 * self.dim.hole_step_x ** 2 + self.dim.hole_step_y ** 2) / 4
+        v1 = self.dim.get_hole_offset(4, 0)
+        v2 = self.dim.get_hole_offset(5, 0)
+        delta_x = self.dim.tray_height / 4 # since cut goes 45 degrees to the left
+        start = (v1 + v2) / 2 + Vector(tray.x_mid + delta_x, tray.y_mid, tray.z_min + self.dim.tray_height / 2)
+        pencil = Pencil(start - create_vector(self.dim.outer_width / 2, -angle))
+        pencil.draw(self.dim.outer_width / 2 + l / 2, -angle)
+        for i in range(2):
+            pencil.draw(l, angle)
+            pencil.draw(l, -angle)
+        pencil.draw(self.dim.outer_width / 2, angle)
+        return pencil.create_wire(False)
 
     def prepare_for_print(self, tray: SmartSolid):
         # return tray
@@ -217,7 +243,6 @@ class TrayFactory:
             external=False,
             end_finishes=("chamfer", "fade")
         )
-        print("hole ", thread.min_radius * 2, thread.root_radius * 2, thread.major_diameter, self.dim.peg_hole_diameter)
 
         return SmartSolid(hole), SmartSolid(thread)
 
@@ -290,41 +315,45 @@ dimensions = TrayDimensions()
 tray_factory = TrayFactory(dimensions)
 
 
-def export_3mf(tray: SmartSolid, peg: SmartSolid, peg_cap: SmartSolid, watering_hole_cap: SmartSolid):
-    clear()
-
-    for shape in [tray, peg, peg_cap]:
+def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: SmartSolid, watering_hole_cap: SmartSolid):
+    for shape in [*tray_pieces, peg, peg_cap]:
         shape.mirror(Plane.XY)
 
-    export(tray, "tray")
+    for i, piece in enumerate(tray_pieces):
+        export(piece, f"tray_piece_{i + 1}")
 
-    plane = Plane.XY.rotated((0, 0, 45))
+    tray = SmartSolid(tray_pieces)
+
     for direction_x in [-1, 1]:
         for direction_y in [-1, 1]:
-            peg.align_xy(tray, Alignment.C, direction_x * dimensions.peg_hole_offset_x, direction_y * dimensions.watering_hole_offset_y, plane)
+            peg.align_xy(tray, Alignment.C, direction_x * dimensions.peg_hole_offset_x, direction_y * dimensions.watering_hole_offset_y)
             peg.align_z(tray, Alignment.RR, -dimensions.tray_height)
             export(peg.copy(), "peg")
 
             peg_cap.align_zxy(peg, Alignment.RR, -dimensions.peg_cap_handle_height)
             export(peg_cap.copy(), "peg_cap")
 
-    watering_hole_cap.align_xy(tray, Alignment.C, dimensions.watering_hole_offset_x, dimensions.watering_hole_offset_y, plane)
+    watering_hole_cap.align_xy(tray, Alignment.C, dimensions.watering_hole_offset_x, dimensions.watering_hole_offset_y)
     watering_hole_cap.align_z(tray, Alignment.LR)
     export(watering_hole_cap, "watering_hole_cap")
 
     save_3mf()
     save_3mf("3mf/tray.3mf")
 
-tray_solid = tray_factory.create_tray()
+tray_solid_pieces = tray_factory.create_tray()
 peg_solid = tray_factory.create_peg()
 peg_cap_solid = tray_factory.create_peg_cap()
 watering_hole_cap_solid = tray_factory.create_watering_hole_cap()
 
-export(tray_solid, "tray")
+# For 3MF export, use the first piece as reference (or could export both)
+export_3mf(tray_solid_pieces, peg_solid, peg_cap_solid, watering_hole_cap_solid)
+
+clear()
+for i, piece in enumerate(tray_solid_pieces):
+    export(piece, f"tray_piece_{i + 1}")
+
 export(peg_solid, "peg")
 export(peg_cap_solid, "peg_cap")
 export(watering_hole_cap_solid, "watering_hole_cap")
 
 save_stl("models\\hydroponic\\tray")
-
-export_3mf(tray_solid, peg_solid, peg_cap_solid, watering_hole_cap_solid)
