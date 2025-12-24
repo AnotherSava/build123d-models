@@ -398,7 +398,7 @@ class TestSweepSolidPathPlane(unittest.TestCase):
         wire = Wire([edge])
         sketch = Circle(0.05)
         # Create path plane with offset origin
-        original_path_plane = Plane(origin=(5, 5, 0), x_dir=(1, 0, 0), y_dir=(0, 1, 0))
+        original_path_plane = Plane(origin=(5, 5, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
         sweep_solid = SweepSolid(sketch, wire, original_path_plane)
         
         # Rotate the sweep solid 90 degrees around Z axis
@@ -421,7 +421,7 @@ class TestSweepSolidPathPlane(unittest.TestCase):
         edge = Edge.make_line((0, 0, 0), (10, 0, 0))
         wire = Wire([edge])
         sketch = Circle(0.05)
-        original_path_plane = Plane(origin=(2, 3, 0), x_dir=(1, 0, 0), y_dir=(0, 1, 0))
+        original_path_plane = Plane(origin=(2, 3, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
         sweep_solid = SweepSolid(sketch, wire, original_path_plane)
         
         # Apply rotation first, then movement
