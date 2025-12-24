@@ -5,8 +5,9 @@ from copy import copy
 from pathlib import Path
 from typing import Iterable
 
-from build123d import Shape, Color, Mesher, Plane
+from build123d import Shape, Color, Mesher, Plane, Wire
 
+from sava.csg.build123d.common.geometry import solidify_wire
 from sava.csg.build123d.common.smartplane import SmartPlane
 from sava.csg.build123d.common.smartsolid import get_solid
 
@@ -50,6 +51,8 @@ def _prepare_shape(shape, label: str) -> Iterable[Shape]:
     result = []
     if isinstance(shape, Plane):
         extracted = SmartPlane(shape).solid
+    elif isinstance(shape, Wire):
+        extracted = solidify_wire(shape)
     else:
         extracted = get_solid(shape)
 

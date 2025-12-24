@@ -2,7 +2,7 @@ from enum import IntEnum, auto
 from math import cos, sin, radians, atan2, degrees
 from typing import Tuple
 
-from build123d import Vector, Axis, Wire, Face, extrude, Part, Polyline, Plane, VectorLike
+from build123d import Vector, Axis, Wire, Face, extrude, Part, Polyline, Plane, VectorLike, sweep, Solid
 
 
 # Ways to align one 2d vector (or another else) to another
@@ -398,3 +398,25 @@ def calculate_orientation(x_axis: Axis, y_axis: Axis, z_axis: Axis) -> Vector:
         angle_z = degrees(atan2(-final_y.X, final_x.X))
     
     return Vector(angle_x, angle_y, angle_z)
+
+def solidify_wire(wire: Wire, radius = 0.2) -> list[Part]:
+    plane = create_wire_tangent_plane(wire, 0.0)
+    circle_wire = Wire.make_circle(radius, plane)
+    circle_face = Face(circle_wire)
+
+    # Create the swept cylinder along the wire
+    swept = sweep(circle_face, wire)
+
+    # Add spheres at each vertex
+    sphere_radius = radius * 4
+    vertices = wire.vertices()
+
+    # Collect all shapes (swept + spheres)
+    shapes = [swept]
+    for vertex in vertices:
+        sphere = Solid.make_sphere(sphere_radius)
+        sphere.position = vertex.center()
+        shapes.append(sphere)
+
+    # Return as a list - the exporter handles iterables by processing each shape individually
+    return shapes
