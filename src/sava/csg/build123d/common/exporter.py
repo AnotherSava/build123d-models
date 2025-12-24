@@ -105,10 +105,12 @@ def get_project_root_folder() -> Path:
 
 
 def get_path(*path_from_project_root) -> str:
-    path = str(get_project_root_folder())
-    for subpath in path_from_project_root:
-        path += f"\\{subpath}"
-    return path
+    # If first path is absolute, use it directly - mostly for temporary files in tests
+    if os.path.isabs(path_from_project_root[0]):
+        return os.path.join(*path_from_project_root)
+
+    # Otherwise join to project root
+    return os.path.join(str(get_project_root_folder()), *path_from_project_root)
 
 
 def _report_labels() -> None:
