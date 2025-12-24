@@ -1,7 +1,7 @@
 from math import asin
 from math import radians, degrees, acos, sin, cos, tan, atan
 
-from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Compound, Axis, make_face, Part, revolve, VectorLike
+from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, make_face, Part, revolve, VectorLike, Sketch
 
 from sava.csg.build123d.common.advanced_math import advanced_mod
 from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle
@@ -172,7 +172,10 @@ class Pencil:
         if enclose and self.location != self.start:
             curves.append(Line(self.location, self.start))
 
-        return self.plane.from_local_coords(Wire(curves))
+        # Create wire in local 2D coordinates
+        local_wire = Wire(curves)
+        # Transform from local to global using the plane's location
+        return local_wire.locate(Location(self.plane))
 
     def extrude_mirrored(self, height: float, axis: Axis = Axis.Y):
         face = self.create_mirrored_face(axis)
@@ -184,17 +187,29 @@ class Pencil:
         if Axis.X == axis and self.location.Y != self.start.Y:
             self.up(self.start.Y - self.location.Y)
 
-    def create_mirrored_face(self, axis: Axis) -> Compound:
+    def create_mirrored_face(self, axis: Axis) -> Sketch:
         self.complete_wire_for_mirror(axis)
         return make_face([self.create_wire(False), self.mirror_wire(axis)])
 
     def mirror_wire(self, axis: Axis) -> Wire:
         wire = self.create_wire(False)
+        # Create mirror planes in pencil's local coordinate system
+        # In build123d Plane, z_dir is the normal (perpendicular to plane surface)
+        # For Axis.X: mirror across plane perpendicular to local Y → z_dir = local Y
+        # For Axis.Y: mirror across plane perpendicular to local X → z_dir = local X
         match axis:
             case Axis.Y:
-                return mirror(wire, Plane.YZ).move(Location(Vector(self.location.X * 2, 0)))
+                # Mirror plane normal = local X direction
+                mirror_plane = Plane(self.plane.origin, x_dir=self.plane.y_dir, z_dir=self.plane.x_dir)
+                move_vector_local = Vector(self.location.X * 2, 0, 0)
+                move_vector_global = self.plane.from_local_coords(move_vector_local) - self.plane.from_local_coords(Vector(0, 0, 0))
+                return mirror(wire, mirror_plane).move(Location(move_vector_global))
             case Axis.X:
-                return mirror(wire, Plane.XZ).move(Location(Vector(0, self.location.Y * 2)))
+                # Mirror plane normal = local Y direction
+                mirror_plane = Plane(self.plane.origin, x_dir=self.plane.x_dir, z_dir=self.plane.y_dir)
+                move_vector_local = Vector(0, self.location.Y * 2, 0)
+                move_vector_global = self.plane.from_local_coords(move_vector_local) - self.plane.from_local_coords(Vector(0, 0, 0))
+                return mirror(wire, mirror_plane).move(Location(move_vector_global))
         raise "Invalid axis"
 
     def create_sweep_path(self, plane: Plane = Plane.YZ) -> 'Pencil':
