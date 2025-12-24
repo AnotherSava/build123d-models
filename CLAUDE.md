@@ -40,9 +40,18 @@ f3d models/current_model.3mf --watch --opacity=0.6
 
 - **SmartBox**: Extends SmartSolid for box primitives with cutout operations
 
-- **Pencil**: 2D drawing tool for creating complex profiles via lines and arcs, then extruding/revolving them into 3D shapes
+- **Pencil**: 2D drawing tool for creating complex profiles via lines and arcs, then extruding/revolving them into 3D shapes. Supports mirroring across axes in arbitrary planes (not just XY)
 
 - **SweepSolid**: Creates 3D shapes by sweeping a 2D profile along a path
+
+- **ModelCutter** (`modelcutter.py`): Advanced cutting system for splitting models along wire paths
+  - `CutSpec`: Dataclass defining a cut (wire path, plane orientation, optional thickness)
+  - `cut_with_wires()`: Cuts a model into pieces along one or more wires
+    - Thin cuts (thickness=0): Split model without removing material
+    - Thick cuts (thickness>0): Remove a slice of material along the wire AND split into separate pieces
+    - Progressive cutting: Each cut subdivides all existing pieces
+    - Properly handles disconnected solids after material removal
+  - Uses `create_wire_tangent_plane()` from geometry.py to orient cutting planes
 
 - **Exporter**: Exports models to 3MF format. Default output is `models/current_model.3mf`. Includes debug helpers (`show_red`, `show_blue`, `show_green`) for visualizing shapes
 
@@ -51,6 +60,8 @@ f3d models/current_model.3mf --watch --opacity=0.6
 - **Alignment**: Enum for positioning (Left/Center/Right relative to Left/Center/Right)
 - **Direction**: Cardinal directions (N/S/E/W) with axis helpers
 - Vector/rotation math utilities including `rotate_orientation` for fixed-axis rotations (vs build123d's object-attached rotations)
+- **create_wire_tangent_plane()**: Creates a plane tangent to a wire at a specified position (0.0-1.0 parameter)
+- **solidify_wire()**: Converts a wire to a 3D solid by sweeping a small circle along it (useful for visualization)
 
 ### Project Structure
 
@@ -85,6 +96,40 @@ save_stl()  # Separate STL files: body.stl, screw.stl
 ```
 
 **Alignment system:** Use `align_x`, `align_y`, `align_z`, or `align` to position solids relative to each other or to origin (pass `None` as reference).
+
+**Cutting models along wires:**
+```python
+from sava.csg.build123d.common.modelcutter import cut_with_wires, CutSpec
+from sava.csg.build123d.common.geometry import create_wire_tangent_plane
+from build123d import Wire, Line
+
+model = SmartBox(100, 50, 30)
+wire = Wire([Line((50, 0, 0), (50, 50, 30))])
+plane = create_wire_tangent_plane(wire, 0.0)
+
+# Thin cut (split into pieces)
+pieces = cut_with_wires(model, CutSpec(wire, plane))
+
+# Thick cut (remove material)
+pieces = cut_with_wires(model, CutSpec(wire, plane, thickness=2.0))
+
+# Multiple cuts
+wire2 = Wire([Line((0, 25, 0), (100, 25, 30))])
+plane2 = create_wire_tangent_plane(wire2, 0.0)
+pieces = cut_with_wires(model, CutSpec(wire, plane), CutSpec(wire2, plane2))
+```
+
+**Pencil mirroring in custom planes:**
+```python
+from sava.csg.build123d.common.pencil import Pencil
+from build123d import Plane, Axis
+
+# Works in any plane orientation, not just XY
+tilted_plane = Plane.XY.rotated((30, 45, 15))
+pencil = Pencil(plane=tilted_plane)
+pencil.draw(50, 45)
+face = pencil.create_mirrored_face(Axis.X)  # Mirrors correctly in tilted plane
+```
 
 **Orientation note:** The `rotate()` method uses fixed axes (global coordinate system), while `orient()` uses build123d's default object-attached axes.
 
