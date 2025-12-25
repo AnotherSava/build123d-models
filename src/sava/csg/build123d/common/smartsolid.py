@@ -192,6 +192,9 @@ class SmartSolid:
         self.orient(rotate_orientation(self.solid.orientation, rotations, plane))
         return self
 
+    def rotated(self, rotations: VectorLike, plane: Plane = Plane.XY) -> 'SmartSolid':
+        return self.copy().rotate(rotations, plane)
+
     def oriented(self, rotations: VectorLike) -> 'SmartSolid':
         return self.copy().orient(rotations)
 
@@ -229,7 +232,7 @@ class SmartSolid:
         return bound_box.min.Z, bound_box.max.Z
 
     def cut(self, *args) -> 'SmartSolid':
-        self.solid = self.solid - fuse(args)
+        self.solid = wrap(self.solid) - fuse(args)
         self.assert_valid()
         return self
 
@@ -345,8 +348,7 @@ class SmartSolid:
         return self
 
     def intersect(self, *args) -> 'SmartSolid':
-        for shape in args:
-            self.solid = self.solid & get_solid(shape)
+        self.solid = self.solid & fuse(args)
         self.assert_valid()
         return self
 
@@ -407,4 +409,4 @@ class SmartSolid:
         return outer.cut(self)
 
     def wrap_solid(self):
-        return Compound(self.solid) if isinstance(self.solid, ShapeList) else self.solid
+        return wrap(self.solid)
