@@ -196,3 +196,29 @@ def test_flatten(input, expected):
 ### Formatting
 
 - Leave an empty line at the end of every file
+- Prefer single-line expressions over multi-line formatting. Keep expressions on one line even if they're long, rather than breaking them across multiple lines with parentheses.
+  ```python
+  # Good
+  radius_at_bottom = self.dim.outer_radius_top * (1 - z_param_bottom) + self.dim.outer_radius_bottom * z_param_bottom
+
+  # Avoid
+  radius_at_bottom = (
+      self.dim.outer_radius_top * (1 - z_param_bottom) +
+      self.dim.outer_radius_bottom * z_param_bottom
+  )
+  ```
+
+  **Exception**: Multi-line formatting is acceptable when creating objects or calling functions with all parameters as named parameters:
+  ```python
+  # Acceptable
+  thread = IsoThread(
+      major_diameter=major_diameter,
+      pitch=pitch,
+      length=height,
+      external=False,
+      end_finishes=("chamfer", "fade")
+  )
+
+  # Also acceptable for single-line if not too long
+  thread = IsoThread(major_diameter=major_diameter, pitch=pitch, length=height, external=False, end_finishes=("chamfer", "fade"))
+  ```
