@@ -18,6 +18,7 @@ BASIC_COLORS = ["yellow", "blue", "green", "orange", "purple", "cyan", "magenta"
 # Module-level storage
 _shapes: dict[str, list] = {}
 _label_colors: dict[str, str] = {}
+_index: int = 1
 
 
 def _is_valid_color(name: str) -> bool:
@@ -70,12 +71,20 @@ def _prepare_shape(shape, label: str) -> Iterable[Shape]:
 
 def clear() -> None:
     """Clear all stored shapes and color assignments. Useful for testing."""
+    global _index
     _shapes.clear()
     _label_colors.clear()
+    _index = 1
 
 
-def export(shape, label: str = "model") -> None:
+def export(shape, label: str = None) -> None:
     """Add shape to export storage under the given label."""
+    global _index
+    label = label or shape.label
+    if label is None:
+        label = f"shape_{_index}"
+        _index += 1
+
     if label not in _shapes:
         _shapes[label] = []
     _shapes[label].append(shape)
@@ -113,6 +122,13 @@ def get_path(*path_from_project_root) -> str:
     return os.path.join(str(get_project_root_folder()), *path_from_project_root)
 
 
+def _resolve_path(location: str) -> str:
+    """Resolve path to absolute path. If relative, treat as relative to project root."""
+    if os.path.isabs(location):
+        return os.path.normpath(location)
+    return os.path.normpath(get_path(location))
+
+
 def _report_labels() -> None:
     """Print summary of shapes by label."""
     for label, shapes in _shapes.items():
@@ -122,7 +138,7 @@ def _report_labels() -> None:
 
 def save_3mf(location: str = None) -> None:
     """Save all shapes to a single 3MF file."""
-    actual_location = location or get_path(CURRENT_MODEL_LOCATION_3MF)
+    actual_location = create_file_path(location or CURRENT_MODEL_LOCATION_3MF)
     print(f"\nExporting to {actual_location}\n")
 
     mesher = Mesher()
@@ -147,15 +163,25 @@ def save_3mf(location: str = None) -> None:
 
     print(f"\nDone")
 
-def create_file_path(label: str, subfolder: str) -> str:
-    path = get_path(subfolder, f"{label}.stl")
-    os.makedirs(os.path.dirname(path), exist_ok=True) # create a folder if needed
+def create_file_path(location: str, filename: str = None) -> str:
+    """Resolve path and create parent directory if needed.
+
+    Args:
+        location: Directory or file path
+        filename: Optional filename to join with location
+    """
+    if filename:
+        path = _resolve_path(os.path.join(location, filename))
+    else:
+        path = _resolve_path(location)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     return path
 
 def save_stl(directory: str = None) -> None:
     """Save each label group to separate STL files."""
-
-    print(f"\nExporting STL files to {get_path(directory or CURRENT_MODEL_LOCATION_STL)}\n")
+    base_dir = directory or CURRENT_MODEL_LOCATION_STL
+    actual_directory = _resolve_path(base_dir)
+    print(f"\nExporting STL files to {actual_directory}\n")
 
     for label, shapes in _shapes.items():
         mesher = Mesher()
@@ -163,7 +189,7 @@ def save_stl(directory: str = None) -> None:
             for prepared in _prepare_shape(shape, label):
                 mesher.add_shape(prepared)
 
-        file_path = create_file_path(label, directory or CURRENT_MODEL_LOCATION_STL)
+        file_path = create_file_path(actual_directory, f"{label}.stl")
         mesher.write(str(file_path))
         print(f"  - {os.path.basename(file_path)}")
 

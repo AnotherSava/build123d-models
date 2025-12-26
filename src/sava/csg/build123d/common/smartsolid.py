@@ -42,7 +42,14 @@ def list_shapes(*args) -> 'SmartSolid':
     return result
 
 class SmartSolid:
-    def __init__(self, *args):
+    def __init__(self, *args, label: str = None):
+        """Create a SmartSolid from one or more solid objects.
+
+        Args:
+            *args: Solid objects to fuse together
+            label: Optional label for the solid (keyword-only argument)
+        """
+        self.label = label
         self.solid = fuse(*args) if len(args) > 0 else None
         self.assert_valid()
 
@@ -352,8 +359,8 @@ class SmartSolid:
         self.assert_valid()
         return self
 
-    def intersected(self, shape) -> 'SmartSolid':
-        return SmartSolid(self.solid & get_solid(shape))
+    def intersected(self, *args) -> 'SmartSolid':
+        return self.copy().intersect(args)
 
     def add_notch(self, direction: Direction, depth: float, length: float):
         raise NotImplementedError("Remove dependency on pencil")
@@ -370,38 +377,34 @@ class SmartSolid:
         # self.fuse(notch.intersect(extended_shape))
 
     def copy(self):
-        return SmartSolid(copy(self.solid))
-
-    def _pad_solid(self, pad_x: float, pad_y: float, pad_z: float):
-        factor_x = 1 + pad_x / self.x_size
-        factor_y = 1 + (pad_x if pad_y is None else pad_y) / self.y_size
-        factor_z = 1 + ((pad_x if pad_y is None else pad_y) if pad_z is None else pad_z) / self.z_size
-
-        return self._scale_solid(factor_x, factor_y, factor_z)
+        return SmartSolid(copy(self.solid), label=self.label)
 
     def _scale_solid(self, factor_x: float, factor_y: float, factor_z: float):
         return scale(self.solid, (factor_x, factor_y or factor_x, factor_z or factor_y or factor_x))
 
     def pad(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None):
-        self.solid = self._pad_solid(pad_x, pad_y, pad_z)
+        pad_y = pad_x if pad_y is None else pad_y
+        pad_z = pad_x if pad_z is None else pad_z
+
+        self.solid = self._scale_solid(1 + pad_x / self.x_size, 1 + pad_y / self.y_size, 1 + pad_z / self.z_size)
         return self
 
     def padded(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None):
-        return SmartSolid(self._pad_solid(pad_x, pad_y, pad_z))
+        return self.copy().pad(pad_x, pad_y, pad_z)
 
     def scale(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None):
         self.solid = self._scale_solid(factor_x, factor_y, factor_z)
         return self
 
     def scaled(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None):
-        return SmartSolid(self._scale_solid(factor_x, factor_y, factor_z))
+        return self.copy().scale(factor_x, factor_y, factor_z)
 
     def mirror(self, about: Plane = Plane.XZ) -> 'SmartSolid':
         self.solid = mirror(self.solid, about)
         return self
 
     def mirrored(self, about: Plane = Plane.XZ) -> 'SmartSolid':
-        return SmartSolid(mirror(self.solid, about))
+        return self.copy().mirror(about)
 
     def molded(self, padding: float = 2) -> 'SmartSolid':
         outer = self.padded(padding)
