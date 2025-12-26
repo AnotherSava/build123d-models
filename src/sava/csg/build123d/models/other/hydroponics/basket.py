@@ -29,7 +29,34 @@ class BasketDimensions:
     cap_angle: float = 45
     cap_leg_width: float = 1.5
     cap_leg_count: int = 4
-    funnel_depth: float = 5.3
+    leg_depth: float = 5.3
+
+    basket_cover_thickness: float = 3
+    basket_cover_hole_diameter: float = 6
+    basket_cover_latch_thickness: float = 2
+    basket_cover_foundation_depth: float = 2.5
+
+    @property
+    def cap_angle_radians(self) -> float:
+        return radians(self.cap_angle)
+
+    @property
+    def window_angle_radians(self) -> float:
+        return radians(self.window_angle)
+
+    def cap_radius_outer(self, offset_z_towards_basket: float = 0) -> float:
+        return self.cap_diameter_outer_wide / 2 - offset_z_towards_basket * tan(self.cap_angle_radians)
+
+    def cap_radius_inner(self, offset_z_towards_basket: float = 0) -> float:
+        return self.cap_radius_outer(offset_z_towards_basket) - self.thickness
+
+    @property
+    def basket_cover_radius_wide(self) -> float:
+        return self.cap_radius_inner(self.cap_depth - self.basket_cover_thickness)
+
+    @property
+    def basket_cover_radius_narrow(self) -> float:
+        return self.cap_radius_inner(self.cap_depth)
 
     @property
     def outer_radius_top(self):
@@ -37,7 +64,7 @@ class BasketDimensions:
 
     @property
     def cap_depth(self):
-        return (self.cap_diameter_outer_wide / 2 - self.outer_radius_top) / tan(radians(self.cap_angle))
+        return (self.cap_diameter_outer_wide / 2 - self.outer_radius_top) / tan(self.cap_angle_radians)
 
     @property
     def inner_radius_top(self):
@@ -51,7 +78,7 @@ class BasketDimensions:
     def triangle_height_at_cap(self) -> float:
         """Height of the triangular window top at the cap level."""
         radius_at_cap = self.outer_radius_bottom
-        arc_length_at_cap = radius_at_cap * radians(self.window_angle)
+        arc_length_at_cap = radius_at_cap * self.window_angle_radians
         return arc_length_at_cap / 2
 
     @property
@@ -116,8 +143,8 @@ class BasketFactory:
         radius_at_center = (radius_at_bottom + radius_at_top) / 2
 
         # Calculate arc lengths to maintain constant angular width
-        arc_length_bottom = radius_at_bottom * radians(self.dim.window_angle)
-        arc_length_top = radius_at_top * radians(self.dim.window_angle)
+        arc_length_bottom = radius_at_bottom * self.dim.window_angle_radians
+        arc_length_top = radius_at_top * self.dim.window_angle_radians
 
         # Window position at angle 0 (on positive X axis)
         x_pos = radius_at_center
@@ -188,13 +215,13 @@ class BasketFactory:
         for item in [basket_outer, basket_inner]:
             item.align_xy()
 
-        cap_45_outer = create_cone_with_angle_and_height(self.dim.cap_diameter_outer_wide / 2, self.dim.cap_depth, -self.dim.cap_angle)
+        cap_45_outer = create_cone_with_angle_and_height(self.dim.cap_radius_outer(), self.dim.cap_depth, -self.dim.cap_angle)
         cap_45_outer.align_zxy(basket_outer, Alignment.LL)
 
-        cap_45_inner = create_cone_with_angle_and_height(self.dim.cap_diameter_outer_wide / 2 - self.dim.thickness, self.dim.cap_depth, -self.dim.cap_angle)
+        cap_45_inner = create_cone_with_angle_and_height(self.dim.cap_radius_inner(), self.dim.cap_depth, -self.dim.cap_angle)
         cap_45_inner.align(cap_45_outer)
 
-        cap_bottom = SmartSolid(Solid.make_cylinder(self.dim.cap_diameter_outer_middle / 2, self.dim.funnel_depth))
+        cap_bottom = SmartSolid(Solid.make_cylinder(self.dim.cap_diameter_outer_middle / 2, self.dim.leg_depth))
         cap_bottom.align_zxy(cap_45_outer, Alignment.LR)
 
         leg = SmartBox(cap_bottom.x_size, self.dim.cap_leg_width, cap_bottom.z_size + basket_outer.z_size + self.dim.thickness * 2)
@@ -206,12 +233,48 @@ class BasketFactory:
 
         return SmartSolid(basket_outer).fuse(cap_bottom, cap_45_outer, legs_external).cut(basket_inner, cap_45_inner)
 
+    def create_basket_cover_and_latch(self, basket: SmartSolid) -> Tuple[SmartSolid, SmartSolid]:
+        cover = SmartSolid(Solid.make_cone(self.dim.basket_cover_radius_wide, self.dim.basket_cover_radius_narrow, self.dim.basket_cover_thickness))
+        cover.align_zxy(basket, Alignment.LR, self.dim.cap_depth - self.dim.basket_cover_thickness)
+
+        hole = create_cone_with_angle_and_height(self.dim.basket_cover_hole_diameter / 2, self.dim.basket_cover_thickness, 45).orient((180, 0, 0))
+        hole.align(cover)
+
+        latch_cut = self.create_latch(cover, hole, 0)
+        latch = self.create_latch(cover, hole, 0.05)
+
+
+        foundation_outer = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2)
+        foundation_outer.align_zxy(cover, Alignment.RR)
+
+        foundation_inner = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow - self.dim.thickness / 2, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2)
+        foundation_inner.align(foundation_outer)
+
+        foundation_cut = SmartBox(self.dim.basket_cover_hole_diameter, self.dim.basket_cover_radius_wide, foundation_outer.z_size)
+        foundation_cut.align_xz(foundation_outer).align_y(foundation_outer, Alignment.CR)
+
+        return cover.fuse(foundation_outer).cut(hole, latch_cut, foundation_inner, foundation_cut), latch
+
+    def create_latch(self, cover: SmartSolid, hole: SmartSolid, gap: float = 0) -> SmartSolid:
+        pencil = Pencil()
+        pencil.right(self.dim.basket_cover_hole_diameter / 2 - gap / 2)
+        pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
+        pencil.jump((self.dim.basket_cover_latch_thickness / 2 - gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
+        pencil.jump((-self.dim.basket_cover_latch_thickness / 2 + gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
+        pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
+        latch = SmartSolid(pencil.extrude_mirrored(self.dim.basket_cover_radius_wide, Axis.Y)).rotate((90, 0, 0))
+        latch.align_zxy(cover, Alignment.C, 0, Alignment.C, 0, Alignment.CR, 0)
+        return latch.cut(hole).intersect(cover)
+
 
 def export_basket():
     dimensions = BasketDimensions()
     basket_factory = BasketFactory(dimensions)
     basket_solid = basket_factory.create_basket()
+    basket_cover_solid, basket_latch_solid = basket_factory.create_basket_cover_and_latch(basket_solid)
     export(basket_solid, "basket")
+    export(basket_cover_solid, "cover")
+    export(basket_latch_solid, "latch")
     save_3mf()
     save_stl("models\\hydroponic\\tray")
 
