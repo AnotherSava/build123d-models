@@ -8,7 +8,7 @@ from sava.csg.build123d.common.exporter import export, save_3mf
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
-from sava.csg.build123d.models.other.hydroponics.connector import HoseConnectorFactory, HoseConnectorDimensions
+from sava.csg.build123d.models.hydroponics.connector import HoseConnectorFactory, HoseConnectorDimensions
 
 
 @dataclass

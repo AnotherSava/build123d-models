@@ -12,7 +12,7 @@ from sava.csg.build123d.common.primitives import create_cone_with_angle
 from sava.csg.build123d.common.smartcone import SmartCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.sweepsolid import SweepSolid
-from sava.csg.build123d.models.other.hydroponics.connector import HoseConnectorFactory, HoseConnectorDimensions
+from sava.csg.build123d.models.hydroponics.connector import HoseConnectorFactory, HoseConnectorDimensions
 
 
 @dataclass

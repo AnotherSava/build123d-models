@@ -12,7 +12,7 @@ from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_cone_with_angle, create_cone_with_angle_and_height
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid, fuse, PositionalFilter
-from sava.csg.build123d.models.other.hydroponics.basket import BasketDimensions
+from sava.csg.build123d.models.hydroponics.basket import BasketDimensions
 
 
 @dataclass
