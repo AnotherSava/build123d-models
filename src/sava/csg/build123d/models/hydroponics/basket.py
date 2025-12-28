@@ -221,17 +221,20 @@ class BasketFactory:
         cap_45_inner = create_cone_with_angle_and_height(self.dim.cap_radius_inner(), self.dim.cap_depth, -self.dim.cap_angle)
         cap_45_inner.align(cap_45_outer)
 
-        cap_bottom = SmartSolid(Solid.make_cylinder(self.dim.cap_diameter_outer_middle / 2, self.dim.leg_depth))
-        cap_bottom.align_zxy(cap_45_outer, Alignment.LR)
+        ribs = self.create_ribs(basket_outer)
 
-        leg = SmartBox(cap_bottom.x_size, self.dim.cap_leg_width, cap_bottom.z_size + basket_outer.z_size + self.dim.thickness * 2)
+        return SmartSolid(basket_outer, cap_45_outer, ribs, label="basket").cut(basket_inner, cap_45_inner)
 
-        legs = [leg.oriented((0, 0, 180 / self.dim.cap_leg_count * i)).align_zxy(cap_bottom, Alignment.LR) for i in range(self.dim.cap_leg_count)]
-        cap_bottom.intersect(legs)
+    def create_ribs(self, basket_outer: SmartSolid) -> SmartSolid:
+        leg_holder_boundary = SmartSolid(Solid.make_cylinder(self.dim.cap_diameter_outer_middle / 2, self.dim.leg_depth))
+        leg_holder_boundary.align_zxy(basket_outer, Alignment.LR, -self.dim.cap_depth)
 
-        legs_external = basket_outer.padded(self.dim.thickness * 2).align_zxy(basket_outer, Alignment.RL).intersect(legs)
+        upper_rib_boundary = basket_outer.padded(self.dim.thickness * 2).align_zxy(basket_outer, Alignment.RL)
 
-        return SmartSolid(basket_outer, cap_bottom, cap_45_outer, legs_external, label="basket").cut(basket_inner, cap_45_inner)
+        rib = SmartBox(leg_holder_boundary.x_size, self.dim.cap_leg_width, leg_holder_boundary.z_size + basket_outer.z_size + self.dim.thickness * 2)
+        ribs = [rib.oriented((0, 0, 180 / self.dim.cap_leg_count * i)).align_zxy(leg_holder_boundary, Alignment.LR) for i in range(self.dim.cap_leg_count)]
+
+        return upper_rib_boundary.fuse(leg_holder_boundary).intersect(ribs)
 
     def create_basket_cover_and_latch(self, basket: SmartSolid) -> Tuple[SmartSolid, SmartSolid]:
         cover = SmartSolid(Solid.make_cone(self.dim.basket_cover_radius_wide, self.dim.basket_cover_radius_narrow, self.dim.basket_cover_thickness), label="cover")
