@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import warnings
 from copy import copy
 from pathlib import Path
 from typing import Iterable
@@ -139,13 +140,19 @@ def _report_labels() -> None:
 def save_3mf(location: str = None) -> None:
     """Save all shapes to a single 3MF file."""
     actual_location = create_file_path(location or CURRENT_MODEL_LOCATION_3MF)
-    print(f"\nExporting to {actual_location}\n")
+    print(f"\nExporting 3mf file to: {actual_location}\n")
 
     mesher = Mesher()
     for label, shapes in _shapes.items():
         for shape in shapes:
             for prepared in _prepare_shape(shape, label):
-                mesher.add_shape(prepared)
+                with warnings.catch_warnings(record=True) as caught_warnings:
+                    warnings.simplefilter("always")
+                    mesher.add_shape(prepared)
+
+                    # Print any warnings with label information
+                    for w in caught_warnings:
+                        print(f"WARNING: Shape with label '{label}': {w.message}")
 
     _report_labels()
 
