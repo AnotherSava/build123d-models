@@ -80,6 +80,53 @@ class Direction(IntEnum):
     def alignment_closer(self) -> Alignment:
         return Alignment.RL if self in [Direction.N, Direction.E] else Alignment.LR
 
+def to_vector(vector: VectorLike) -> Vector:
+    """Converts a VectorLike to a Vector if it isn't already.
+
+    Args:
+        vector: A Vector or tuple/list of coordinates
+
+    Returns:
+        A Vector object
+    """
+    return vector if isinstance(vector, Vector) else Vector(vector)
+
+def are_points_too_close(pt1: VectorLike, pt2: VectorLike, tolerance: float = 1e-6) -> bool:
+    """Checks if two points are too close together.
+
+    Args:
+        pt1: First point
+        pt2: Second point
+        tolerance: Minimum allowed distance between points. Default is 1e-6.
+
+    Returns:
+        True if points are closer than tolerance, False otherwise
+    """
+    pt1 = to_vector(pt1)
+    pt2 = to_vector(pt2)
+    return (pt1 - pt2).length < tolerance
+
+def validate_points_unique(points: list[VectorLike], tolerance: float = 1e-6, labels: list[str] | None = None) -> None:
+    """Validates that no two points in the list are too close together.
+
+    Args:
+        points: List of points to check
+        tolerance: Minimum allowed distance between points. Default is 1e-6.
+        labels: Optional labels for points to use in error messages
+
+    Raises:
+        ValueError: If any two points are too close together
+    """
+    # Convert all points to Vector first
+    points_vec = [to_vector(pt) for pt in points]
+
+    for i, pt1 in enumerate(points_vec):
+        for j, pt2 in enumerate(points_vec[i+1:], start=i+1):
+            if are_points_too_close(pt1, pt2, tolerance):
+                label1 = labels[i] if labels else f"point {i}"
+                label2 = labels[j] if labels else f"point {j}"
+                raise ValueError(f"{label1} and {label2} are too close together")
+
 # angle is measured in degrees CCW from axis Y
 def create_vector(length: float, angle: float) -> Vector:
     return Vector(-length * sin(radians(angle)), length * cos(radians(angle)))
@@ -168,7 +215,7 @@ def rotate_vector(vector: VectorLike, axis: Axis, angle: float) -> Vector:
     Returns:
         The rotated vector
     """
-    vector = vector if isinstance(vector, Vector) else Vector(vector)
+    vector = to_vector(vector)
     angle_rad = radians(angle)
     cos_a = cos(angle_rad)
     sin_a = sin(angle_rad)
@@ -211,8 +258,8 @@ def multi_rotate_vector(vector: VectorLike, plane: Plane, rotations: VectorLike)
         The rotated vector
     """
     # Convert inputs to Vector if needed
-    vector = vector if isinstance(vector, Vector) else Vector(vector)
-    rotations = rotations if isinstance(rotations, Vector) else Vector(rotations)
+    vector = to_vector(vector)
+    rotations = to_vector(rotations)
     
     # Get the plane's axes
     x_axis = Axis(plane.location.position, plane.x_dir)
@@ -275,7 +322,7 @@ def _rotate_single_axis(axis: Axis, rotations: Vector, plane: Plane) -> Axis:
     return rotate_axis(axis, plane.location.z_axis, rotations.Z)
 
 def rotate_orientation(orientation: VectorLike, rotations: VectorLike, plane: Plane) -> Vector:
-    rotations = rotations if isinstance(rotations, Vector) else Vector(rotations)
+    rotations = to_vector(rotations)
     x_axis, y_axis, z_axis = orient_axis(orientation)
 
     x_axis = _rotate_single_axis(x_axis, rotations, plane)
@@ -289,7 +336,7 @@ def orient_axis(orientation: VectorLike) -> Tuple[Axis, Axis, Axis]:
 
     Take a default XY plane, rotate it by orientation.X degree around its axis X, then rotate it by orientation.Y degree around its _new_ axis Y, and finally by orientation.Z degree around its _new_ axis Z.
     """
-    orientation = orientation if isinstance(orientation, Vector) else Vector(orientation)
+    orientation = to_vector(orientation)
 
     # Start with standard XY plane vectors
     # Apply the orientation transformation using object-attached axes

@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Python project for creating 3D models (primarily board game inserts and other designs) using the [build123d](https://github.com/gumyr/build123d) CAD framework. The project provides custom wrapper classes and utilities that simplify common 3D modeling operations.
 
+## Build123d Direct API
+
+This project heavily uses the build123d library and particularly its **Direct API**. When working with this codebase, familiarize yourself with the Direct API documentation:
+
+**[Build123d Direct API Reference](https://build123d.readthedocs.io/en/stable/direct_api_reference.html)**
+
+The Direct API provides the fundamental primitives (Box, Cylinder, Sphere, etc.) and operations (fillet, chamfer, extrude, etc.) that this project's custom classes (SmartSolid, SmartBox, Pencil) wrap and extend.
+
 ## Commands
 
 **Run all tests:**
@@ -192,6 +200,7 @@ def test_flatten(input, expected):
 - When changing field/function names, check all usages (including tests) and update accordingly
 - Use search tools to find all references before making breaking changes
 - Run all tests after refactoring
+- **Backwards compatibility**: Don't worry too much about maintaining backwards compatibility for internal APIs. As long as you check all usages in the codebase (using Grep/search tools) and update them, breaking changes are fine. This is a personal project, not a public library.
 
 ### Formatting
 

@@ -1,10 +1,10 @@
 from math import asin
 from math import radians, degrees, acos, sin, cos, tan, atan
 
-from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, make_face, Part, revolve, VectorLike, Sketch
+from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, make_face, Part, revolve, VectorLike, Sketch, Edge
 
 from sava.csg.build123d.common.advanced_math import advanced_mod
-from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle
+from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle, to_vector, are_points_too_close, validate_points_unique
 from sava.csg.build123d.common.sweepsolid import SweepSolid
 
 
@@ -17,14 +17,89 @@ class Pencil:
         self.plane = plane
 
     def check_destination(self, destination: Vector) -> Vector:
-        tolerance = 1e-7
-        return self.start if (destination - self.start).length < tolerance else destination
+        return self.start if are_points_too_close(destination, self.start) else destination
 
     def double_arc(self, destination: VectorLike, shift_coefficient: float = 0.5, angle: float = None):
-        destination = destination if isinstance(destination, Vector) else Vector(destination)
+        """Draw two symmetric arcs to reach the destination.
+
+        Creates a smooth S-curve by drawing two arcs with opposite curvatures. The first arc
+        curves in one direction to an intermediate point, and the second arc curves in the
+        opposite direction to complete the path to the destination.
+
+        Args:
+            destination: Target point relative to current location
+            shift_coefficient: Where to split the path (0.0-1.0). 0.5 means equal-length arcs,
+                             values closer to 0 make the first arc shorter, closer to 1 make it longer
+            angle: Arc angle in degrees for each curve. If None, auto-calculated from destination
+                  to create a smooth symmetric curve
+
+        Returns:
+            self for method chaining
+        """
+        destination = to_vector(destination)
         angle_actual = 180 - degrees(2 * atan(destination.Y / destination.X)) if angle is None else angle
         angle_actual = advanced_mod(angle_actual, 360, -180)
         return self.arc_with_destination(destination * (1 - shift_coefficient), -angle_actual).arc_with_destination(destination * shift_coefficient, angle_actual)
+
+    def spline(self, destination: VectorLike, destination_tangent: VectorLike, intermediate_points: list[VectorLike] | None = None, start_tangent: VectorLike | None = None) -> 'Pencil':
+        """Draw a smooth spline curve to reach the destination, optionally passing through intermediate points.
+
+        Creates a cubic spline that smoothly transitions from the current location to the
+        destination point. The curve is tangent to the previous path at the current location
+        and arrives at the destination with the specified tangent direction. Optionally, the
+        curve can pass through intermediate points along the way.
+
+        Args:
+            destination: Target point relative to current location
+            destination_tangent: Tangent direction vector at the destination point (only direction matters,
+                    magnitude is normalized by build123d's default behavior)
+            intermediate_points: Optional list of points to pass through between current location
+                               and destination. Each point is relative to current location.
+                               Points are interpolated in order. Default is None (direct spline).
+            start_tangent: Optional tangent direction vector at the start point. If None, the tangent
+                         is calculated from the previous curve (or from destination if no previous curves).
+                         Default is None (auto-calculated).
+
+        Returns:
+            self for method chaining
+
+        Examples:
+            # Simple spline (existing behavior)
+            pencil.spline((50, 50), (1, 0))
+
+            # Spline with intermediate points
+            pencil.spline((50, 50), (1, 0), intermediate_points=[(20, 30), (40, 20)])
+
+            # Spline with custom start tangent
+            pencil.spline((50, 50), (1, 0), start_tangent=(0, 1))
+
+            # Spline with both intermediate points and custom start tangent
+            pencil.spline((50, 50), (1, 0), intermediate_points=[(25, 25)], start_tangent=(0, 1))
+        """
+        destination = to_vector(destination)
+        destination_tangent = to_vector(destination_tangent)
+
+        # Convert relative destination to absolute
+        destination_abs = self.check_destination(self.location + destination)
+
+        # Calculate or use provided tangent at current location
+        if start_tangent is not None:
+            current_tangent = to_vector(start_tangent)
+        else:
+            current_tangent = destination if not self.curves else self.curves[-1].tangent_at(1.0)
+
+        # Convert intermediate points (relative) to absolute coordinates
+        intermediate_abs = [self.location + to_vector(pt) for pt in intermediate_points or []]
+        points = [self.location] + intermediate_abs + [destination_abs]
+
+        # Validate that all points are unique
+        labels = ["start"] + [f"intermediate point {i}" for i in range(len(intermediate_abs))] + ["destination"]
+        validate_points_unique(points, tolerance=1e-6, labels=labels)
+
+        edge = Edge.make_spline(points, [current_tangent, destination_tangent])
+        self.curves.append(edge)
+        self.location = destination_abs
+        return self
 
     def arc_with_radius(self, radius: float, centre_angle: float, arc_degrees: float):
         centre = shift_vector(self.location, radius, centre_angle)
@@ -113,7 +188,7 @@ class Pencil:
 
     # create arc with specific destination and angle measure
     def arc_with_destination(self, destination: VectorLike, angle: float):
-        destination = destination if isinstance(destination, Vector) else Vector(destination)
+        destination = to_vector(destination)
         return self.arc_with_destination_abs(destination + self.location, angle)
 
     def jump_to(self, abs_destination: Vector):
@@ -123,7 +198,7 @@ class Pencil:
         return self
 
     def jump(self, destination: VectorLike):
-        return self.jump_to((destination if isinstance(destination, Vector) else Vector(destination)) + self.location)
+        return self.jump_to(to_vector(destination) + self.location)
 
     def jump_from_start(self, destination: Vector):
         return self.jump_to(destination + self.start)
