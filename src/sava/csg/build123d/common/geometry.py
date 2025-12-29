@@ -3,6 +3,7 @@ from math import cos, sin, radians, atan2, degrees
 from typing import Tuple
 
 from build123d import Vector, Axis, Wire, Face, extrude, Part, Polyline, Plane, VectorLike, sweep, Solid
+from build123d.topology import Mixin1D
 
 
 # Ways to align one 2d vector (or another else) to another
@@ -180,7 +181,7 @@ def create_plane_from_planes(plane_xy: Plane, axis_x: Plane):
     # but with x-direction aligned to the intersection
     return Plane(plane_xy.location.position, x_dir=x_direction, z_dir=plane_xy.z_dir)
 
-def create_wire_tangent_plane(wire: Wire, position_at: float) -> Plane:
+def create_wire_tangent_plane(wire: Mixin1D, position_at: float) -> Plane:
     """Creates a plane at a specified position along a wire, orthogonal to the wire's direction.
     
     Args:
@@ -446,24 +447,32 @@ def calculate_orientation(x_axis: Axis, y_axis: Axis, z_axis: Axis) -> Vector:
     
     return Vector(angle_x, angle_y, angle_z)
 
-def solidify_wire(wire: Wire, radius = 0.2) -> list[Part]:
-    plane = create_wire_tangent_plane(wire, 0.0)
-    circle_wire = Wire.make_circle(radius, plane)
-    circle_face = Face(circle_wire)
+def choose_wire_diameter(wire: Wire) -> float:
+    return wire.length / 100
 
-    # Create the swept cylinder along the wire
-    swept = sweep(circle_face, wire)
+def choose_vertex_diameter(wire: Wire) -> float:
+    return choose_wire_diameter(wire) * 2
 
-    # Add spheres at each vertex
-    sphere_radius = radius * 4
-    vertices = wire.vertices()
+def solidify_wire(wire: Wire) -> list[Part]:
+    radius = choose_wire_diameter(wire) / 2
+    shapes = []
 
-    # Collect all shapes (swept + spheres)
-    shapes = [swept]
-    for vertex in vertices:
-        sphere = Solid.make_sphere(sphere_radius)
+    # Break wire into individual edges and sweep each separately
+    # This ensures each segment has a circular profile perpendicular to its direction
+    for edge in wire.edges():
+        # Create a plane perpendicular to the edge's starting direction
+        profile_plane = create_wire_tangent_plane(edge, 0)
+
+        # Create a circle profile in this plane and sweep it along just this edge
+        circle_wire = Wire.make_circle(radius, profile_plane)
+        segment_solid = sweep(Face(circle_wire), edge)
+        shapes.append(segment_solid)
+
+    # Add spheres at each vertex to smooth the joints between segments
+    # Collect all shapes (swept segments + spheres)
+    for vertex in wire.vertices():
+        sphere = Solid.make_sphere(choose_vertex_diameter(wire) / 2)
         sphere.position = vertex.center()
         shapes.append(sphere)
 
-    # Return as a list - the exporter handles iterables by processing each shape individually
     return shapes
