@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from math import radians, degrees, atan, cos, tan
 from typing import Tuple
 
-from build123d import Solid, Vector, Plane, Axis
+from build123d import Solid, Vector, Plane, Axis, VectorLike, Wire, Edge, loft, Location, Face
 
 from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
-from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.geometry import Alignment, to_vector, rotate_vector, create_vector, get_angle
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_cone_with_angle_and_height
 from sava.csg.build123d.common.smartbox import SmartBox
@@ -35,6 +35,10 @@ class BasketDimensions:
     basket_cover_hole_diameter: float = 6
     basket_cover_latch_thickness: float = 2
     basket_cover_foundation_depth: float = 2.5
+
+    cover_handle_height: float = 1
+    cover_handle_width: float = 2.6
+    cover_handle_angle: float = 45
 
     @property
     def cap_angle_radians(self) -> float:
@@ -208,9 +212,72 @@ class BasketFactory:
 
         return windows
 
-    def create_basket(self) -> SmartSolid:
-        """Create the complete basket with windows."""
-        # Create the basic basket shell
+
+    def create_handle_wire(self, centre: VectorLike, start: VectorLike, angle: float, width: float) -> Wire:
+        """Create a curved handle wire as a spline arc.
+
+        Args:
+            centre: Center point of the circular arc
+            start: Start vector relative to centre (radial direction)
+            angle: Angular span in degrees (CCW rotation around Z axis)
+            width: Additional radial distance for the middle point (creates outward bulge)
+
+        Returns:
+            Wire: Spline wire forming the handle curve
+        """
+        offset = 1.0001
+        centre = to_vector(centre)
+        start = to_vector(start) / offset
+
+        # Calculate the three points
+        start_point = centre + start
+
+        # Rotate start vector by angle around Z axis to get end point
+        start_rotated = rotate_vector(start, Axis.Z, angle)
+        end_point = centre + start_rotated
+
+        # Rotate start vector by angle/2 and increase length by width for middle point
+        start_rotated_half = rotate_vector(start, Axis.Z, angle / 2)
+        middle_direction = start_rotated_half.normalized()
+        middle_point = centre + middle_direction * (start.length + width)
+
+        # Calculate tangents perpendicular to radial directions (CCW in XY plane)
+        # For a radial vector (x, y, z), the tangent for CCW motion is (-y, x, 0)
+        start_tangent = Vector(-start.Y, start.X, 0).normalized()
+        end_tangent = Vector(-start_rotated.Y, start_rotated.X, 0).normalized()
+
+        # Middle tangent is the average of start and end tangents in terms of direction, but twice as long
+        middle_tangent = start_tangent + end_tangent
+
+        # Create spline through the three points with specified tangents at each point
+        points = [start_point, middle_point, end_point]
+        tangents = [start_tangent, middle_tangent, end_tangent]
+
+        edge = Edge.make_spline(points, tangents, scale=False)
+
+        # return edge along the circle
+        back = Edge.make_circle(start.length * offset, start_angle = get_angle(start) + 90, end_angle = get_angle(start) + angle + 90).move(Location(centre))
+
+        # At least a minimal offset is needed for a shape to be valid
+        offset_a = Edge.make_line(centre + start_rotated, centre + start_rotated * offset)
+        offset_b = Edge.make_line(centre + start * offset, start_point)
+
+        return Wire([edge, offset_a, back, offset_b])
+
+    def create_handle(self, cap_45_inner: SmartSolid, middle_angle: float) -> SmartSolid:
+        centre = Vector(cap_45_inner.x_mid, cap_45_inner.y_mid, cap_45_inner.z_min)
+        radius = cap_45_inner.x_size / 2
+        start_angle = middle_angle - self.dim.cover_handle_angle / 2
+        start = create_vector(radius, start_angle)
+
+        top = self.create_handle_wire(centre, start, self.dim.cover_handle_angle, -self.dim.cover_handle_width)
+        bottom = self.create_handle_wire(centre + (0, 0, self.dim.cover_handle_height), create_vector(radius - self.dim.cover_handle_height, start_angle), self.dim.cover_handle_angle, self.dim.cover_handle_height - self.dim.cover_handle_width)
+
+        handle = SmartSolid(loft([Face(Wire(top).close()), Face(Wire(bottom).close())]))
+        handle.align_z(cap_45_inner, Alignment.LR)
+        return handle
+
+    def create_basket(self, with_handles: bool = False) -> SmartSolid:
         basket_outer, basket_inner = self._create_basket()
         for item in [basket_outer, basket_inner]:
             item.align_xy()
@@ -223,7 +290,13 @@ class BasketFactory:
 
         ribs = self.create_ribs(basket_outer)
 
-        return SmartSolid(basket_outer, cap_45_outer, ribs, label="basket").cut(basket_inner, cap_45_inner)
+        basket = SmartSolid(basket_outer, cap_45_outer, ribs, label="basket_with_handles" if with_handles else "basket").cut(basket_inner, cap_45_inner)
+
+        if with_handles:
+            handles = [self.create_handle(cap_45_inner, angle) for angle in [90, -90]]
+            basket.fuse(handles)
+
+        return basket
 
     def create_ribs(self, basket_outer: SmartSolid) -> SmartSolid:
         leg_holder_boundary = SmartSolid(Solid.make_cylinder(self.dim.cap_diameter_outer_middle / 2, self.dim.leg_depth))
@@ -269,15 +342,16 @@ class BasketFactory:
         latch.align_zxy(cover, Alignment.C, 0, Alignment.C, 0, Alignment.CR, 0)
         return latch.cut(hole).intersect(cover)
 
-def export_3mf(basket: SmartSolid, cover: SmartSolid, latch: SmartSolid):
+def export_3mf(basket: SmartSolid, cover: SmartSolid, latch: SmartSolid, suffix: str = ""):
     for item in [basket, cover, latch]:
         export(item.mirrored(Plane.XY))
-    save_3mf()
-    save_3mf("models/hydroponic/basket/export.3mf")
+    save_3mf(f"models/hydroponic/basket/export{suffix}.3mf")
+    if not suffix: # default model
+        save_3mf()
 
-def export_stl(basket: SmartSolid, cover: SmartSolid, latch: SmartSolid):
+def export_stl(basket: SmartSolid, basket_with_handles: SmartSolid, cover: SmartSolid, latch: SmartSolid):
     latch.mirror(Plane.XY)
-    for item in [basket, cover, latch]:
+    for item in [basket, cover, latch, basket_with_handles]:
         export(item)
     save_stl("models/hydroponic/basket/stl")
 
@@ -285,11 +359,14 @@ def export_basket():
     dimensions = BasketDimensions()
     basket_factory = BasketFactory(dimensions)
     basket_solid = basket_factory.create_basket()
+    basket_with_handles_solid = basket_factory.create_basket(True)
     basket_cover_solid, basket_latch_solid = basket_factory.create_basket_cover_and_latch(basket_solid)
 
     export_3mf(basket_solid, basket_cover_solid, basket_latch_solid)
     clear()
-    export_stl(basket_solid, basket_cover_solid, basket_latch_solid)
+    export_3mf(basket_with_handles_solid, basket_cover_solid, basket_latch_solid, "_with_handles")
+    clear()
+    export_stl(basket_solid, basket_with_handles_solid, basket_cover_solid, basket_latch_solid)
 
 if __name__ == "__main__":
     export_basket()
