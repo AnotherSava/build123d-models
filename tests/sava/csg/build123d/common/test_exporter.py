@@ -7,7 +7,7 @@ from parameterized import parameterized
 
 from sava.csg.build123d.common.exporter import (
     export, clear, show_red, show_blue, show_green, save_3mf, save_stl,
-    _shapes, _label_colors, _get_color_for_label, _prepare_shape, BASIC_COLORS
+    _shapes, _label_colors, _get_color_for_label, _prepare_shape, _is_valid_color, BASIC_COLORS
 )
 
 
@@ -17,12 +17,13 @@ class TestExport(unittest.TestCase):
         clear()
 
     def test_export_default_label(self):
-        """Test export with default 'model' label"""
+        """Test export with default auto-generated label"""
         box = Box(10, 10, 10)
+        box.label = None  # Ensure label is None to trigger auto-generation
         export(box)
 
-        self.assertIn("model", _shapes)
-        self.assertEqual(len(_shapes["model"]), 1)
+        self.assertIn("shape_1", _shapes)
+        self.assertEqual(len(_shapes["shape_1"]), 1)
 
     def test_export_custom_label(self):
         """Test export with custom label"""
@@ -120,6 +121,15 @@ class TestGetColorForLabel(unittest.TestCase):
             _get_color_for_label("one_too_many")
 
         self.assertIn("exhausted", str(context.exception))
+
+    def test_all_basic_colors_are_valid_build123d_colors(self):
+        """Test that all BASIC_COLORS are recognized by build123d's Color class"""
+        for color_name in BASIC_COLORS:
+            with self.subTest(color=color_name):
+                self.assertTrue(
+                    _is_valid_color(color_name),
+                    f"Color '{color_name}' is not recognized by build123d's Color class"
+                )
 
 
 class TestPrepareShape(unittest.TestCase):

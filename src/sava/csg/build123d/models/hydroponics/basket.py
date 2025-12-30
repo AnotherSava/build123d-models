@@ -4,6 +4,7 @@ from typing import Tuple
 
 from build123d import Solid, Vector, Plane, Axis, VectorLike, Wire, Edge, loft, Location, Face
 
+from sava.common.common import flatten
 from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
 from sava.csg.build123d.common.geometry import Alignment, to_vector, rotate_vector, create_vector, get_angle
 from sava.csg.build123d.common.pencil import Pencil
@@ -32,7 +33,6 @@ class BasketDimensions:
     leg_depth: float = 5.3
 
     basket_cover_thickness: float = 3
-    basket_cover_hole_diameter: float = 6
     basket_cover_latch_thickness: float = 2
     basket_cover_foundation_depth: float = 2.5
 
@@ -258,16 +258,16 @@ class BasketFactory:
 
         return upper_rib_boundary.fuse(leg_holder_boundary).intersect(ribs)
 
-    def create_basket_cover_and_latch(self, basket: SmartSolid) -> Tuple[SmartSolid, SmartSolid]:
-        cover = SmartSolid(Solid.make_cone(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_radius_wide, self.dim.basket_cover_thickness), label="cover")
+    def create_basket_cover_and_latch(self, basket: SmartSolid, hole_diameter: float) -> Tuple[SmartSolid, SmartSolid]:
+        cover = SmartSolid(Solid.make_cone(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_radius_wide, self.dim.basket_cover_thickness), label=f"cover_{hole_diameter}mm")
         cover.align_zxy(basket, Alignment.RL, self.dim.basket_cover_thickness - self.dim.cap_depth)
 
-        hole = create_cone_with_angle_and_height(self.dim.basket_cover_hole_diameter / 2, self.dim.basket_cover_thickness, 45)
+        hole = create_cone_with_angle_and_height(hole_diameter / 2, self.dim.basket_cover_thickness, 45)
         hole.align(cover)
 
-        latch_cut = self.create_latch(cover, hole, 0)
-        latch = self.create_latch(cover, hole, 0.05)
-        latch.label = "latch"
+        latch_cut = self.create_latch(cover, hole, hole_diameter, 0)
+        latch = self.create_latch(cover, hole, hole_diameter, 0.05)
+        latch.label = f"latch_{hole_diameter}mm"
 
         foundation_outer = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2).rotate((180, 0, 0))
         foundation_outer.align_zxy(cover, Alignment.LL)
@@ -275,14 +275,14 @@ class BasketFactory:
         foundation_inner = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow - self.dim.thickness / 2, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2).rotate((180, 0, 0))
         foundation_inner.align(foundation_outer)
 
-        foundation_cut = SmartBox(self.dim.basket_cover_hole_diameter, self.dim.basket_cover_radius_wide, foundation_outer.z_size)
+        foundation_cut = SmartBox(hole_diameter, self.dim.basket_cover_radius_wide, foundation_outer.z_size)
         foundation_cut.align_xz(foundation_outer).align_y(foundation_outer, Alignment.CL)
 
         return cover.fuse(foundation_outer).cut(hole, latch_cut, foundation_inner, foundation_cut), latch
 
-    def create_latch(self, cover: SmartSolid, hole: SmartSolid, gap: float = 0) -> SmartSolid:
+    def create_latch(self, cover: SmartSolid, hole: SmartSolid, hole_diameter: float, gap: float) -> SmartSolid:
         pencil = Pencil()
-        pencil.right(self.dim.basket_cover_hole_diameter / 2 - gap / 2)
+        pencil.right((hole_diameter - gap) / 2)
         pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
         pencil.jump((self.dim.basket_cover_latch_thickness / 2 - gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
         pencil.jump((-self.dim.basket_cover_latch_thickness / 2 + gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
@@ -291,17 +291,18 @@ class BasketFactory:
         latch.align_zxy(cover, Alignment.C, 0, Alignment.C, 0, Alignment.CL, 0)
         return latch.cut(hole).intersect(cover)
 
-def export_3mf(basket: SmartSolid, cover: SmartSolid, latch: SmartSolid, suffix: str = ""):
-    for item in [basket, cover, latch]:
-        export(item)
+def export_3mf(*solids, suffix: str = ""):
+    for solid in solids:
+        export(solid)
     save_3mf(f"models/hydroponic/basket/export{suffix}.3mf")
-    if suffix: # default model
+    if not suffix: # default model
         save_3mf()
 
-def export_stl(basket: SmartSolid, basket_with_handles: SmartSolid, cover: SmartSolid, latch: SmartSolid):
-    latch.mirror(Plane.XY)
-    for item in [basket, cover, latch, basket_with_handles]:
-        export(item.mirrored(Plane.XY))
+def export_stl(*solids):
+    for solid in solids:
+        if not solid.label.startswith("latch_"):
+            solid.mirror(Plane.XY)
+        export(solid)
     save_stl("models/hydroponic/basket/stl")
 
 def export_basket():
@@ -309,13 +310,16 @@ def export_basket():
     basket_factory = BasketFactory(dimensions)
     basket_solid = basket_factory.create_basket()
     basket_with_handles_solid = basket_factory.create_basket(True)
-    basket_cover_solid, basket_latch_solid = basket_factory.create_basket_cover_and_latch(basket_solid)
+    basket_cover_solid, basket_latch_solid = basket_factory.create_basket_cover_and_latch(basket_solid, 12)
+
+    objects = flatten(basket_factory.create_basket_cover_and_latch(basket_solid, diameter) for diameter in [4, 6, 8, 10, 12])
+
 
     export_3mf(basket_solid, basket_cover_solid, basket_latch_solid)
     clear()
-    export_3mf(basket_with_handles_solid, basket_cover_solid, basket_latch_solid, "_with_handles")
+    export_3mf(basket_with_handles_solid, basket_cover_solid, basket_latch_solid, suffix="_with_handles")
     clear()
-    export_stl(basket_solid, basket_with_handles_solid, basket_cover_solid, basket_latch_solid)
+    export_stl(basket_solid, basket_with_handles_solid, *objects)
 
 if __name__ == "__main__":
     export_basket()

@@ -14,7 +14,7 @@ from sava.csg.build123d.common.smartsolid import get_solid
 
 CURRENT_MODEL_LOCATION_3MF = "models/current_model.3mf"
 CURRENT_MODEL_LOCATION_STL = "models/current_model/"
-BASIC_COLORS = ["yellow", "blue", "green", "orange", "purple", "cyan", "magenta", "red"]
+BASIC_COLORS = ["yellow", "blue", "green", "orange", "purple", "cyan", "magenta", "red", "brown", "pink", "lime", "navy", "teal", "maroon", "olive", "indigo", "white"]
 
 # Module-level storage
 _shapes: dict[str, list] = {}
