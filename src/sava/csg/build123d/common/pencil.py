@@ -1,7 +1,7 @@
 from math import asin
 from math import radians, degrees, acos, sin, cos, tan, atan
 
-from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, make_face, Part, revolve, VectorLike, Sketch, Edge
+from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, Part, revolve, VectorLike, Edge
 
 from sava.csg.build123d.common.advanced_math import advanced_mod
 from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle, to_vector, are_points_too_close, validate_points_unique
@@ -12,8 +12,8 @@ class Pencil:
     sweep_path_for: 'Pencil'  # pencil we are creating a sweep path for (if any)
     def __init__(self, start: VectorLike = (0, 0), plane: Plane = Plane.XY):
         self.curves = []
-        self.start = start if isinstance(start, Vector) else Vector(*start)
-        self.location = start
+        self.start = to_vector(start)
+        self.location = self.start
         self.plane = plane
 
     def check_destination(self, destination: Vector) -> Vector:
@@ -191,7 +191,8 @@ class Pencil:
         destination = to_vector(destination)
         return self.arc_with_destination_abs(destination + self.location, angle)
 
-    def jump_to(self, abs_destination: Vector):
+    def jump_to(self, abs_destination: VectorLike):
+        abs_destination = to_vector(abs_destination)
         abs_destination = self.check_destination(abs_destination)
         self.curves.append(Line(self.location, abs_destination))
         self.location = abs_destination
@@ -257,14 +258,34 @@ class Pencil:
         return extrude(face, height)
 
     def complete_wire_for_mirror(self, axis: Axis):
-        if Axis.Y == axis and self.location.X != self.start.X:
+        tolerance = 1e-6
+        if Axis.Y == axis and abs(self.location.X - self.start.X) > tolerance:
             self.right(self.start.X - self.location.X)
-        if Axis.X == axis and self.location.Y != self.start.Y:
+        if Axis.X == axis and abs(self.location.Y - self.start.Y) > tolerance:
             self.up(self.start.Y - self.location.Y)
 
-    def create_mirrored_face(self, axis: Axis) -> Sketch:
+    def create_mirrored_face(self, axis: Axis) -> Face:
+        return Face(self.create_mirrored_wire(axis))
+
+    def create_mirrored_wire(self, axis: Axis) -> Wire:
         self.complete_wire_for_mirror(axis)
-        return make_face([self.create_wire(False), self.mirror_wire(axis)])
+        original_wire = self.create_wire(False)
+        mirrored = self.mirror_wire(axis)
+
+        # Handle case where mirror_wire returns Curve instead of Wire
+        # Curve is a composite type that can contain multiple wires
+        if hasattr(mirrored, 'wires'):
+            mirrored_wire = mirrored.wires()[0]
+        else:
+            mirrored_wire = mirrored
+
+        # Create a closed wire by combining original and reversed mirrored wire
+        # This ensures edges connect: original end → mirrored end, mirrored start → original start
+        # Need to reverse both the direction of each edge AND the order of edges
+        mirrored_edges = list(mirrored_wire.edges())
+        mirrored_edges_reversed = [Edge(e.wrapped.Reversed()) for e in reversed(mirrored_edges)]
+        all_edges = list(original_wire.edges()) + mirrored_edges_reversed
+        return Wire(all_edges)
 
     def mirror_wire(self, axis: Axis) -> Wire:
         wire = self.create_wire(False)
