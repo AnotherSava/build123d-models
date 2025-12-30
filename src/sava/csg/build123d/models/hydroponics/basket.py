@@ -111,79 +111,36 @@ class BasketFactory:
 
     def _create_basket(self) -> Tuple[SmartSolid, SmartSolid]:
         """Create the basic basket shape (outer cone, inner cone, cap)."""
-        outer = SmartSolid(Solid.make_cone(self.dim.outer_radius_top, self.dim.outer_radius_bottom, self.dim.height))
+        outer = SmartSolid(Solid.make_cone(self.dim.outer_radius_bottom, self.dim.outer_radius_top, self.dim.height))
 
-        inner = SmartSolid(Solid.make_cone(self.dim.inner_radius_top, self.dim.inner_diameter_bottom / 2, self.dim.height))
-        inner.align_zxy(outer, Alignment.RL)
+        inner = SmartSolid(Solid.make_cone(self.dim.inner_diameter_bottom / 2, self.dim.inner_radius_top, self.dim.height))
+        inner.align_zxy(outer, Alignment.LR)
 
-        cap_outer = SmartCone.create_empty(45, self.dim.outer_radius_bottom, self.dim.thickness * cos(radians(45)))
-        cap_outer.align_zxy(outer, Alignment.RR)
+        cap_outer = SmartCone.create_empty(-45, self.dim.outer_radius_bottom, self.dim.thickness * cos(radians(45)))
+        cap_outer.align_zxy(outer, Alignment.LL)
 
         # Create all window cutouts
-        windows = self._create_all_windows()
+        windows = SmartSolid(self._create_all_windows()).align_z(outer, Alignment.RL)
 
         return outer.fuse(cap_outer).cut(windows), inner
 
-    def _create_window(self, window_z_bottom: float) -> SmartSolid:
-        """Create a single window cutout at angle 0.
+    def _create_window_shape(self, distance: float) -> Face:
+        width = distance * self.dim.window_angle_radians
 
-        Args:
-            window_z_bottom: Bottom Z position of window
+        # Create half of pentagonal window to mirror across "Y" axis
+        # Start at top middle, trace right side down to triangle tip
+        pencil = Pencil(plane=Plane.YZ)
+        pencil.right(width / 2)
+        pencil.down(self.dim.window_height - width / 2)
+        pencil.jump((-width / 2, -width / 2))
 
-        Returns:
-            SmartSolid: Window cutout solid
-        """
-        # Calculate derived positions
-        window_z_top = window_z_bottom + self.dim.window_height
-        window_z_center = window_z_bottom + self.dim.window_height / 2
+        return pencil.create_mirrored_face(Axis.Y).move(Location((distance, 0, 0)))
 
-        # Calculate radius at window bottom and top (for trapezoid shape)
-        # Assumes outer cone z_min == 0
-        z_param_bottom = window_z_bottom / self.dim.height
-        z_param_top = window_z_top / self.dim.height
+    def _create_window(self) -> SmartSolid:
+        inner_face = self._create_window_shape(self.dim.inner_diameter_bottom / 3)
+        outer_face = self._create_window_shape(self.dim.inner_radius_top * 1.5)
 
-        radius_at_bottom = self.dim.outer_radius_top * (1 - z_param_bottom) + self.dim.outer_radius_bottom * z_param_bottom
-        radius_at_top = self.dim.outer_radius_top * (1 - z_param_top) + self.dim.outer_radius_bottom * z_param_top
-        radius_at_center = (radius_at_bottom + radius_at_top) / 2
-
-        # Calculate arc lengths to maintain constant angular width
-        arc_length_bottom = radius_at_bottom * self.dim.window_angle_radians
-        arc_length_top = radius_at_top * self.dim.window_angle_radians
-
-        # Window position at angle 0 (on positive X axis)
-        x_pos = radius_at_center
-        y_pos = 0
-
-        # Create window with triangular top (45-45-90 triangle)
-        window_depth = self.dim.thickness * 6  # Extra depth to ensure full cut through cap
-
-        # For 45-45-90 triangle at top, height = base_width / 2
-        triangle_height_top = arc_length_top / 2
-
-        # Trapezoid height (total height minus only top triangle height)
-        trapezoid_height = self.dim.window_height - triangle_height_top
-
-        # Draw window profile in YZ plane (Y = arc width, Z = height)
-        # Shape: trapezoid + top triangle (no bottom triangle)
-        pencil = Pencil(start=(-arc_length_bottom / 2, 0), plane=Plane.YZ)
-        pencil.jump_to(Vector(arc_length_bottom / 2, 0))  # Bottom right corner
-        pencil.jump_to(Vector(arc_length_top / 2, trapezoid_height))  # Top right corner
-        pencil.jump_to(Vector(0, trapezoid_height + triangle_height_top))  # Top peak
-        pencil.jump_to(Vector(-arc_length_top / 2, trapezoid_height))  # Top left corner
-        pencil.jump_to(Vector(-arc_length_bottom / 2, 0))  # Back to bottom left
-
-        window = SmartSolid(pencil.extrude(window_depth))
-
-        # Center the window at origin before rotating
-        window.move(x=-window_depth / 2, z=-self.dim.window_height / 2)
-
-        # Tilt to align perpendicular to cone wall
-        window.rotate((0, -self.dim.cone_slope_angle, 0))
-
-        # Move to final position
-        window.move(x=x_pos - window.x_mid, y=y_pos - window.y_mid, z=window_z_center - window.z_mid)
-
-        return window
+        return SmartSolid(loft([inner_face, outer_face]))
 
     def _create_all_windows(self) -> list[SmartSolid]:
         """Create all window cutouts for all levels.
@@ -192,26 +149,18 @@ class BasketFactory:
             list[SmartSolid]: List of all window cutout solids
         """
         windows = []
-        current_z_offset = 0
+        template_window = self._create_window()
 
         for level in range(self.dim.floor_count):
-            # Z position for this window level (assumes cone z_min == 0)
-            window_z_bottom = current_z_offset
-
-            # Create one window at angle 0
-            template_window = self._create_window(window_z_bottom)
+            current_offset_from_top = (self.dim.window_height + self.dim.gap_between_levels) * level # offset from basket's wide top
 
             # Create copies rotated around the circumference
             angle_step = 360 / self.dim.window_count
             for i in range(self.dim.window_count):
                 # Create a copy and rotate it around Z axis at origin
-                windows.append(template_window.solid.rotate(Axis.Z, (i + 0.5) * angle_step))
-
-            # Move to next level (use reduced gap between levels)
-            current_z_offset += self.dim.window_height + self.dim.gap_between_levels
+                windows.append(template_window.copy().move_z(-current_offset_from_top).solid.rotate(Axis.Z, (i + 0.5) * angle_step))
 
         return windows
-
 
     def create_handle_wire(self, centre: VectorLike, start: VectorLike, angle: float, width: float) -> Wire:
         """Create a curved handle wire as a spline arc.
@@ -265,16 +214,16 @@ class BasketFactory:
         return Wire([edge, offset_a, back, offset_b])
 
     def create_handle(self, cap_45_inner: SmartSolid, middle_angle: float) -> SmartSolid:
-        centre = Vector(cap_45_inner.x_mid, cap_45_inner.y_mid, cap_45_inner.z_min)
+        centre = Vector(cap_45_inner.x_mid, cap_45_inner.y_mid, cap_45_inner.z_max)
         radius = cap_45_inner.x_size / 2
         start_angle = middle_angle - self.dim.cover_handle_angle / 2
         start = create_vector(radius, start_angle)
 
         top = self.create_handle_wire(centre, start, self.dim.cover_handle_angle, -self.dim.cover_handle_width)
-        bottom = self.create_handle_wire(centre + (0, 0, self.dim.cover_handle_height), create_vector(radius - self.dim.cover_handle_height, start_angle), self.dim.cover_handle_angle, self.dim.cover_handle_height - self.dim.cover_handle_width)
+        bottom = self.create_handle_wire(centre - (0, 0, self.dim.cover_handle_height), create_vector(radius - self.dim.cover_handle_height, start_angle), self.dim.cover_handle_angle, self.dim.cover_handle_height - self.dim.cover_handle_width)
 
         handle = SmartSolid(loft([Face(Wire(top).close()), Face(Wire(bottom).close())]))
-        handle.align_z(cap_45_inner, Alignment.LR)
+        handle.align_z(cap_45_inner, Alignment.RL)
         return handle
 
     def create_basket(self, with_handles: bool = False) -> SmartSolid:
@@ -282,10 +231,10 @@ class BasketFactory:
         for item in [basket_outer, basket_inner]:
             item.align_xy()
 
-        cap_45_outer = create_cone_with_angle_and_height(self.dim.cap_radius_outer(), self.dim.cap_depth, -self.dim.cap_angle)
-        cap_45_outer.align_zxy(basket_outer, Alignment.LL)
+        cap_45_outer = create_cone_with_angle_and_height(self.dim.cap_radius_outer(self.dim.cap_depth), self.dim.cap_depth, self.dim.cap_angle)
+        cap_45_outer.align_zxy(basket_outer, Alignment.RR)
 
-        cap_45_inner = create_cone_with_angle_and_height(self.dim.cap_radius_inner(), self.dim.cap_depth, -self.dim.cap_angle)
+        cap_45_inner = create_cone_with_angle_and_height(self.dim.cap_radius_inner(self.dim.cap_depth), self.dim.cap_depth, self.dim.cap_angle)
         cap_45_inner.align(cap_45_outer)
 
         ribs = self.create_ribs(basket_outer)
@@ -300,34 +249,34 @@ class BasketFactory:
 
     def create_ribs(self, basket_outer: SmartSolid) -> SmartSolid:
         leg_holder_boundary = SmartSolid(Solid.make_cylinder(self.dim.cap_diameter_outer_middle / 2, self.dim.leg_depth))
-        leg_holder_boundary.align_zxy(basket_outer, Alignment.LR, -self.dim.cap_depth)
+        leg_holder_boundary.align_zxy(basket_outer, Alignment.RL, self.dim.cap_depth)
 
-        upper_rib_boundary = basket_outer.padded(self.dim.thickness * 2).align_zxy(basket_outer, Alignment.RL)
+        upper_rib_boundary = basket_outer.padded(self.dim.thickness * 2).align_zxy(basket_outer, Alignment.LR)
 
         rib = SmartBox(leg_holder_boundary.x_size, self.dim.cap_leg_width, leg_holder_boundary.z_size + basket_outer.z_size + self.dim.thickness * 2)
-        ribs = [rib.oriented((0, 0, 180 / self.dim.cap_leg_count * i)).align_zxy(leg_holder_boundary, Alignment.LR) for i in range(self.dim.cap_leg_count)]
+        ribs = [rib.oriented((0, 0, 180 / self.dim.cap_leg_count * i)).align_zxy(leg_holder_boundary, Alignment.RL) for i in range(self.dim.cap_leg_count)]
 
         return upper_rib_boundary.fuse(leg_holder_boundary).intersect(ribs)
 
     def create_basket_cover_and_latch(self, basket: SmartSolid) -> Tuple[SmartSolid, SmartSolid]:
-        cover = SmartSolid(Solid.make_cone(self.dim.basket_cover_radius_wide, self.dim.basket_cover_radius_narrow, self.dim.basket_cover_thickness), label="cover")
-        cover.align_zxy(basket, Alignment.LR, self.dim.cap_depth - self.dim.basket_cover_thickness)
+        cover = SmartSolid(Solid.make_cone(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_radius_wide, self.dim.basket_cover_thickness), label="cover")
+        cover.align_zxy(basket, Alignment.RL, self.dim.basket_cover_thickness - self.dim.cap_depth)
 
-        hole = create_cone_with_angle_and_height(self.dim.basket_cover_hole_diameter / 2, self.dim.basket_cover_thickness, 45).orient((180, 0, 0))
+        hole = create_cone_with_angle_and_height(self.dim.basket_cover_hole_diameter / 2, self.dim.basket_cover_thickness, 45)
         hole.align(cover)
 
         latch_cut = self.create_latch(cover, hole, 0)
         latch = self.create_latch(cover, hole, 0.05)
         latch.label = "latch"
 
-        foundation_outer = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2)
-        foundation_outer.align_zxy(cover, Alignment.RR)
+        foundation_outer = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2).rotate((180, 0, 0))
+        foundation_outer.align_zxy(cover, Alignment.LL)
 
-        foundation_inner = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow - self.dim.thickness / 2, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2)
+        foundation_inner = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow - self.dim.thickness / 2, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2).rotate((180, 0, 0))
         foundation_inner.align(foundation_outer)
 
         foundation_cut = SmartBox(self.dim.basket_cover_hole_diameter, self.dim.basket_cover_radius_wide, foundation_outer.z_size)
-        foundation_cut.align_xz(foundation_outer).align_y(foundation_outer, Alignment.CR)
+        foundation_cut.align_xz(foundation_outer).align_y(foundation_outer, Alignment.CL)
 
         return cover.fuse(foundation_outer).cut(hole, latch_cut, foundation_inner, foundation_cut), latch
 
@@ -339,20 +288,20 @@ class BasketFactory:
         pencil.jump((-self.dim.basket_cover_latch_thickness / 2 + gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
         pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
         latch = SmartSolid(pencil.extrude_mirrored(self.dim.basket_cover_radius_wide, Axis.Y)).rotate((90, 0, 0))
-        latch.align_zxy(cover, Alignment.C, 0, Alignment.C, 0, Alignment.CR, 0)
+        latch.align_zxy(cover, Alignment.C, 0, Alignment.C, 0, Alignment.CL, 0)
         return latch.cut(hole).intersect(cover)
 
 def export_3mf(basket: SmartSolid, cover: SmartSolid, latch: SmartSolid, suffix: str = ""):
     for item in [basket, cover, latch]:
-        export(item.mirrored(Plane.XY))
+        export(item)
     save_3mf(f"models/hydroponic/basket/export{suffix}.3mf")
-    if not suffix: # default model
+    if suffix: # default model
         save_3mf()
 
 def export_stl(basket: SmartSolid, basket_with_handles: SmartSolid, cover: SmartSolid, latch: SmartSolid):
     latch.mirror(Plane.XY)
     for item in [basket, cover, latch, basket_with_handles]:
-        export(item)
+        export(item.mirrored(Plane.XY))
     save_stl("models/hydroponic/basket/stl")
 
 def export_basket():
