@@ -3,8 +3,8 @@ from math import radians, degrees, acos, sin, cos, tan, atan
 
 from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, Part, revolve, VectorLike, Edge
 
-from sava.csg.build123d.common.advanced_math import advanced_mod
-from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle, to_vector, are_points_too_close, validate_points_unique
+from sava.common.advanced_math import advanced_mod
+from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle, to_vector, are_points_too_close, validate_points_unique, are_numbers_too_close
 from sava.csg.build123d.common.sweepsolid import SweepSolid
 
 
@@ -258,10 +258,9 @@ class Pencil:
         return extrude(face, height)
 
     def complete_wire_for_mirror(self, axis: Axis):
-        tolerance = 1e-6
-        if Axis.Y == axis and abs(self.location.X - self.start.X) > tolerance:
+        if Axis.Y == axis and not are_numbers_too_close(self.location.X, self.start.X):
             self.right(self.start.X - self.location.X)
-        if Axis.X == axis and abs(self.location.Y - self.start.Y) > tolerance:
+        if Axis.X == axis and not are_numbers_too_close(self.location.Y, self.start.Y):
             self.up(self.start.Y - self.location.Y)
 
     def create_mirrored_face(self, axis: Axis) -> Face:

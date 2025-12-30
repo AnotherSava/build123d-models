@@ -2,7 +2,7 @@ import unittest
 
 from parameterized import parameterized
 
-from sava.csg.build123d.common.advanced_math import advanced_mod
+from sava.common.advanced_math import advanced_mod
 
 
 class TestAdvancedMod(unittest.TestCase):

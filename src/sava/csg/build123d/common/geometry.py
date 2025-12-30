@@ -92,6 +92,19 @@ def to_vector(vector: VectorLike) -> Vector:
     """
     return vector if isinstance(vector, Vector) else Vector(vector)
 
+def are_numbers_too_close(num1: float, num2: float, tolerance: float = 1e-6) -> bool:
+    """Checks if two numbers are too close together.
+
+    Args:
+        num1: First number
+        num2: Second number
+        tolerance: Minimum allowed difference between numbers. Default is 1e-6.
+
+    Returns:
+        True if numbers are closer than tolerance, False otherwise
+    """
+    return abs(num1 - num2) < tolerance
+
 def are_points_too_close(pt1: VectorLike, pt2: VectorLike, tolerance: float = 1e-6) -> bool:
     """Checks if two points are too close together.
 

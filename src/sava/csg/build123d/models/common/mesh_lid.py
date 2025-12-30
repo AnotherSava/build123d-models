@@ -6,7 +6,7 @@ from typing import Tuple
 from build123d import Vector, Solid, Part, Plane, Compound
 from traitlets import HasTraits, Float, Int, TraitError, validate
 
-from sava.csg.build123d.common.advanced_math import advanced_round
+from sava.common.advanced_math import advanced_round
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.hexagon import Hexagon, HexagonConfiguration, HexTileVertices, get_distance_y
 from sava.csg.build123d.common.primitives import create_tapered_box

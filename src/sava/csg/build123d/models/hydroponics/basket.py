@@ -4,13 +4,13 @@ from typing import Tuple
 
 from build123d import Solid, Vector, Plane, Axis, VectorLike, Wire, Edge, loft, Location, Face
 
-from sava.common.common import flatten
-from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
+from sava.csg.build123d.common.exporter import export, save_3mf, save_stl
 from sava.csg.build123d.common.geometry import Alignment, to_vector, rotate_vector, create_vector, get_angle
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_cone_with_angle_and_height
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartcone import SmartCone
+from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
@@ -266,28 +266,33 @@ class BasketFactory:
         hole.align(cover)
 
         latch_cut = self.create_latch(cover, hole, hole_diameter, 0)
-        latch = self.create_latch(cover, hole, hole_diameter, 0.05)
-        latch.label = f"latch_{hole_diameter}mm"
+        latch = self.create_latch(cover, hole, hole_diameter, 0.05, f"latch_{hole_diameter}mm")
 
-        foundation_outer = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2).rotate((180, 0, 0))
+        foundation = self._create_cover_foundation(cover, hole_diameter)
+
+        return cover.fuse(foundation).cut(hole, latch_cut), latch
+
+    def _create_cover_foundation(self, cover: SmartSolid, hole_diameter: float) -> SmartSolid:
+        foundation_outer = SmarterCone.with_base_angle_and_height(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_foundation_depth, self.dim.cone_slope_angle / 2 - 90)
         foundation_outer.align_zxy(cover, Alignment.LL)
 
-        foundation_inner = create_cone_with_angle_and_height(self.dim.basket_cover_radius_narrow - self.dim.thickness / 2, self.dim.basket_cover_foundation_depth, -self.dim.cone_slope_angle / 2).rotate((180, 0, 0))
+        foundation_inner = SmarterCone.with_base_angle_and_height(self.dim.basket_cover_radius_narrow - self.dim.thickness / 2, self.dim.basket_cover_foundation_depth, self.dim.cone_slope_angle / 2 - 90)
         foundation_inner.align(foundation_outer)
 
         foundation_cut = SmartBox(hole_diameter, self.dim.basket_cover_radius_wide, foundation_outer.z_size)
         foundation_cut.align_xz(foundation_outer).align_y(foundation_outer, Alignment.CL)
 
-        return cover.fuse(foundation_outer).cut(hole, latch_cut, foundation_inner, foundation_cut), latch
+        foundation = foundation_outer.cut(foundation_inner, foundation_cut)
+        return foundation
 
-    def create_latch(self, cover: SmartSolid, hole: SmartSolid, hole_diameter: float, gap: float) -> SmartSolid:
+    def create_latch(self, cover: SmartSolid, hole: SmartSolid, hole_diameter: float, gap: float, label = None) -> SmartSolid:
         pencil = Pencil()
         pencil.right((hole_diameter - gap) / 2)
         pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
         pencil.jump((self.dim.basket_cover_latch_thickness / 2 - gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
         pencil.jump((-self.dim.basket_cover_latch_thickness / 2 + gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
         pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
-        latch = SmartSolid(pencil.extrude_mirrored(self.dim.basket_cover_radius_wide, Axis.Y)).rotate((90, 0, 0))
+        latch = SmartSolid(pencil.extrude_mirrored(self.dim.basket_cover_radius_wide, Axis.Y), label=label).rotate((90, 0, 0))
         latch.align_zxy(cover, Alignment.C, 0, Alignment.C, 0, Alignment.CL, 0)
         return latch.cut(hole).intersect(cover)
 
