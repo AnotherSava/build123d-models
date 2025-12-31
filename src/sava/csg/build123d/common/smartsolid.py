@@ -206,11 +206,11 @@ class SmartSolid:
         self.orient(rotate_orientation(self.solid.orientation, rotations, plane))
         return self
 
-    def rotated(self, rotations: VectorLike, plane: Plane = Plane.XY) -> 'SmartSolid':
-        return self.copy().rotate(rotations, plane)
+    def rotated(self, rotations: VectorLike, plane: Plane = Plane.XY, label: str = None) -> 'SmartSolid':
+        return self.copy(label).rotate(rotations, plane)
 
-    def oriented(self, rotations: VectorLike) -> 'SmartSolid':
-        return self.copy().orient(rotations)
+    def oriented(self, rotations: VectorLike, label: str = None) -> 'SmartSolid':
+        return self.copy(label).orient(rotations)
 
     def get_side_length(self, direction: Direction):
         return self.y_size if direction.horizontal else self.x_size
@@ -250,16 +250,16 @@ class SmartSolid:
         self.assert_valid()
         return self
 
-    def cutted(self, *args) -> 'SmartSolid':
-        return self.copy().cut(*args)
+    def cutted(self, *args, label: str = None) -> 'SmartSolid':
+        return self.copy(label).cut(*args)
 
     def fuse(self, *args) -> 'SmartSolid':
         self.solid = fuse(self.solid, *args)
         self.assert_valid()
         return self
 
-    def fused(self, *args) -> 'SmartSolid':
-        return self.copy().fuse(*args)
+    def fused(self, *args, label: str = None) -> 'SmartSolid':
+        return self.copy(label).fuse(*args)
 
     def is_simple(self):
         return not isinstance(self.solid, ShapeList)
@@ -366,8 +366,8 @@ class SmartSolid:
         self.assert_valid()
         return self
 
-    def intersected(self, *args) -> 'SmartSolid':
-        return self.copy().intersect(args)
+    def intersected(self, *args, label: str = None) -> 'SmartSolid':
+        return self.copy(label).intersect(args)
 
     def add_notch(self, direction: Direction, depth: float, length: float):
         raise NotImplementedError("Remove dependency on pencil")
@@ -383,8 +383,8 @@ class SmartSolid:
         #
         # self.fuse(notch.intersect(extended_shape))
 
-    def copy(self):
-        return SmartSolid(copy(self.solid), label=self.label)
+    def copy(self, label: str = None):
+        return SmartSolid(copy(self.solid), label=label or self.label)
 
     def _scale_solid(self, factor_x: float, factor_y: float, factor_z: float):
         return scale(self.solid, (factor_x, factor_y or factor_x, factor_z or factor_y or factor_x))
@@ -396,25 +396,25 @@ class SmartSolid:
         self.solid = self._scale_solid(1 + pad_x / self.x_size, 1 + pad_y / self.y_size, 1 + pad_z / self.z_size)
         return self
 
-    def padded(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None):
-        return self.copy().pad(pad_x, pad_y, pad_z)
+    def padded(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None, label: str = None):
+        return self.copy(label).pad(pad_x, pad_y, pad_z)
 
     def scale(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None):
         self.solid = self._scale_solid(factor_x, factor_y, factor_z)
         return self
 
-    def scaled(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None):
-        return self.copy().scale(factor_x, factor_y, factor_z)
+    def scaled(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None, label: str = None):
+        return self.copy(label).scale(factor_x, factor_y, factor_z)
 
     def mirror(self, about: Plane = Plane.XZ) -> 'SmartSolid':
         self.solid = mirror(self.solid, about)
         return self
 
-    def mirrored(self, about: Plane = Plane.XZ) -> 'SmartSolid':
-        return self.copy().mirror(about)
+    def mirrored(self, about: Plane = Plane.XZ, label: str = None) -> 'SmartSolid':
+        return self.copy(label).mirror(about)
 
-    def molded(self, padding: float = 2) -> 'SmartSolid':
-        outer = self.padded(padding)
+    def molded(self, padding: float = 2, label: str = None) -> 'SmartSolid':
+        outer = self.padded(padding, label=label)
         outer.align_zxy(self, Alignment.RL)
         return outer.cut(self)
 

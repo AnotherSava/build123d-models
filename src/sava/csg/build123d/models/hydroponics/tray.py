@@ -146,7 +146,7 @@ class TrayFactory:
         outer_tray.fillet_z(self.dim.inner_fillet_radius + self.dim.outer_padding)
         outer_tray.align_zxy(inner_tray, Alignment.LL)
 
-        tray = inner_tray.fuse(outer_tray)
+        tray = SmartSolid(inner_tray, outer_tray, label="tray")
 
         cutout = self.create_cutout().align_x(tray, Alignment.C, self.dim.cutout_shift).align_y(tray, Alignment.LR).align_z(tray)
         tray.cut(cutout)
@@ -265,7 +265,7 @@ class TrayFactory:
     def create_peg(self) -> SmartSolid:
         thread = self.create_peg_thread()
 
-        core_screw = SmartSolid(Solid.make_cylinder(thread.min_radius, thread.length + self.dim.peg_height))
+        core_screw = SmartSolid(Solid.make_cylinder(thread.min_radius, thread.length + self.dim.peg_height), label="peg")
         core_screw.fillet_positional(self.dim.peg_fillet_radius, None, PositionalFilter(Axis.Z, core_screw.z_min))
 
         thread_screw_solid = SmartSolid(thread)
@@ -293,7 +293,7 @@ class TrayFactory:
             end_finishes=("fade", "fade")
         )
 
-        core_screw = SmartSolid(Solid.make_cylinder(thread.min_radius, thread.length + self.dim.peg_cap_handle_height))
+        core_screw = SmartSolid(Solid.make_cylinder(thread.min_radius, thread.length + self.dim.peg_cap_handle_height), label="peg_cap")
 
         thread_screw_solid = SmartSolid(thread)
         thread_screw_solid.align_zxy(core_screw, Alignment.RL, -0.1)
@@ -315,7 +315,7 @@ class TrayFactory:
         ball = SmartSolid(Solid.make_sphere(self.dim.watering_hole_cap_handle_ball_radius))
         ball.align_zxy(handle, Alignment.RL, self.dim.watering_hole_cap_handle_ball_radius)
 
-        return watering_hole.fuse(handle, ball)
+        return SmartSolid(watering_hole, handle, ball, label="watering_hole_cap")
 
 
 dimensions = TrayDimensions()
@@ -326,8 +326,8 @@ def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: Smar
     for shape in [*tray_pieces, peg, peg_cap]:
         shape.mirror(Plane.XY)
 
-    for i, piece in enumerate(tray_pieces):
-        export(piece, f"tray_piece_{i + 1}")
+    for piece in tray_pieces:
+        export(piece)
 
     tray = SmartSolid(tray_pieces)
 
@@ -335,14 +335,14 @@ def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: Smar
         for direction_y in [-1, 1]:
             peg.align_xy(tray, Alignment.C, direction_x * dimensions.peg_hole_offset_x, direction_y * dimensions.watering_hole_offset_y)
             peg.align_z(tray, Alignment.RR, -dimensions.tray_height)
-            export(peg.copy(), "peg")
+            export(peg.copy())
 
             peg_cap.align_zxy(peg, Alignment.RR, -dimensions.peg_cap_handle_height)
-            export(peg_cap.copy(), "peg_cap")
+            export(peg_cap.copy())
 
     watering_hole_cap.align_xy(tray, Alignment.C, dimensions.watering_hole_offset_x, dimensions.watering_hole_offset_y)
     watering_hole_cap.align_z(tray, Alignment.LR)
-    export(watering_hole_cap, "watering_hole_cap")
+    export(watering_hole_cap)
 
     save_3mf()
     save_3mf("3mf/tray.3mf")
@@ -358,11 +358,11 @@ def export_all():
 
     clear()
     for i, piece in enumerate(tray_solid_pieces):
-        export(piece, f"tray_piece_{i + 1}")
+        export(piece)
 
-    export(peg_solid, "peg")
-    export(peg_cap_solid, "peg_cap")
-    export(watering_hole_cap_solid, "watering_hole_cap")
+    export(peg_solid)
+    export(peg_cap_solid)
+    export(watering_hole_cap_solid)
 
     save_stl("models\\hydroponic\\tray")
 

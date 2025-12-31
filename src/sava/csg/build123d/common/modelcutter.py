@@ -102,8 +102,8 @@ def cut_with_wires(model: SmartSolid, *cuts: CutSpec) -> list[SmartSolid]:
 
         new_pieces = []
         for piece in pieces:
-            piece_left = piece.intersected(cutter_left)
-            piece_right = piece.cutted(cutter_right)
+            piece_left = piece.intersected(cutter_left, label=None if piece.label is None else f"{piece.label}_1")
+            piece_right = piece.cutted(cutter_right, label=None if piece.label is None else f"{piece.label}_2")
 
             for sub_piece in [piece_left, piece_right]:
                 if sub_piece.solid is not None and sub_piece.solid:
