@@ -8,7 +8,7 @@ from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 class SmarterCone(SmartSolid):
-    def __init__(self, base_radius: float, top_radius: float, height: float, plane: Plane = Plane.XY, angle: float = 360):
+    def __init__(self, base_radius: float, top_radius: float, height: float, plane: Plane = Plane.XY, angle: float = 360, label: str = None):
         self.base_radius = base_radius
         self.height = height
         self.plane = plane
@@ -21,7 +21,7 @@ class SmarterCone(SmartSolid):
             self.top_radius = top_radius
             solid = Solid.make_cone(base_radius, top_radius, height, plane, angle)
 
-        super().__init__(solid)
+        super().__init__(solid, label=label)
 
     @classmethod
     def with_base_angle_and_height(cls, base_radius: float, height: float, base_angle: float = 90, plane: Plane = Plane.XY, angle: float = 360) -> 'SmarterCone':

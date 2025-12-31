@@ -34,6 +34,8 @@ class BasketDimensions:
 
     basket_cover_thickness: float = 3
     basket_cover_latch_thickness: float = 2
+    basket_cover_latch_stopper_extra_width: float = 1
+    basket_cover_latch_stopper_radius_delta: float = 2 # extra distance letch can go in beyond the central hole
     basket_cover_foundation_depth: float = 2.5
 
     cover_handle_height: float = 1
@@ -281,14 +283,13 @@ class BasketFactory:
 
     def create_basket_cover_and_latch(self, basket: SmartSolid, hole_diameter: float, with_hooks: bool) -> Tuple[SmartSolid, SmartSolid]:
         cover_label = f"cover_{hole_diameter}mm{'_hooks' if with_hooks else ''}"
-        cover = SmartSolid(Solid.make_cone(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_radius_wide, self.dim.basket_cover_thickness), label=cover_label)
+        cover = SmarterCone(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_radius_wide, self.dim.basket_cover_thickness, label=cover_label)
         cover.align_zxy(basket, Alignment.RL, self.dim.basket_cover_thickness - self.dim.cap_depth)
 
-        hole = create_cone_with_angle_and_height(hole_diameter / 2, self.dim.basket_cover_thickness, 45)
-        hole.align(cover)
+        hole = SmarterCone.with_base_angle_and_height(hole_diameter / 2, self.dim.basket_cover_thickness, 135).align(cover)
 
-        latch_cut = self.create_latch(cover, hole, hole_diameter, 0)
-        latch = self.create_latch(cover, hole, hole_diameter, 0.05, f"latch_{hole_diameter}mm")
+        latch_cut = self.create_latch(cover, hole.top_radius * 2, hole, 0)
+        latch = self.create_latch(cover, hole.top_radius * 2, hole, 0.05, f"latch_{hole_diameter}mm")
 
         foundation = self._create_cover_foundation(cover, hole_diameter, with_hooks)
 
@@ -328,15 +329,16 @@ class BasketFactory:
             foundation_cut.align_xz(foundation_outer).align_y(foundation_outer, Alignment.CL)
             return foundation.cut(foundation_cut)
 
-    def create_latch(self, cover: SmartSolid, hole: SmartSolid, hole_diameter: float, gap: float, label = None) -> SmartSolid:
+    def create_latch(self, cover: SmartSolid, latch_width: float, hole: SmarterCone, gap: float, label=None) -> SmartSolid:
         pencil = Pencil()
-        pencil.right((hole_diameter - gap) / 2)
+        pencil.right((latch_width - gap) / 2)
         pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
         pencil.jump((self.dim.basket_cover_latch_thickness / 2 - gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
         pencil.jump((-self.dim.basket_cover_latch_thickness / 2 + gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
         pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
         latch = SmartSolid(pencil.extrude_mirrored(self.dim.basket_cover_radius_wide, Axis.Y), label=label).rotate((90, 0, 0))
         latch.align_zxy(cover, Alignment.C, 0, Alignment.C, 0, Alignment.CL, 0)
+
         return latch.cut(hole).intersect(cover)
 
 def export_3mf(*solids, suffix: str = ""):
