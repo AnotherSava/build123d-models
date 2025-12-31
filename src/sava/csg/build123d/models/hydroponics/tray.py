@@ -344,7 +344,6 @@ def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: Smar
     watering_hole_cap.align_z(tray, Alignment.LR)
     export(watering_hole_cap)
 
-    save_3mf()
     save_3mf("3mf/tray.3mf")
 
 def export_all():

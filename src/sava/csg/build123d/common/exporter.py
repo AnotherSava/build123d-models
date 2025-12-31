@@ -137,10 +137,21 @@ def _report_labels() -> None:
         print(f"{label + ':':<15} {count} shape(s)")
 
 
-def save_3mf(location: str = None) -> None:
+def save_3mf(location: str = None, current: bool = True) -> None:
     """Save all shapes to a single 3MF file."""
     actual_location = create_file_path(location or CURRENT_MODEL_LOCATION_3MF)
     print(f"\nExporting 3mf file to: {actual_location}\n")
+    _save_3mf(actual_location)
+
+    if location and current:
+        current_model_location = create_file_path(CURRENT_MODEL_LOCATION_3MF)
+        print(f"\nCopying 3MF to use as a current model: {current_model_location}\n")
+        shutil.copy2(actual_location, current_model_location)
+
+    print(f"\nDone")
+
+def _save_3mf(location: str) -> None:
+    """Save all shapes to a single 3MF file."""
 
     mesher = Mesher()
     for label, shapes in _shapes.items():
@@ -163,12 +174,11 @@ def save_3mf(location: str = None) -> None:
 
     try:
         mesher.write(temp_path)
-        shutil.copy2(temp_path, actual_location)
+        shutil.copy2(temp_path, location)
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-    print(f"\nDone")
 
 def create_file_path(location: str, filename: str = None) -> str:
     """Resolve path and create parent directory if needed.
