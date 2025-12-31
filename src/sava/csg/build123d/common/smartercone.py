@@ -24,7 +24,7 @@ class SmarterCone(SmartSolid):
         super().__init__(solid)
 
     @classmethod
-    def with_base_angle_and_height(cls, base_radius: float, height: float, base_angle: float = 90, plane: Plane = Plane.XY, angle: float = 360) -> SmartSolid:
+    def with_base_angle_and_height(cls, base_radius: float, height: float, base_angle: float = 90, plane: Plane = Plane.XY, angle: float = 360) -> 'SmarterCone':
         assert not are_numbers_too_close(advanced_mod(base_angle, 180, -90, 90), 0), f"Base angle is invalid: {base_angle}"
 
         base_angle = advanced_mod(base_angle, 360, -180, 180)

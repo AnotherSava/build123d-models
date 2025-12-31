@@ -185,6 +185,13 @@ class SmartSolid:
         self.solid.orientation = rotations
         return self
 
+    def rotate_with_axis(self, axis: Axis, angle: float) -> 'SmartSolid':
+        self.solid = self.solid.rotate(axis, angle)
+        return self
+
+    def rotated_with_axis(self, axis: Axis, angle: float) -> 'SmartSolid':
+        return self.copy().rotate_with_axis(axis, angle)
+
     # Orientation in build123d works a bit weird:
     # (a, b, c) input does rotate "a" degrees around axis X, then "b" degrees around axis Y, then "c" degrees around axis Z.
     # But those axes are not in the original coordinate system (plane), but in a coordinate system attached to the object itself.

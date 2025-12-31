@@ -201,8 +201,8 @@ class Pencil:
     def jump(self, destination: VectorLike):
         return self.jump_to(to_vector(destination) + self.location)
 
-    def jump_from_start(self, destination: Vector):
-        return self.jump_to(destination + self.start)
+    def jump_from_start(self, destination: VectorLike):
+        return self.jump_to(to_vector(destination) + self.start)
 
     def draw(self, length: float, angle: float):
         abs_destination = shift_vector(self.location, length, angle)
@@ -263,7 +263,7 @@ class Pencil:
         if Axis.X == axis and not are_numbers_too_close(self.location.Y, self.start.Y):
             self.up(self.start.Y - self.location.Y)
 
-    def create_mirrored_face(self, axis: Axis) -> Face:
+    def create_mirrored_face(self, axis: Axis = Axis.Y) -> Face:
         return Face(self.create_mirrored_wire(axis))
 
     def create_mirrored_wire(self, axis: Axis) -> Wire:
