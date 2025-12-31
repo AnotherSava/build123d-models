@@ -1,10 +1,12 @@
+from copy import copy
 from dataclasses import dataclass
 from math import radians, degrees, atan, cos, tan
 from typing import Tuple
 
 from build123d import Solid, Vector, Plane, Axis, VectorLike, Wire, Edge, loft, Location, Face
 
-from sava.csg.build123d.common.exporter import export, save_3mf, save_stl
+from sava.common.common import flatten
+from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
 from sava.csg.build123d.common.geometry import Alignment, to_vector, rotate_vector, create_vector, get_angle
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_cone_with_angle_and_height
@@ -46,6 +48,10 @@ class BasketDimensions:
     cover_foundation_offset: float = 0.1
     cover_foundation_support_thickness: float = 1.5
     cover_foundation_hook_depth: float = 1.2
+
+    cover_etch_height: float = 1
+    cover_etch_width: float = 1.5
+    cover_etch_arc_angle: float = 30
 
     @property
     def foundation_thickness(self) -> float:
@@ -245,7 +251,7 @@ class BasketFactory:
         top = self.create_handle_wire(centre, start, self.dim.cover_handle_arc_angle, -self.dim.cover_handle_width)
         bottom = self.create_handle_wire(centre - (0, 0, self.dim.cover_handle_height), create_vector(radius - self.dim.cover_handle_height, start_angle), self.dim.cover_handle_arc_angle, self.dim.cover_handle_height - self.dim.cover_handle_width)
 
-        handle = SmartSolid(loft([Face(Wire(top).close()), Face(Wire(bottom).close())]))
+        handle = SmartSolid(loft([Face(top), Face(bottom)]))
         handle.align_z(cap_45_inner, Alignment.RL)
         return handle
 
@@ -281,6 +287,20 @@ class BasketFactory:
 
         return upper_rib_boundary.fuse(leg_holder_boundary).intersect(ribs)
 
+    def create_cover_etch(self, cover: SmarterCone) -> SmartSolid:
+        centre = Vector(cover.x_mid, cover.y_mid, cover.z_max)
+        radius = cover.top_radius
+        start_angle = -self.dim.cover_etch_arc_angle / 2
+        start = create_vector(radius, start_angle)
+
+        top = self.create_handle_wire(centre, start, self.dim.cover_etch_arc_angle, -self.dim.cover_etch_width)
+        middle = self.create_handle_wire(centre - (0, 0, self.dim.cover_etch_height), create_vector(radius - self.dim.cover_etch_height, start_angle), self.dim.cover_etch_arc_angle, -self.dim.cover_etch_width)
+        bottom = copy(middle).move(Location((0, 0, -self.dim.cover_etch_width)))
+
+        etch_top = SmartSolid(loft([Face(top), Face(middle)]))
+        etch_bottom = SmartSolid(loft([Face(middle), Face(bottom)]))
+        return etch_top.fuse(etch_bottom)
+
     def create_basket_cover_and_latch(self, basket: SmartSolid, hole_diameter: float, with_hooks: bool) -> Tuple[SmartSolid, SmartSolid]:
         cover_label = f"cover_{hole_diameter}mm{'_hooks' if with_hooks else ''}"
         cover = SmarterCone(self.dim.basket_cover_radius_narrow, self.dim.basket_cover_radius_wide, self.dim.basket_cover_thickness, label=cover_label)
@@ -291,9 +311,12 @@ class BasketFactory:
         latch_cut = self.create_latch(cover, hole.top_radius * 2, hole, 0)
         latch = self.create_latch(cover, hole.top_radius * 2, hole, 0.05, f"latch_{hole_diameter}mm")
 
-        foundation = self._create_cover_foundation(cover, hole_diameter, with_hooks)
+        foundation = self._create_cover_foundation(cover, hole, with_hooks)
 
-        return cover.fuse(foundation).cut(hole, latch_cut), latch
+        etch = self.create_cover_etch(cover)
+        etch.align_y(cover, Alignment.RL, 0.01)
+
+        return cover.fuse(foundation).cut(hole, latch_cut, etch), latch
 
     def create_foundation_support_triangle(self, radius: float, thickness: float) -> Face:
         pencil = Pencil()
@@ -306,7 +329,7 @@ class BasketFactory:
         bottom = self.create_foundation_support_triangle(foundation_inner.base_radius, 0.001)
         return SmartSolid(loft([top, bottom]))
 
-    def _create_cover_foundation(self, cover: SmartSolid, hole_diameter: float, with_hooks: bool) -> SmartSolid | list[SmartSolid]:
+    def _create_cover_foundation(self, cover: SmartSolid, hole: SmarterCone, with_hooks: bool) -> SmartSolid | list[SmartSolid]:
         segment_angle = self.dim.foundation_hook_arc_angle if with_hooks else 360
         segment_height = self.dim.cover_foundation_hook_depth if with_hooks else self.dim.basket_cover_foundation_depth
         base_angle = self.dim.cover_foundation_angle if with_hooks else -90 + self.dim.cone_slope_angle / 2
@@ -325,17 +348,17 @@ class BasketFactory:
             foundation_hooks = [foundation.rotated_with_axis(Axis.Z, 360 / self.dim.window_count * (index + 0.5)) for index in [-1, 0, 3, 4]]
             return foundation_hooks
         else:
-            foundation_cut = SmartBox(hole_diameter, self.dim.basket_cover_radius_wide, foundation_outer.z_size)
+            foundation_cut = SmartBox(hole.top_radius * 2, self.dim.basket_cover_radius_wide, foundation_outer.z_size)
             foundation_cut.align_xz(foundation_outer).align_y(foundation_outer, Alignment.CL)
             return foundation.cut(foundation_cut)
 
     def create_latch(self, cover: SmartSolid, latch_width: float, hole: SmarterCone, gap: float, label=None) -> SmartSolid:
         pencil = Pencil()
-        pencil.right((latch_width - gap) / 2)
-        pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
-        pencil.jump((self.dim.basket_cover_latch_thickness / 2 - gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
-        pencil.jump((-self.dim.basket_cover_latch_thickness / 2 + gap / 2, self.dim.basket_cover_latch_thickness / 2 - gap / 2))
-        pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap / 2)
+        pencil.right(latch_width / 2 - gap)
+        pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap)
+        pencil.jump((self.dim.basket_cover_latch_thickness / 2 - gap, self.dim.basket_cover_latch_thickness / 2 - gap))
+        pencil.jump((-self.dim.basket_cover_latch_thickness / 2 + gap, self.dim.basket_cover_latch_thickness / 2 - gap))
+        pencil.up((self.dim.basket_cover_thickness - self.dim.basket_cover_latch_thickness) / 2 + gap)
         latch = SmartSolid(pencil.extrude_mirrored(self.dim.basket_cover_radius_wide, Axis.Y), label=label).rotate((90, 0, 0))
         latch.align_zxy(cover, Alignment.C, 0, Alignment.C, 0, Alignment.CL, 0)
 
@@ -360,16 +383,13 @@ def export_basket():
     basket_factory = BasketFactory(dimensions)
     basket_solid = basket_factory.create_basket()
     basket_with_handles_solid = basket_factory.create_basket(True)
-    basket_cover_solid, basket_latch_solid = basket_factory.create_basket_cover_and_latch(basket_solid, 10, True)
+    basket_cover_solid, basket_latch_solid = basket_factory.create_basket_cover_and_latch(basket_solid, 10, False)
 
-    objects = []
-    # objects = flatten(basket_factory.create_basket_cover_and_latch(basket_solid, diameter) for diameter in [4, 6, 8, 10, 12])
+    cover_and_latch_variety = flatten(basket_factory.create_basket_cover_and_latch(basket_solid, diameter, hooks) for diameter in [4, 6, 8, 10, 12] for hooks in [True, False])
 
-    export_3mf(basket_solid, basket_cover_solid, basket_latch_solid)
-    # clear()
-    # export_3mf(basket_with_handles_solid, basket_cover_solid, basket_latch_solid, suffix="_with_handles")
-    # clear()
-    export_stl(basket_solid, basket_with_handles_solid, basket_cover_solid, basket_latch_solid, *objects)
+    export_3mf(basket_with_handles_solid, basket_cover_solid, basket_latch_solid)
+    clear()
+    export_stl(basket_solid, basket_with_handles_solid, *cover_and_latch_variety)
 
 if __name__ == "__main__":
     export_basket()
