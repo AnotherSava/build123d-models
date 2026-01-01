@@ -1,6 +1,6 @@
 from copy import copy
 from dataclasses import dataclass
-from math import radians, degrees, atan, cos, tan
+from math import radians, degrees, atan, tan
 from typing import Tuple
 
 from build123d import Solid, Vector, Plane, Axis, VectorLike, Wire, Edge, loft, Location, Face
@@ -9,9 +9,7 @@ from sava.common.common import flatten
 from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
 from sava.csg.build123d.common.geometry import Alignment, to_vector, rotate_vector, create_vector, get_angle
 from sava.csg.build123d.common.pencil import Pencil
-from sava.csg.build123d.common.primitives import create_cone_with_angle_and_height
 from sava.csg.build123d.common.smartbox import SmartBox
-from sava.csg.build123d.common.smartcone import SmartCone
 from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -137,19 +135,16 @@ class BasketFactory:
         self.dim = dim
 
     def _create_basket(self) -> Tuple[SmartSolid, SmartSolid]:
-        """Create the basic basket shape (outer cone, inner cone, cap)."""
-        outer = SmartSolid(Solid.make_cone(self.dim.outer_radius_bottom, self.dim.outer_radius_top, self.dim.height))
+        outer = SmarterCone(self.dim.outer_radius_bottom, self.dim.outer_radius_top, self.dim.height)
+        inner = outer.create_offset_cone(-self.dim.thickness)
 
-        inner = SmartSolid(Solid.make_cone(self.dim.inner_diameter_bottom / 2, self.dim.inner_radius_top, self.dim.height))
-        inner.align_zxy(outer, Alignment.LR)
-
-        cap_outer = SmartCone.create_empty(-45, self.dim.outer_radius_bottom, self.dim.thickness * cos(radians(45)))
-        cap_outer.align_zxy(outer, Alignment.LL)
+        point_end = SmarterCone(0, self.dim.outer_radius_bottom, self.dim.outer_radius_bottom).align_zxy(outer, Alignment.LL)
+        point_end.shell(thickness_side=-self.dim.thickness)
 
         # Create all window cutouts
         windows = SmartSolid(self._create_all_windows()).align_z(outer, Alignment.RL)
 
-        return outer.fuse(cap_outer).cut(windows), inner
+        return outer.fuse(point_end).cut(windows), inner
 
     def _create_window_shape(self, distance: float) -> Face:
         width = distance * self.dim.window_angle_radians
@@ -258,11 +253,10 @@ class BasketFactory:
         for item in [basket_outer, basket_inner]:
             item.align_xy()
 
-        cap_45_outer = create_cone_with_angle_and_height(self.dim.cap_radius_outer(self.dim.cap_depth), self.dim.cap_depth, self.dim.cap_angle)
+        cap_45_outer = SmarterCone.with_base_angle_and_height(self.dim.cap_radius_outer(self.dim.cap_depth), self.dim.cap_depth, 90 + self.dim.cap_angle)
         cap_45_outer.align_zxy(basket_outer, Alignment.RR)
 
-        cap_45_inner = create_cone_with_angle_and_height(self.dim.cap_radius_inner(self.dim.cap_depth), self.dim.cap_depth, self.dim.cap_angle)
-        cap_45_inner.align(cap_45_outer)
+        cap_45_inner = cap_45_outer.create_offset_cone(-self.dim.thickness)
 
         ribs = self.create_ribs(basket_outer)
 
@@ -362,12 +356,10 @@ class BasketFactory:
 
         return latch.cut(hole).intersect(cap)
 
-def export_3mf(*solids, suffix: str = ""):
+def export_3mf(*solids, current: bool = True):
     for solid in solids:
         export(solid)
-    save_3mf(f"models/hydroponic/basket/export{suffix}.3mf")
-    if not suffix: # default model
-        save_3mf()
+    save_3mf("models/hydroponic/basket/export.3mf", current)
 
 def export_stl(*solids):
     for solid in solids:
@@ -381,11 +373,11 @@ def export_basket():
     basket_factory = BasketFactory(dimensions)
     basket_solid = basket_factory.create_basket()
     basket_with_handles_solid = basket_factory.create_basket(True)
-    basket_cap_solid, basket_latch_solid = basket_factory.create_basket_cap_and_latch(basket_solid, 10, False)
+    basket_cap_solid, basket_latch_solid = basket_factory.create_basket_cap_and_latch(basket_solid, 8, False)
+
+    export_3mf(basket_with_handles_solid, basket_cap_solid, basket_latch_solid, current=True)
 
     cap_and_latch_variety = flatten(basket_factory.create_basket_cap_and_latch(basket_solid, diameter, hooks) for diameter in [4, 6, 8, 10, 12] for hooks in [True, False])
-
-    export_3mf(basket_with_handles_solid, basket_cap_solid, basket_latch_solid)
     clear()
     export_stl(basket_solid, basket_with_handles_solid, *cap_and_latch_variety)
 
