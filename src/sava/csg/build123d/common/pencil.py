@@ -4,20 +4,50 @@ from math import radians, degrees, acos, sin, cos, tan, atan
 from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, Part, revolve, VectorLike, Edge
 
 from sava.common.advanced_math import advanced_mod
-from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle, to_vector, are_points_too_close, validate_points_unique, are_numbers_too_close
+from sava.csg.build123d.common.exporter import show_red, show_green
+from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle, to_vector, are_points_too_close, validate_points_unique, are_numbers_too_close, snap_to
 from sava.csg.build123d.common.sweepsolid import SweepSolid
 
 
+def _reconstruct_edge(edge: Edge) -> Edge:
+    """
+    Reconstruct an edge from its geometry to avoid OCCT issues with mirrored edges.
+
+    This fixes a freeze in OCCT's extrusion algorithm when a face contains two adjacent
+    circular arcs created through mirroring and edge reversal. By reconstructing the edge,
+    we create a fresh edge object without the problematic internal state from mirroring.
+
+    Args:
+        edge: The edge to reconstruct
+
+    Returns:
+        A new edge with the same geometry but fresh internal state
+    """
+    start = edge.position_at(0)
+    end = edge.position_at(1)
+
+    if edge.geom_type.name == 'LINE':
+        return Line(start, end)
+    elif edge.geom_type.name == 'CIRCLE':
+        mid = edge.position_at(0.5)
+        return ThreePointArc(start, mid, end)
+    else:
+        # For other edge types, return as-is
+        return edge
+
+
 class Pencil:
-    sweep_path_for: 'Pencil'  # pencil we are creating a sweep path for (if any)
     def __init__(self, start: VectorLike = (0, 0), plane: Plane = Plane.XY):
         self.curves = []
         self.start = to_vector(start)
         self.location = self.start
         self.plane = plane
 
-    def check_destination(self, destination: Vector) -> Vector:
-        return self.start if are_points_too_close(destination, self.start) else destination
+    def process_vector_input(self, vector: VectorLike) -> Vector:
+        vector = to_vector(vector)
+        vector = Vector(snap_to(vector.X, self.start.X), snap_to(vector.Y, self.start.Y), snap_to(vector.Z, self.start.Z))
+        assert vector.Z == self.start.Z
+        return vector
 
     def double_arc(self, destination: VectorLike, shift_coefficient: float = 0.5, angle: float = None):
         """Draw two symmetric arcs to reach the destination.
@@ -80,7 +110,7 @@ class Pencil:
         destination_tangent = to_vector(destination_tangent)
 
         # Convert relative destination to absolute
-        destination_abs = self.check_destination(self.location + destination)
+        destination_abs = self.process_vector_input(self.location + destination)
 
         # Calculate or use provided tangent at current location
         if start_tangent is not None:
@@ -89,7 +119,7 @@ class Pencil:
             current_tangent = destination if not self.curves else self.curves[-1].tangent_at(1.0)
 
         # Convert intermediate points (relative) to absolute coordinates
-        intermediate_abs = [self.location + to_vector(pt) for pt in intermediate_points or []]
+        intermediate_abs = [self.process_vector_input(self.location + to_vector(pt)) for pt in intermediate_points or []]
         points = [self.location] + intermediate_abs + [destination_abs]
 
         # Validate that all points are unique
@@ -105,63 +135,39 @@ class Pencil:
         centre = shift_vector(self.location, radius, centre_angle)
         degrees_destination_from_centre = ((arc_degrees + centre_angle + 180) % 360)
         degrees_middle_from_centre = ((arc_degrees / 2 + centre_angle + 180) % 360)
-        destination = self.check_destination(shift_vector(centre, radius, degrees_destination_from_centre))
+        destination = shift_vector(centre, radius, degrees_destination_from_centre)
         middle = shift_vector(centre, radius, degrees_middle_from_centre)
         return self.arc_abs(middle, destination)
 
-    def arc_abs(self, midpoint: Vector, destination: Vector):
-        self.curves.append(ThreePointArc(self.location, midpoint, destination))
-        self.location = destination
+    def arc_abs(self, midpoint_abs: VectorLike, destination_abs: VectorLike):
+        midpoint_abs = self.process_vector_input(midpoint_abs)
+        destination_abs = self.process_vector_input(destination_abs)
+        self.curves.append(ThreePointArc(self.location, midpoint_abs, destination_abs))
+        self.location = destination_abs
         return self
-
-    def arc_from_start(self, midpoint_vector: Vector, destination_vector: Vector):
-        return self.arc_abs(self.start + midpoint_vector, self.start + destination_vector)
 
     def arc(self, midpoint_vector: Vector, destination_vector: Vector):
         return self.arc_abs(self.location + midpoint_vector, self.location + destination_vector)
-
-    def arc_with_angle_to_centre(self, angle_to_centre: float, destination_vector: Vector):
-        return self.arc_with_centre_direction(create_vector(1, angle_to_centre), destination_vector)
 
     def arc_with_vector_to_intersection(self, vector_to_tangents_intersection: Vector, angle: float):
         direction_to_centre = get_angle(vector_to_tangents_intersection) + 90 * (-1 if angle % 360 < 180 else 1)
         radius = vector_to_tangents_intersection.length * tan(radians(angle / 2))
         return self.arc_with_radius(radius, direction_to_centre, angle - 180)
 
-    def arc_with_angle_to_centre_abs(self, angle_to_centre: float, destination: Vector):
-        return self.arc_with_centre_direction_abs(create_vector(1, angle_to_centre), destination)
-
-    def arc_with_destination_and_radius(self, destinationVector: Vector, radius: float):
-        angle = 2 * degrees(asin(destinationVector.length / 2 / radius))
-        return self.arc_with_destination(destinationVector, angle)
-
-    def arc_with_centre_direction(self, centre_direction: Vector, destination_vector: Vector):
-        # Create copies and normalize to preserve original vectors
-        # Calculate an angle between vectors using dot product
-        dot_product = Vector(centre_direction).normalized().dot(Vector(destination_vector).normalized())
-        # Clamp dot product to [-1, 1] to handle floating point precision errors
-        dot_product = max(-1.0, min(1.0, dot_product))
-        a = degrees(acos(dot_product))
-
-        return self.arc_with_destination(destination_vector, 2 * a - 180)
-
-    def arc_with_centre_direction_abs(self, centre_direction: Vector, destination: Vector):
-        return self.arc_with_centre_direction(centre_direction, destination - self.location)
-
     # create arc with specific destination and angle measure
-    def arc_with_destination_abs(self, destination: Vector, angle: float):
+    def arc_with_destination_abs(self, destination_abs: Vector, angle: float):
         # Calculate chord (straight line distance between start and end)
-        destination = self.check_destination(destination)
-        chord = destination - self.location
+        destination_abs = self.process_vector_input(destination_abs)
+        chord = destination_abs - self.location
         chord_length = chord.length
         
-        chord_midpoint = (self.location + destination) / 2
+        chord_midpoint_abs = (self.location + destination_abs) / 2
         
         # Calculate radius using chord length and arc angle
         # For an arc with angle θ, radius = chord_length / (2 * sin(θ/2))
         half_angle_rad = radians(abs(angle) / 2)
         if half_angle_rad == 0:
-            return self.jump_to(destination)  # Straight line for 0° angle
+            return self.jump_to(destination_abs)  # Straight line for 0° angle
             
         radius = chord_length / (2 * sin(half_angle_rad))
         
@@ -174,17 +180,13 @@ class Pencil:
         if angle < 0:
             perp_direction = -perp_direction  # Clockwise for negative angles
             
-        center = chord_midpoint + perp_direction * center_distance
+        center_abs = chord_midpoint_abs + perp_direction * center_distance
         
         # Calculate midpoint of arc for Part.Arc
         # The arc midpoint is on the arc, perpendicular to the chord at center
-        arc_midpoint = center - perp_direction * radius
+        arc_midpoint = self.process_vector_input(center_abs - perp_direction * radius)
         
-        return self.arc_abs(arc_midpoint, destination)
-
-    # create arc with specific destination and angle measure
-    def arc_with_destination_from_start(self, destination_vector: Vector, angle: float):
-        return self.arc_with_destination_abs(destination_vector + self.start, angle)
+        return self.arc_abs(arc_midpoint, destination_abs)
 
     # create arc with specific destination and angle measure
     def arc_with_destination(self, destination: VectorLike, angle: float):
@@ -192,17 +194,13 @@ class Pencil:
         return self.arc_with_destination_abs(destination + self.location, angle)
 
     def jump_to(self, abs_destination: VectorLike):
-        abs_destination = to_vector(abs_destination)
-        abs_destination = self.check_destination(abs_destination)
+        abs_destination = self.process_vector_input(abs_destination)
         self.curves.append(Line(self.location, abs_destination))
         self.location = abs_destination
         return self
 
     def jump(self, destination: VectorLike):
         return self.jump_to(to_vector(destination) + self.location)
-
-    def jump_from_start(self, destination: VectorLike):
-        return self.jump_to(to_vector(destination) + self.start)
 
     def draw(self, length: float, angle: float):
         abs_destination = shift_vector(self.location, length, angle)
@@ -228,18 +226,6 @@ class Pencil:
         face = self.create_face()
         return extrude(face, height)
 
-    def extrude_x(self, height: float, transpose: Vector = Vector()):
-        solid = self.extrude(height)
-        solid.orientation = (90, 90, 0)
-        solid.position = transpose
-        return solid
-
-    def extrude_y(self, height: float, transpose: Vector = Vector()):
-        solid = self.extrude(height)
-        solid.orientation = (90, 180, 0)
-        solid.position = transpose
-        return solid
-
     def create_face(self, enclose: bool = True) -> Face:
         return Face(self.create_wire(enclose))
 
@@ -253,68 +239,98 @@ class Pencil:
         # Transform from local to global using the plane's location
         return local_wire.locate(Location(self.plane))
 
-    def extrude_mirrored(self, height: float, axis: Axis = Axis.Y):
-        face = self.create_mirrored_face(axis)
+    def extrude_mirrored_x(self, height: float, center: float = 0) -> Part:
+        """Extrude a face mirrored around the local X axis at the specified Y coordinate."""
+        face = self.create_mirrored_face_x(center)
         return extrude(face, height)
 
-    def complete_wire_for_mirror(self, axis: Axis):
-        if Axis.Y == axis and not are_numbers_too_close(self.location.X, self.start.X):
-            self.right(self.start.X - self.location.X)
-        if Axis.X == axis and not are_numbers_too_close(self.location.Y, self.start.Y):
-            self.up(self.start.Y - self.location.Y)
+    def extrude_mirrored_y(self, height: float, center: float = 0) -> Part:
+        """Extrude a face mirrored around the local Y axis at the specified X coordinate."""
+        face = self.create_mirrored_face_y(center)
+        return extrude(face, height)
 
-    def create_mirrored_face(self, axis: Axis = Axis.Y) -> Face:
-        return Face(self.create_mirrored_wire(axis))
+    def create_mirrored_face_x(self, center: float = 0) -> Face:
+        """Create a face mirrored around the local X axis at the specified Y coordinate."""
+        wire = self.create_mirrored_wire_x(center)
+        return Face(wire)
 
-    def create_mirrored_wire(self, axis: Axis) -> Wire:
-        self.complete_wire_for_mirror(axis)
-        original_wire = self.create_wire(False)
-        mirrored = self.mirror_wire(axis)
+    def create_mirrored_face_y(self, center: float = 0) -> Face:
+        """Create a face mirrored around the local Y axis at the specified X coordinate."""
+        wire = self.create_mirrored_wire_y(center)
+        return Face(wire)
 
-        # Handle case where mirror_wire returns Curve instead of Wire
-        # Curve is a composite type that can contain multiple wires
+    def create_mirrored_wire_x(self, center: float = 0) -> Wire:
+        """Create a wire mirrored around the local X axis at the specified Y coordinate."""
+        return self._create_mirrored_wire_impl(mirror_around_x_axis=True, center=center)
+
+    def create_mirrored_wire_y(self, center: float = 0) -> Wire:
+        """Create a wire mirrored around the local Y axis at the specified X coordinate."""
+        return self._create_mirrored_wire_impl(mirror_around_x_axis=False, center=center)
+
+    def _create_mirrored_wire_impl(self, mirror_around_x_axis: bool, center: float) -> Wire:
+        """Implementation for creating mirrored wires.
+
+        Args:
+            mirror_around_x_axis: True to mirror around X axis (at Y=center), False for Y axis (at X=center)
+            center: The coordinate of the mirror axis in local plane coordinates
+        """
+        original_curves = self.curves.copy()
+
+        # Add segments to/from center to create a closed path for mirroring
+        if mirror_around_x_axis:
+            # Mirroring around X axis at Y=center
+            center = snap_to(center, self.start.Y, self.location.Y)
+            if self.start.Y != center:
+                self.curves.insert(0, Line(Vector(self.start.X, center), self.start))
+            if self.location.Y != center:
+                self.jump_to((self.location.X, center))
+        else:
+            # Mirroring around Y axis at X=center
+            center = snap_to(center, self.start.X, self.location.X)
+            if self.start.X != center:
+                self.curves.insert(0, Line(Vector(center, self.start.Y), self.start))
+            if self.location.X != center:
+                self.jump_to((center, self.location.Y))
+
+        # Create wire and locate it to the plane
+        wire_with_start = Wire(self.curves)
+        original_wire = wire_with_start.locate(Location(self.plane))
+
+        # Create mirror plane: offset from plane origin along the appropriate axis
+        if mirror_around_x_axis:
+            # Mirror across plane perpendicular to local Y at Y=center
+            mirror_pos = self.plane.origin + self.plane.y_dir * center
+            mirror_plane = Plane(mirror_pos, x_dir=self.plane.x_dir, z_dir=self.plane.y_dir)
+        else:
+            # Mirror across plane perpendicular to local X at X=center
+            mirror_pos = self.plane.origin + self.plane.x_dir * center
+            mirror_plane = Plane(mirror_pos, x_dir=self.plane.y_dir, z_dir=self.plane.x_dir)
+
+        mirrored = mirror(original_wire, mirror_plane)
+
+        # Restore original curves
+        self.curves = original_curves
+
+        # Handle case where mirror returns Curve instead of Wire
         if hasattr(mirrored, 'wires'):
             mirrored_wire = mirrored.wires()[0]
         else:
             mirrored_wire = mirrored
 
-        # Create a closed wire by combining original and reversed mirrored wire
-        # This ensures edges connect: original end → mirrored end, mirrored start → original start
-        # Need to reverse both the direction of each edge AND the order of edges
+        # Create a closed wire by combining original and reversed mirrored edges
+        original_edges = list(original_wire.edges())
         mirrored_edges = list(mirrored_wire.edges())
         mirrored_edges_reversed = [Edge(e.wrapped.Reversed()) for e in reversed(mirrored_edges)]
-        all_edges = list(original_wire.edges()) + mirrored_edges_reversed
-        return Wire(all_edges)
 
-    def mirror_wire(self, axis: Axis) -> Wire:
-        wire = self.create_wire(False)
-        # Create mirror planes in pencil's local coordinate system
-        # In build123d Plane, z_dir is the normal (perpendicular to plane surface)
-        # For Axis.X: mirror across plane perpendicular to local Y → z_dir = local Y
-        # For Axis.Y: mirror across plane perpendicular to local X → z_dir = local X
-        match axis:
-            case Axis.Y:
-                # Mirror plane normal = local X direction
-                mirror_plane = Plane(self.plane.origin, x_dir=self.plane.y_dir, z_dir=self.plane.x_dir)
-                move_vector_local = Vector(self.location.X * 2, 0, 0)
-                move_vector_global = self.plane.from_local_coords(move_vector_local) - self.plane.from_local_coords(Vector(0, 0, 0))
-                return mirror(wire, mirror_plane).move(Location(move_vector_global))
-            case Axis.X:
-                # Mirror plane normal = local Y direction
-                mirror_plane = Plane(self.plane.origin, x_dir=self.plane.x_dir, z_dir=self.plane.y_dir)
-                move_vector_local = Vector(0, self.location.Y * 2, 0)
-                move_vector_global = self.plane.from_local_coords(move_vector_local) - self.plane.from_local_coords(Vector(0, 0, 0))
-                return mirror(wire, mirror_plane).move(Location(move_vector_global))
-        raise "Invalid axis"
+        # Combine all edges to form closed loop
+        all_edges = original_edges + mirrored_edges_reversed
 
-    def create_sweep_path(self, plane: Plane = Plane.YZ) -> 'Pencil':
-        pencil = Pencil(self.start, plane)
-        pencil.sweep_path_for = self
-        return pencil
+        # Reconstruct edges to avoid OCCT extrusion freeze with mirrored circular arcs
+        # This fixes an issue where two adjacent circular arcs from mirroring cause
+        # OCCT's extrusion algorithm to freeze indefinitely
+        reconstructed_edges = [_reconstruct_edge(e) for e in all_edges]
 
-    def sweep(self) -> SweepSolid:
-        face = self.sweep_path_for.create_face()
-        return SweepSolid(face, self.create_wire(False), self.plane)
+        return Wire(reconstructed_edges)
 
     def revolve(self, angle: float = 360, axis: Axis = Axis.Y, enclose: bool = True) -> Part:
         return revolve(self.create_face(enclose), axis, angle)
