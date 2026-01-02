@@ -58,28 +58,12 @@ class Direction(IntEnum):
         return self in (Direction.E, Direction.W)
 
     @property
-    def vertical(self) -> bool:
-        return self in (Direction.S, Direction.N)
-
-    @property
     def axis(self) -> Axis:
         return Axis.X if self.horizontal else Axis.Y
 
     @property
     def orthogonal_axis(self) -> Axis:
         return Axis.Y if self.horizontal else Axis.X
-
-    @property
-    def alignment_further(self) -> Alignment:
-        return Alignment.RR if self in [Direction.N, Direction.E] else Alignment.LL
-
-    @property
-    def alignment_middle(self) -> Alignment:
-        return Alignment.R if self in [Direction.N, Direction.E] else Alignment.L
-
-    @property
-    def alignment_closer(self) -> Alignment:
-        return Alignment.RL if self in [Direction.N, Direction.E] else Alignment.LR
 
 def to_vector(vector: VectorLike) -> Vector:
     """Converts a VectorLike to a Vector if it isn't already.
@@ -91,6 +75,38 @@ def to_vector(vector: VectorLike) -> Vector:
         A Vector object
     """
     return vector if isinstance(vector, Vector) else Vector(vector)
+
+def snap_to(original_number: float, *round_numbers: float, tolerance: float = 1e-6) -> float:
+    """Snaps a number to one of multiple target values if within tolerance.
+
+    Useful for cleaning up floating-point arithmetic by snapping values that are
+    very close to specific numbers (e.g., 0, 90, 180) to those exact values.
+    Checks each target value in order and returns the first match.
+
+    Args:
+        original_number: The number to potentially snap
+        *round_numbers: One or more target values to snap to
+        tolerance: Maximum difference for snapping (default: 1e-6)
+
+    Returns:
+        The first round_number within tolerance, otherwise original_number
+
+    Examples:
+        >>> snap_to(0.0000001, 0.0)
+        0.0
+        >>> snap_to(89.9999999, 90.0)
+        90.0
+        >>> snap_to(45.5, 90.0)
+        45.5
+        >>> snap_to(10.0000001, 0.0, 10.0, 20.0)  # Multiple targets
+        10.0
+        >>> snap_to(5.0, 0.0, 10.0)  # No match within tolerance
+        5.0
+    """
+    for round_number in round_numbers:
+        if are_numbers_too_close(original_number, round_number, tolerance):
+            return round_number
+    return original_number
 
 def are_numbers_too_close(num1: float, num2: float, tolerance: float = 1e-6) -> bool:
     """Checks if two numbers are too close together.
@@ -156,30 +172,6 @@ def shift_vector(vector: Vector, *args: float) -> Vector:
 
 def get_angle(vector: Vector):
     return -degrees(atan2(vector.X, vector.Y))
-
-def extrude_wire(wire: Wire, height: float) -> Part:
-    face = Face(wire)
-    return extrude(face, height, Vector(0, 0, 1))
-
-def create_closed_wire(*points) -> Wire:
-    return Polyline(*points, points[0])
-
-def create_plane(origin: VectorLike = (0, 0, 0), x_axis: VectorLike = (1, 0, 0), y_axis: VectorLike = (0, 1, 0)) -> Plane:
-    """Creates a plane with specified origin, x-axis and y-axis directions.
-    
-    Args:
-        origin: The origin point of the plane
-        x_axis: The direction of the x-axis
-        y_axis: The direction of the y-axis
-        
-    Returns:
-        A Plane object with the specified orientation
-    """
-    x_dir = Vector(x_axis).normalized()
-    y_dir = Vector(y_axis).normalized()
-    z_dir = x_dir.cross(y_dir)
-    
-    return Plane(origin=origin, x_dir=x_dir, z_dir=z_dir)
 
 def create_plane_from_planes(plane_xy: Plane, axis_x: Plane):
     """Create a plane that matches plane_xy position and z-direction,
