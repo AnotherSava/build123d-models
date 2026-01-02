@@ -1,10 +1,10 @@
 from copy import copy
 from math import radians, sqrt, tan
 
-from build123d import Plane, Solid
+from build123d import Plane, Solid, Vector
 
 from sava.common.advanced_math import advanced_mod
-from sava.csg.build123d.common.geometry import are_numbers_too_close, Alignment
+from sava.csg.build123d.common.geometry import are_numbers_too_close, Alignment, snap_to
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
@@ -18,33 +18,14 @@ class SmarterCone(SmartSolid):
         self.thickness_base = None
         self.thickness_top = None
         self.inner_cone = None
+        self.top_radius = snap_to(top_radius, base_radius)
 
-        if are_numbers_too_close(top_radius, base_radius):
-            self.top_radius = base_radius
+        if top_radius == base_radius:
             solid = Solid.make_cylinder(base_radius, height, plane, angle)
         else:
-            self.top_radius = top_radius
             solid = Solid.make_cone(base_radius, top_radius, height, plane, angle)
 
         super().__init__(solid, label=label)
-
-    def copy(self, label: str = None) -> 'SmarterCone':
-        """Override copy to return a SmarterCone instead of SmartSolid"""
-        result = SmarterCone.__new__(SmarterCone)
-
-        result.solid = copy(self.solid)
-        result.label = label or self.label
-        result.base_radius = self.base_radius
-        result.top_radius = self.top_radius
-        result.height = self.height
-        result.plane = self.plane
-        result.angle = self.angle
-        result.thickness_radius = self.thickness_radius
-        result.thickness_base = self.thickness_base
-        result.thickness_top = self.thickness_top
-        result.inner_cone = None if self.inner_cone is None else self.inner_cone.copy()
-
-        return result
 
     @property
     def slope(self) -> float:
@@ -59,20 +40,78 @@ class SmarterCone(SmartSolid):
         """
         return (self.top_radius - self.base_radius) / self.height
 
+    def center(self, height_fraction: float = 1) -> Vector:
+        """
+        Get the center point at any height along the cone in global coordinates.
+
+        Args:
+            height_fraction: Position along the cone's height (0.0 = base, 1.0 = top, 0.5 = middle)
+
+        Returns:
+            The center point at the specified height fraction along the cone's z-direction
+
+        Examples:
+            cone.center(0.0)   # Base center (same as base_center)
+            cone.center(1.0)   # Top center
+            cone.center(0.5)   # Middle center (halfway up the cone)
+        """
+        return self.base_center + self.plane.z_dir * self.height * height_fraction
+
+    def radius(self, height_fraction: float = 1) -> float:
+        """
+        Get the radius at any height along the cone.
+
+        Args:
+            height_fraction: Position along the cone's height (0.0 = base, 1.0 = top, 0.5 = middle)
+
+        Returns:
+            The radius at the specified height fraction (linearly interpolated between base and top)
+
+        Examples:
+            cone.radius(0.0)   # Base radius
+            cone.radius(1.0)   # Top radius
+            cone.radius(0.5)   # Middle radius (halfway between base and top)
+        """
+        return self.base_radius + (self.top_radius - self.base_radius) * height_fraction
+
+    @property
+    def base_center(self) -> Vector:
+        """
+        Get the center point of the cone's base surface in global coordinates.
+
+        Returns:
+            The center of the base of the cone
+        """
+        return self.plane.origin
+
     @classmethod
-    def with_base_angle_and_height(cls, base_radius: float, height: float, base_angle: float = 90, plane: Plane = Plane.XY, angle: float = 360) -> 'SmarterCone':
+    def with_base_angle(cls, base_radius: float, base_angle: float, top_radius: float = 0, plane: Plane = Plane.XY, angle: float = 360, label: str = None) -> 'SmarterCone':
+        height = abs((top_radius - base_radius) / tan(radians(base_angle)))
+        return SmarterCone.with_base_angle_and_height(base_radius, height, base_angle, plane, angle, label)
+
+    @classmethod
+    def with_base_angle_and_height(cls, base_radius: float, height: float, base_angle: float, plane: Plane = Plane.XY, angle: float = 360, label: str = None) -> 'SmarterCone':
         assert not are_numbers_too_close(advanced_mod(base_angle, 180, -90, 90), 0), f"Base angle is invalid: {base_angle}"
 
+        if height < 0:
+            height = -height
+            base_angle += 180
+
         base_angle = advanced_mod(base_angle, 360, -180, 180)
-        top_radius = base_radius - height / tan(radians(abs(base_angle)))
+
+        top_radius = snap_to(base_radius - height / tan(radians(abs(base_angle))), 0)
         assert top_radius >= 0, f"With base radius {base_radius}, base angle {base_angle}, and height {height}, top radius ends up being negative: {top_radius}"
 
         if base_angle < 0:
-            return SmarterCone(top_radius, base_radius, height, plane, angle)
+            return SmarterCone(top_radius, base_radius, height, plane, angle, label)
         else:
-            return SmarterCone(base_radius, top_radius, height, plane, angle)
+            return SmarterCone(base_radius, top_radius, height, plane, angle, label)
 
-    def create_offset_cone(self, thickness_radius: float = None, thickness_side: float = None, thickness_base: float = 0, thickness_top: float = 0) -> 'SmarterCone':
+    @classmethod
+    def cylinder(cls, radius: float, height: float, plane: Plane = Plane.XY, angle: float = 360, label: str = None) -> 'SmarterCone':
+        return SmarterCone(radius, radius, height, plane, angle, label)
+
+    def create_offset_cone(self, thickness_radius: float = None, thickness_side: float = None, thickness_base: float = 0, thickness_top: float = 0, label: str = None) -> 'SmarterCone':
         """
         Creates an offset cone by adjusting radii and height based on thickness parameters.
 
@@ -131,10 +170,28 @@ class SmarterCone(SmartSolid):
         offset_height = self.height + adjusted_thickness_base + adjusted_thickness_top
 
         # Create and align the offset cone
-        offset_cone = SmarterCone(offset_base_radius, offset_top_radius, offset_height, self.plane, self.angle)
+        offset_cone = SmarterCone(offset_base_radius, offset_top_radius, offset_height, self.plane, self.angle, label)
         offset_cone.align_z(self, Alignment.LR, -adjusted_thickness_base, self.plane)
 
         return offset_cone
+
+    def copy(self, label: str = None) -> 'SmarterCone':
+        """Override copy to return a SmarterCone instead of SmartSolid"""
+        result = SmarterCone.__new__(SmarterCone)
+
+        result.solid = copy(self.solid)
+        result.label = label or self.label
+        result.base_radius = self.base_radius
+        result.top_radius = self.top_radius
+        result.height = self.height
+        result.plane = self.plane
+        result.angle = self.angle
+        result.thickness_radius = self.thickness_radius
+        result.thickness_base = self.thickness_base
+        result.thickness_top = self.thickness_top
+        result.inner_cone = None if self.inner_cone is None else self.inner_cone.copy()
+
+        return result
 
     def shell(self, thickness_radius: float = None, thickness_base: float = 0, thickness_top: float = 0, thickness_side: float = None) -> 'SmarterCone':
         """
