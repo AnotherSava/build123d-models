@@ -1,7 +1,8 @@
 from math import tan, radians
 
-from build123d import Location, loft, Face, fillet, Wire, Solid
+from build123d import Location, loft, Face, fillet, Wire, Solid, VectorLike, Axis, Vector, Edge
 
+from sava.csg.build123d.common.geometry import to_vector, rotate_vector, get_angle
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
@@ -17,10 +18,57 @@ def create_filleted_rect(length: float, width: float, radius: float) -> Face:
         wire = fillet(wire.vertices(), radius)
     return Face(wire)
 
-def create_cone_with_angle(bottom_radius: float = 0, top_radius: float = 0, angle: float = 45) -> SmartSolid:
-    height = abs((top_radius - bottom_radius) / tan(radians(angle)))
-    return SmartSolid(Solid.make_cone(bottom_radius, top_radius, height))
-
 def create_cone_with_angle_and_height(bottom_radius: float, height: float, angle: float) -> SmartSolid:
     top_radius = height * tan(radians(angle)) + bottom_radius
     return SmartSolid(Solid.make_cone(bottom_radius, top_radius, height))
+
+def create_handle_wire(centre: VectorLike, start: VectorLike, angle: float, width: float) -> Wire:
+    """Create a curved handle wire as a spline arc.
+
+    Args:
+        centre: Center point of the circular arc
+        start: Start vector relative to centre (radial direction)
+        angle: Angular span in degrees (CCW rotation around Z axis)
+        width: Additional radial distance for the middle point (creates outward bulge)
+
+    Returns:
+        Wire: Spline wire forming the handle curve
+    """
+    offset = 1 - width / 1000
+    centre = to_vector(centre)
+    start = to_vector(start) / offset
+
+    # Calculate the three points
+    start_point = centre + start
+
+    # Rotate start vector by angle around Z axis to get end point
+    start_rotated = rotate_vector(start, Axis.Z, angle)
+    end_point = centre + start_rotated
+
+    # Rotate start vector by angle/2 and increase length by width for middle point
+    start_rotated_half = rotate_vector(start, Axis.Z, angle / 2)
+    middle_direction = start_rotated_half.normalized()
+    middle_point = centre + middle_direction * (start.length + width)
+
+    # Calculate tangents perpendicular to radial directions (CCW in XY plane)
+    # For a radial vector (x, y, z), the tangent for CCW motion is (-y, x, 0)
+    start_tangent = Vector(-start.Y, start.X, 0).normalized()
+    end_tangent = Vector(-start_rotated.Y, start_rotated.X, 0).normalized()
+
+    # Middle tangent is the average of start and end tangents in terms of direction, but twice as long
+    middle_tangent = start_tangent + end_tangent
+
+    # Create spline through the three points with specified tangents at each point
+    points = [start_point, middle_point, end_point]
+    tangents = [start_tangent, middle_tangent, end_tangent]
+
+    edge = Edge.make_spline(points, tangents, scale=False)
+
+    # return edge along the circle
+    back = Edge.make_circle(start.length * offset, start_angle = get_angle(start) + 90, end_angle = get_angle(start) + angle + 90).move(Location(centre))
+
+    # At least a minimal offset is needed for a shape to be valid
+    offset_a = Edge.make_line(centre + start_rotated, centre + start_rotated * offset)
+    offset_b = Edge.make_line(centre + start * offset, start_point)
+
+    return Wire([edge, offset_a, back, offset_b])
