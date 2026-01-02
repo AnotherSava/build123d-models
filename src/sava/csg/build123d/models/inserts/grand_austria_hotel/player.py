@@ -34,7 +34,7 @@ class PlayerComponents(SmartBox):
         pencil.down(3.1)
         pencil.draw(4.5, 144)
         pencil.down(9.4)
-        return SmartSolid(pencil.extrude_mirrored(self.dim.height))
+        return SmartSolid(pencil.extrude_mirrored_y(self.dim.height, center=0))
 
 
 

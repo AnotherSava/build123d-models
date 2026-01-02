@@ -14,7 +14,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         pencil = Pencil(plane=Plane.XY)
         pencil.draw(50, 45)  # Draw at 45° from X axis
 
-        face = pencil.create_mirrored_face(Axis.X)
+        face = pencil.create_mirrored_face_x()
 
         # Should create a valid face
         self.assertTrue(face.is_valid)
@@ -28,7 +28,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         pencil = Pencil(plane=Plane.XZ)
         pencil.draw(50, 45)  # Draw at 45° from X axis in XZ plane
 
-        face = pencil.create_mirrored_face(Axis.X)
+        face = pencil.create_mirrored_face_x()
 
         # Should create a valid face
         self.assertTrue(face.is_valid)
@@ -42,7 +42,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         pencil = Pencil(plane=Plane.YZ)
         pencil.draw(50, 45)  # Draw at 45° from Y axis in YZ plane
 
-        face = pencil.create_mirrored_face(Axis.X)
+        face = pencil.create_mirrored_face_x()
 
         # Should create a valid face
         self.assertTrue(face.is_valid)
@@ -59,7 +59,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         pencil = Pencil(plane=tilted_plane)
         pencil.draw(50, 45)  # Draw at 45° in the tilted plane
 
-        face = pencil.create_mirrored_face(Axis.X)
+        face = pencil.create_mirrored_face_x()
 
         # Should create a valid face even in tilted plane
         self.assertTrue(face.is_valid, "Mirrored face should be valid in tilted plane")
@@ -76,7 +76,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         pencil = Pencil(plane=diagonal_plane)
         pencil.draw(50, 45)
 
-        face = pencil.create_mirrored_face(Axis.X)
+        face = pencil.create_mirrored_face_x()
 
         # Should create a valid face
         self.assertTrue(face.is_valid, "Mirrored face should be valid in diagonal plane")
@@ -95,7 +95,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
 
         # Get both wires
         original_wire = pencil.create_wire(False)
-        mirrored_wire = pencil.mirror_wire(Axis.X)
+        mirrored_wire = pencil.create_mirrored_wire_x()
 
         # Get all vertices from both wires
         orig_vertices = original_wire.vertices()
@@ -124,7 +124,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         pencil = Pencil(plane=plane)
         pencil.draw(50, 45)
 
-        face = pencil.create_mirrored_face(Axis.X)
+        face = pencil.create_mirrored_face_x()
 
         self.assertTrue(face.is_valid,
                        f"Mirrored face should be valid for {name}")

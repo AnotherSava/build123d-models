@@ -69,7 +69,7 @@ def _create_cutting_triangle_at_wire(plane: Plane, wire: Wire, leg_length: float
     )
     pencil = Pencil(plane=positioned_plane)
     pencil.draw(leg_length, 45)
-    return pencil.create_mirrored_face(Axis.X)
+    return pencil.create_mirrored_face_x(0)
 
 
 def cut_with_wires(model: SmartSolid, *cuts: CutSpec) -> list[SmartSolid]:

@@ -151,7 +151,7 @@ class PowerAdapterBox:
         pencil.up(self.dim.lid_height - self.dim.lock_cantilever_attachment_height)
         pencil.left(1) # no idea why single left doesn't work here
         pencil.left(self.dim.lock_length / 2 - 1)
-        return SmartSolid(pencil.extrude_mirrored(self.dim.box_length, Axis.Y))
+        return SmartSolid(pencil.extrude_mirrored_y(self.dim.box_length))
 
     def create_snap(self) -> SmartSolid:
         pencil = Pencil()

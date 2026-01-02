@@ -9,6 +9,7 @@ from sava.common.common import flatten
 from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
 from sava.csg.build123d.common.geometry import Alignment, to_vector, rotate_vector, create_vector, get_angle
 from sava.csg.build123d.common.pencil import Pencil
+from sava.csg.build123d.common.primitives import create_handle_wire
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -156,7 +157,7 @@ class BasketFactory:
         pencil.down(self.dim.window_height - width / 2)
         pencil.jump((-width / 2, -width / 2))
 
-        return pencil.create_mirrored_face(Axis.Y).move(Location((distance, 0, 0)))
+        return pencil.create_mirrored_face_y(0).move(Location((distance, 0, 0)))
 
     def _create_window(self) -> SmartSolid:
         inner_face = self._create_window_shape(self.dim.inner_diameter_bottom / 3)
@@ -184,65 +185,14 @@ class BasketFactory:
 
         return windows
 
-    def create_handle_wire(self, centre: VectorLike, start: VectorLike, angle: float, width: float) -> Wire:
-        """Create a curved handle wire as a spline arc.
-
-        Args:
-            centre: Center point of the circular arc
-            start: Start vector relative to centre (radial direction)
-            angle: Angular span in degrees (CCW rotation around Z axis)
-            width: Additional radial distance for the middle point (creates outward bulge)
-
-        Returns:
-            Wire: Spline wire forming the handle curve
-        """
-        offset = 1.0001
-        centre = to_vector(centre)
-        start = to_vector(start) / offset
-
-        # Calculate the three points
-        start_point = centre + start
-
-        # Rotate start vector by angle around Z axis to get end point
-        start_rotated = rotate_vector(start, Axis.Z, angle)
-        end_point = centre + start_rotated
-
-        # Rotate start vector by angle/2 and increase length by width for middle point
-        start_rotated_half = rotate_vector(start, Axis.Z, angle / 2)
-        middle_direction = start_rotated_half.normalized()
-        middle_point = centre + middle_direction * (start.length + width)
-
-        # Calculate tangents perpendicular to radial directions (CCW in XY plane)
-        # For a radial vector (x, y, z), the tangent for CCW motion is (-y, x, 0)
-        start_tangent = Vector(-start.Y, start.X, 0).normalized()
-        end_tangent = Vector(-start_rotated.Y, start_rotated.X, 0).normalized()
-
-        # Middle tangent is the average of start and end tangents in terms of direction, but twice as long
-        middle_tangent = start_tangent + end_tangent
-
-        # Create spline through the three points with specified tangents at each point
-        points = [start_point, middle_point, end_point]
-        tangents = [start_tangent, middle_tangent, end_tangent]
-
-        edge = Edge.make_spline(points, tangents, scale=False)
-
-        # return edge along the circle
-        back = Edge.make_circle(start.length * offset, start_angle = get_angle(start) + 90, end_angle = get_angle(start) + angle + 90).move(Location(centre))
-
-        # At least a minimal offset is needed for a shape to be valid
-        offset_a = Edge.make_line(centre + start_rotated, centre + start_rotated * offset)
-        offset_b = Edge.make_line(centre + start * offset, start_point)
-
-        return Wire([edge, offset_a, back, offset_b])
-
     def create_handle(self, cap_45_inner: SmartSolid, middle_angle: float) -> SmartSolid:
         centre = Vector(cap_45_inner.x_mid, cap_45_inner.y_mid, cap_45_inner.z_max)
         radius = cap_45_inner.x_size / 2
         start_angle = middle_angle - self.dim.cap_handle_arc_angle / 2
         start = create_vector(radius, start_angle)
 
-        top = self.create_handle_wire(centre, start, self.dim.cap_handle_arc_angle, -self.dim.cap_handle_width)
-        bottom = self.create_handle_wire(centre - (0, 0, self.dim.cap_handle_height), create_vector(radius - self.dim.cap_handle_height, start_angle), self.dim.cap_handle_arc_angle, self.dim.cap_handle_height - self.dim.cap_handle_width)
+        top = create_handle_wire(centre, start, self.dim.cap_handle_arc_angle, -self.dim.cap_handle_width)
+        bottom = create_handle_wire(centre - (0, 0, self.dim.cap_handle_height), create_vector(radius - self.dim.cap_handle_height, start_angle), self.dim.cap_handle_arc_angle, self.dim.cap_handle_height - self.dim.cap_handle_width)
 
         handle = SmartSolid(loft([Face(top), Face(bottom)]))
         handle.align_z(cap_45_inner, Alignment.RL)
@@ -253,7 +203,7 @@ class BasketFactory:
         for item in [basket_outer, basket_inner]:
             item.align_xy()
 
-        cap_45_outer = SmarterCone.with_base_angle_and_height(self.dim.cap_radius_outer(self.dim.cap_depth), self.dim.cap_depth, 90 + self.dim.cap_angle)
+        cap_45_outer = SmarterCone.with_base_angle_and_height(self.dim.cap_diameter_outer_wide / 2, self.dim.cap_depth, -self.dim.cap_angle)
         cap_45_outer.align_zxy(basket_outer, Alignment.RR)
 
         cap_45_inner = cap_45_outer.create_offset_cone(-self.dim.thickness)
@@ -269,7 +219,7 @@ class BasketFactory:
         return basket
 
     def create_ribs(self, basket_outer: SmartSolid) -> SmartSolid:
-        leg_holder_boundary = SmartSolid(Solid.make_cylinder(self.dim.cap_diameter_outer_middle / 2, self.dim.leg_depth))
+        leg_holder_boundary = SmarterCone.cylinder(self.dim.cap_diameter_outer_middle / 2, self.dim.leg_depth)
         leg_holder_boundary.align_zxy(basket_outer, Alignment.RL, self.dim.cap_depth)
 
         upper_rib_boundary = basket_outer.padded(self.dim.thickness * 2).align_zxy(basket_outer, Alignment.LR)
@@ -285,8 +235,8 @@ class BasketFactory:
         start_angle = -self.dim.cap_notch_arc_angle / 2
         start = create_vector(radius, start_angle)
 
-        top = self.create_handle_wire(centre, start, self.dim.cap_notch_arc_angle, -self.dim.cap_notch_width)
-        middle = self.create_handle_wire(centre - (0, 0, self.dim.cap_notch_height), create_vector(radius - self.dim.cap_notch_height, start_angle), self.dim.cap_notch_arc_angle, -self.dim.cap_notch_width)
+        top = create_handle_wire(centre, start, self.dim.cap_notch_arc_angle, -self.dim.cap_notch_width)
+        middle = create_handle_wire(centre - (0, 0, self.dim.cap_notch_height), create_vector(radius - self.dim.cap_notch_height, start_angle), self.dim.cap_notch_arc_angle, -self.dim.cap_notch_width)
         bottom = copy(middle).move(Location((0, 0, -self.dim.cap_notch_width)))
 
         notch_top = SmartSolid(loft([Face(top), Face(middle)]))
@@ -314,7 +264,7 @@ class BasketFactory:
         pencil = Pencil()
         pencil.arc_with_radius(radius, 90, self.dim.foundation_hook_arc_angle / 3)
         pencil.jump_from_start((-thickness, 0))
-        return pencil.create_mirrored_face(Axis.X)
+        return pencil.create_mirrored_face_x(0)
 
     def create_foundation_support(self, foundation_inner: SmarterCone) -> SmartSolid:
         top = self.create_foundation_support_triangle(foundation_inner.top_radius, self.dim.cap_foundation_support_thickness).move(Location((0, 0, foundation_inner.z_size)))
@@ -351,7 +301,7 @@ class BasketFactory:
         pencil.jump((self.dim.cap_latch_thickness / 2 - gap, self.dim.cap_latch_thickness / 2 - gap))
         pencil.jump((-self.dim.cap_latch_thickness / 2 + gap, self.dim.cap_latch_thickness / 2 - gap))
         pencil.up((self.dim.cap_thickness - self.dim.cap_latch_thickness) / 2 + gap)
-        latch = SmartSolid(pencil.extrude_mirrored(self.dim.basket_cap_radius_wide, Axis.Y), label=label).rotate((90, 0, 0))
+        latch = SmartSolid(pencil.extrude_mirrored_y(self.dim.basket_cap_radius_wide, center=0), label=label).rotate((90, 0, 0))
         latch.align_zxy(cap, Alignment.C, 0, Alignment.C, 0, Alignment.CL, 0)
 
         return latch.cut(hole).intersect(cap)
