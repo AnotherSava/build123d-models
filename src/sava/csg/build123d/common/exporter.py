@@ -137,7 +137,7 @@ def _report_labels() -> None:
         print(f"{label + ':':<15} {count} shape(s)")
 
 
-def save_3mf(location: str = None, current: bool = True) -> None:
+def save_3mf(location: str = None, current: bool = False) -> None:
     """Save all shapes to a single 3MF file."""
     actual_location = create_file_path(location or CURRENT_MODEL_LOCATION_3MF)
     print(f"\nExporting 3mf file to: {actual_location}\n")
