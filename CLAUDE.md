@@ -202,6 +202,13 @@ def test_flatten(input, expected):
 - Run all tests after refactoring
 - **Backwards compatibility**: Don't worry too much about maintaining backwards compatibility for internal APIs. As long as you check all usages in the codebase (using Grep/search tools) and update them, breaking changes are fine. This is a personal project, not a public library.
 
+### Git Workflow
+
+- **IMPORTANT**: Do not create git commits unless explicitly asked by the user
+- When the user requests commits, group related changes into logical, focused commits with clear messages
+- Never mention "Claude Code" or AI assistance in commit messages
+- Do not push to remote unless explicitly requested
+
 ### Formatting
 
 - Leave an empty line at the end of every file

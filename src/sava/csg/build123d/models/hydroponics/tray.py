@@ -1,15 +1,15 @@
 from dataclasses import dataclass
-from math import sin, radians, tan, atan, sqrt, degrees
+from math import sin, radians, atan, sqrt, degrees
 from typing import Tuple, Iterable
 
 from bd_warehouse.thread import IsoThread
-from build123d import Solid, Vector, Axis, Plane, Wire, extrude, Face, make_face, loft
+from build123d import Solid, Vector, Axis, Plane, Wire, Face, loft
 
-from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl, show_red, show_green
+from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
 from sava.csg.build123d.common.geometry import Alignment, create_vector
 from sava.csg.build123d.common.modelcutter import cut_with_wires, CutSpec
 from sava.csg.build123d.common.pencil import Pencil
-from sava.csg.build123d.common.primitives import create_cone_with_angle, create_cone_with_angle_and_height, create_handle_wire
+from sava.csg.build123d.common.primitives import create_handle_wire
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid, fuse, PositionalFilter
@@ -20,29 +20,26 @@ from sava.csg.build123d.models.hydroponics.basket import BasketDimensions
 class TrayDimensions:
     inner_length: float = 301
     inner_width: float = 167
-    inner_height: float = 6
+    inner_height: float = 5
     inner_fillet_radius: float = 30
     outer_height: float = 1.2
     outer_padding: float = 2.5
 
-    basket_gap: float = 0.2
-    basket_width: float = 38.3
-    basket_outer_diameter: float = 43.35
-    basket_cap_angle: float = 45
-    basket_cap_depth: float = 1.5
-    basket_padding: float = 1.2
-    basket_handle_length: float = 2
-    basket_handle_angle: float = -37.5
-    basket_handle_arc_angle: float = 40
-    basket_handle_width: float = 3
-    basket_handle_depth: float = 2
+    holder_width: float = 3
+    holder_length: float = 4.8
+    holder_offset: float = 1.2
+    holder_depth: float = 2.5
+
+    basket_gap: float = 0.2 # gap between basket and its hole
+    basket_notch_angle: float = -37.5
+    basket_notch_arc_angle: float = 40
+    basket_notch_width: float = 3
 
     cutout_angle: float = 5.9
     cutout_diameter: float = 52.6
     cutout_length: float = 38.7
-    cutout_shift: float = 0
 
-    watering_hole_bevel: float = 1.5
+    watering_hole_bevel: float = 2.7
     watering_hole_radius_wide: float = 8
     watering_hole_angle: float = -86
     watering_hole_cap_handle_radius: float = 2
@@ -71,9 +68,11 @@ class TrayDimensions:
 
     basket_dimensions: BasketDimensions = None
 
-    holder_thickness: float = 0.4
-
     columns: int = 7
+
+    @property
+    def basket_hole_width(self) -> float:
+        return self.basket_dimensions.cap_diameter_outer_wide + self.basket_gap
 
     def __post_init__(self):
         if self.basket_dimensions is None:
@@ -92,18 +91,19 @@ class TrayDimensions:
         return self.inner_length + self.outer_padding * 2
 
     @property
-    def basket_external_diameter(self) -> float:
-        return self.basket_outer_diameter + self.basket_padding * 4
-
-    @property
     def basket_distance_y(self) -> float:
         # Calculate to fit 4 holes in odd columns (3-4-3 pattern)
-        return (self.outer_width - self.basket_width * 4) / 5
+        return (self.outer_width - self.basket_hole_width * 4) / 5
+
+    @property
+    def basket_distance_x(self) -> float:
+        # Calculate to fit 7 columns of holes
+        return (self.outer_length - self.basket_hole_width * 7) / 8
 
     @property
     def watering_hole_offset_y(self) -> float:
         # Position in 3rd column (index 2), middle between first basket_hole and wall
-        return -(self.outer_width / 2 + self.basket_width * 1.5 + self.basket_distance_y * 0.75) / 2
+        return -(self.inner_width / 2 + self.basket_hole_width * 1.5 + self.basket_distance_y * 1.25) / 2
 
     @property
     def watering_hole_offset_x(self) -> float:
@@ -120,11 +120,11 @@ class TrayDimensions:
 
     @property
     def hole_step_x(self):
-        return (self.inner_length - self.basket_external_diameter) / (self.columns - 1)
+        return self.basket_hole_width + self.basket_distance_x
 
     @property
     def hole_step_y(self):
-        return self.basket_width + self.basket_distance_y
+        return self.basket_hole_width + self.basket_distance_y
 
     def get_hole_offset(self, column: int, row: int) -> Vector:
         rows = 3 if column % 2 == 0 else 4
@@ -152,6 +152,9 @@ class TrayFactory:
         cutout.align_xz(tray).align_y(tray, Alignment.RL)
         tray.cut(cutout)
 
+        holder_cutouts = self.create_holder_cutouts(inner_tray, cutout)
+        tray.cut(holder_cutouts)
+
         basket_hole = self.create_basket_hole().align_zxy(tray, Alignment.RL)
 
         holes = []
@@ -175,9 +178,27 @@ class TrayFactory:
 
         # Cut tray between columns 2 and 3
         cutting_wire = self._create_cutting_wire(tray)
-        pieces = cut_with_wires(tray, CutSpec(cutting_wire, Plane.XZ, 0.2))
+        return cut_with_wires(tray, CutSpec(cutting_wire, Plane.XZ, 0.2))
 
-        return pieces
+    def create_holder_cutouts(self, inner_tray: SmartSolid, light_cutout: SmartSolid) -> SmartSolid:
+        cutout = SmartBox(self.dim.holder_length, self.dim.holder_width, self.dim.inner_height - self.dim.holder_depth)
+        cutout.align_z(inner_tray, Alignment.RL, -self.dim.holder_depth)
+
+        #tray orientation is with light cutout in the back
+
+        return SmartSolid(
+            cutout.copy().align_x(inner_tray, Alignment.LR, self.dim.holder_offset).align_y(inner_tray, Alignment.L, 71.5),  # left
+            cutout.copy().align_x(inner_tray, Alignment.RL, -self.dim.holder_offset).align_y(inner_tray, Alignment.L, 72),  # right
+
+            cutout.oriented((0, 0, 90)).align_x(light_cutout).align_y(light_cutout, Alignment.LL, -self.dim.holder_offset),  # back
+            cutout.oriented((0, 0, 90)).align_x(inner_tray, Alignment.L, 70).align_y(inner_tray, Alignment.RL, -self.dim.holder_offset),  # back
+            cutout.oriented((0, 0, 90)).align_x(inner_tray, Alignment.R, -70).align_y(inner_tray, Alignment.RL, -self.dim.holder_offset),  # back
+
+            cutout.oriented((0, 0, 90)).align_x(inner_tray, Alignment.R, -70).align_y(inner_tray, Alignment.LR, self.dim.holder_offset),  # front
+            cutout.oriented((0, 0, 90)).align_x(inner_tray, Alignment.R, -70 - 55.5).align_y(inner_tray, Alignment.LR, self.dim.holder_offset),  # front
+            cutout.oriented((0, 0, 90)).align_x(inner_tray, Alignment.L, 71).align_y(inner_tray, Alignment.LR, self.dim.holder_offset),  # front
+            cutout.oriented((0, 0, 90)).align_x(inner_tray, Alignment.L, 71 + 55.5).align_y(inner_tray, Alignment.LR, self.dim.holder_offset),  # front
+        )
 
     def _create_cutting_wire(self, tray: SmartSolid) -> Wire:
         angle = degrees(atan(self.dim.hole_step_y / (2 * self.dim.hole_step_x)))
@@ -206,15 +227,15 @@ class TrayFactory:
 
     def create_basket_hole(self) -> SmartSolid:
         dim = self.dim.basket_dimensions
-        cap_45_outer = SmarterCone.with_base_angle(dim.cap_diameter_outer_middle / 2 + self.dim.basket_gap, 180 - dim.cap_angle, dim.cap_diameter_outer_wide / 2 + self.dim.basket_gap / 2)
+        cap_45_outer = SmarterCone.with_base_angle(dim.cap_diameter_outer_middle / 2 + self.dim.basket_gap, 180 - dim.cap_angle, self.dim.basket_hole_width / 2)
 
         leg_holder_boundary = SmarterCone.cylinder(dim.cap_diameter_outer_middle / 2 + self.dim.basket_gap, self.dim.tray_height)
         leg_holder_boundary.align_zxy(cap_45_outer, Alignment.RL)
 
         for angle_shift in [0, 180]:
-            start_arc_angle = self.dim.basket_handle_angle - self.dim.basket_handle_arc_angle / 2 + angle_shift
-            top = create_handle_wire(cap_45_outer.center(1), create_vector(cap_45_outer.top_radius, start_arc_angle), self.dim.basket_handle_arc_angle, self.dim.basket_handle_width)
-            bottom = create_handle_wire(cap_45_outer.center(0.5), create_vector(cap_45_outer.radius(0.5), start_arc_angle), self.dim.basket_handle_arc_angle, 0.1)
+            start_arc_angle = self.dim.basket_notch_angle - self.dim.basket_notch_arc_angle / 2 + angle_shift
+            top = create_handle_wire(cap_45_outer.center(1), create_vector(cap_45_outer.top_radius, start_arc_angle), self.dim.basket_notch_arc_angle, self.dim.basket_notch_width)
+            bottom = create_handle_wire(cap_45_outer.center(0.5), create_vector(cap_45_outer.radius(0.5), start_arc_angle), self.dim.basket_notch_arc_angle, 0.1)
             handle = SmartSolid(loft([Face(top), Face(bottom)]))
             cap_45_outer.fuse(handle)
 
@@ -232,7 +253,7 @@ class TrayFactory:
     def create_watering_hole(self, radius_delta: float = 0) -> SmartSolid:
         radius_wide = self.dim.watering_hole_radius_wide - radius_delta
         central_cone = SmarterCone.with_base_angle_and_height(radius_wide, self.dim.tray_height, self.dim.watering_hole_angle)
-        top_cone = SmarterCone.with_base_angle_and_height(radius_wide + self.dim.basket_padding + self.dim.watering_hole_bevel, self.dim.tray_height, -45)
+        top_cone = SmarterCone.with_base_angle_and_height(radius_wide + self.dim.watering_hole_bevel, self.dim.tray_height, -45)
         top_cone.align_zxy(central_cone, Alignment.RL)
         return central_cone.fuse(top_cone)
 
