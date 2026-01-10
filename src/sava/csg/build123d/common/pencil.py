@@ -1,12 +1,9 @@
-from math import asin
-from math import radians, degrees, acos, sin, cos, tan, atan
+from math import radians, degrees, sin, cos, tan, atan
 
 from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, Part, revolve, VectorLike, Edge
 
 from sava.common.advanced_math import advanced_mod
-from sava.csg.build123d.common.exporter import show_red, show_green
-from sava.csg.build123d.common.geometry import shift_vector, create_vector, get_angle, to_vector, are_points_too_close, validate_points_unique, are_numbers_too_close, snap_to
-from sava.csg.build123d.common.sweepsolid import SweepSolid
+from sava.csg.build123d.common.geometry import shift_vector, get_angle, to_vector, validate_points_unique, snap_to
 
 
 def _reconstruct_edge(edge: Edge) -> Edge:
@@ -193,14 +190,17 @@ class Pencil:
         destination = to_vector(destination)
         return self.arc_with_destination_abs(destination + self.location, angle)
 
-    def jump_to(self, abs_destination: VectorLike):
-        abs_destination = self.process_vector_input(abs_destination)
-        self.curves.append(Line(self.location, abs_destination))
-        self.location = abs_destination
+    def jump_to(self, destination_abs: VectorLike):
+        destination_abs = self.process_vector_input(destination_abs)
+        self.curves.append(Line(self.location, destination_abs))
+        self.location = destination_abs
         return self
 
     def jump(self, destination: VectorLike):
         return self.jump_to(to_vector(destination) + self.location)
+
+    def jump_from_start(self, destination: VectorLike):
+        return self.jump_to(to_vector(destination) + self.start)
 
     def draw(self, length: float, angle: float):
         abs_destination = shift_vector(self.location, length, angle)

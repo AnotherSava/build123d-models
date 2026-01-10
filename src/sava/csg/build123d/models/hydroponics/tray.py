@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from math import sin, radians, atan, sqrt, degrees
 from typing import Tuple, Iterable
 
+from bd_warehouse.fastener import hex_recess
 from bd_warehouse.thread import IsoThread
-from build123d import Solid, Vector, Axis, Plane, Wire, Face, loft
+from build123d import Solid, Vector, Axis, Plane, Wire, Face, loft, extrude
 
 from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
 from sava.csg.build123d.common.geometry import Alignment, create_vector
@@ -65,6 +66,8 @@ class TrayDimensions:
     peg_cap_thread_diameter_delta = 0.2
     peg_cap_handle_height: float = 5
     peg_cap_fillet_radius: float = 0.2
+    peg_cap_hex_socket_size: float = 4
+    peg_cap_hex_socket_depth: float = 2.5
 
     basket_dimensions: BasketDimensions = None
 
@@ -322,7 +325,11 @@ class TrayFactory:
         cap_base.fillet_positional(self.dim.peg_cap_fillet_radius, None, PositionalFilter(Axis.Z, cap_base.z_max))
         cap_base.align_zxy(peg_cap, Alignment.RL)
 
-        return peg_cap.fuse(thread_screw_solid, cap_base)
+        hex_socket_face = hex_recess(self.dim.peg_cap_hex_socket_size)
+        hex_socket = SmartSolid(extrude(hex_socket_face, self.dim.peg_cap_hex_socket_depth))
+        hex_socket.align_zxy(peg_cap, Alignment.RL)
+
+        return peg_cap.fuse(thread_screw_solid, cap_base).cut(hex_socket)
 
     def create_watering_hole_cap(self) -> SmartSolid:
         watering_hole = self.create_watering_hole(self.dim.watering_hole_cap_radius_delta)
