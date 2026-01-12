@@ -4,7 +4,7 @@ from math import cos, radians
 from bd_warehouse.thread import IsoThread
 from build123d import Solid
 
-from sava.csg.build123d.common.exporter import export, save_3mf
+from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -73,7 +73,7 @@ class HydroponicsSplitterFactory:
 
         thread_side_solid = SmartSolid(thread_side).colocate(side_pipe_outer).align_x(side_pipe_outer, Alignment.RL)
 
-        result = SmartSolid(core, thread_bottom_solid, connector, side_pipe_outer)
+        result = SmartSolid(core, thread_bottom_solid, connector, side_pipe_outer, label="splitter")
         result.cut(connector_inner, side_pipe_inner)
         result.fuse(thread_side_solid)
         result.cut(side_hole)
@@ -113,7 +113,7 @@ class HydroponicsSplitterFactory:
 
         handle2 = handle.oriented((0, 0, 90)).align_zxy(core_screw, Alignment.LL)
 
-        result = SmartSolid(thread_screw_solid, core_screw, handle, handle2)
+        result = SmartSolid(thread_screw_solid, core_screw, handle, handle2, label="screw")
 
         return result
 
@@ -121,8 +121,25 @@ class HydroponicsSplitterFactory:
 dimensions = SplitterDimensions()
 splitter_factory = HydroponicsSplitterFactory(dimensions)
 
-splitter = splitter_factory.create_splitter()
-screw = splitter_factory.create_screw().move_x(-30).align_z(splitter, Alignment.LR)
-export(splitter, "splitter")
-export(screw, "screw")
-save_3mf()
+
+def export_3mf(splitter: SmartSolid, screw: SmartSolid):
+    export(splitter)
+
+    screw.move_x(-30).align_z(splitter, Alignment.LR)
+    export(screw)
+
+    save_3mf("models/hydroponic/splitter/export.3mf", current=True)
+
+def export_all():
+    splitter_solid = splitter_factory.create_splitter()
+    screw_solid = splitter_factory.create_screw()
+
+    export_3mf(splitter_solid, screw_solid)
+
+    clear()
+    export(splitter_solid)
+    export(screw_solid)
+
+    save_stl("models/hydroponic/splitter/stl")
+
+export_all()

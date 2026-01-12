@@ -4,7 +4,7 @@ from typing import Tuple
 from build123d import Solid
 
 from sava.csg.build123d.common.geometry import Alignment
-from sava.csg.build123d.common.primitives import create_cone_with_angle
+from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
@@ -59,7 +59,7 @@ class HoseConnectorFactory:
             radius = diameter_max / 2
             top_radius = min(pipe_diameter_outer, diameter_min) / 2
             angle = -45
-            cap = create_cone_with_angle(radius, top_radius, angle)
+            cap = SmarterCone.with_base_angle(radius, angle, top_radius)
 
             if result is None:
                 result = segment.copy()  # segment shouldn't be modified (reused as last_segment)
