@@ -141,7 +141,7 @@ class TrayFactory:
     def __init__(self, dim: TrayDimensions):
         self.dim = dim
 
-    def create_tray(self) -> list[SmartSolid]:
+    def create_tray(self, peg_holes: bool = True) -> list[SmartSolid]:
         inner_tray = SmartBox(self.dim.inner_length, self.dim.inner_width, self.dim.inner_height)
         inner_tray.fillet_z(self.dim.inner_fillet_radius)
 
@@ -149,7 +149,7 @@ class TrayFactory:
         outer_tray.fillet_z(self.dim.inner_fillet_radius + self.dim.outer_padding)
         outer_tray.align_zxy(inner_tray, Alignment.RR)
 
-        tray = SmartSolid(inner_tray, outer_tray, label="tray")
+        tray = SmartSolid(inner_tray, outer_tray, label=f"tray{'' if peg_holes else '_no_peg_holes'}")
 
         cutout = self.create_cutout()
         cutout.align_xz(tray).align_y(tray, Alignment.RL)
@@ -172,12 +172,13 @@ class TrayFactory:
 
         tray.cut(watering_hole)
 
-        peg_hole_inner, peg_hole_outer = self.create_peg_hole_parts()
-        for direction_x in [-1, 1]:
-            for direction_y in [-1, 1]:
-                peg_hole_inner.align_xy(tray, Alignment.C, direction_x * self.dim.peg_hole_offset_x, direction_y * self.dim.watering_hole_offset_y).align_z(tray)
-                peg_hole_outer.align(peg_hole_inner)
-                tray.cut(peg_hole_inner).fuse(peg_hole_outer)
+        if peg_holes:
+            peg_hole_inner, peg_hole_outer = self.create_peg_hole_parts()
+            for direction_x in [-1, 1]:
+                for direction_y in [-1, 1]:
+                    peg_hole_inner.align_xy(tray, Alignment.C, direction_x * self.dim.peg_hole_offset_x, direction_y * self.dim.watering_hole_offset_y).align_z(tray)
+                    peg_hole_outer.align(peg_hole_inner)
+                    tray.cut(peg_hole_inner).fuse(peg_hole_outer)
 
         # Cut tray between columns 2 and 3
         cutting_wire = self._create_cutting_wire(tray)
@@ -370,6 +371,7 @@ def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: Smar
 
 def export_all():
     tray_solid_pieces = tray_factory.create_tray()
+    tray_solid_pieces_no_peg_holes = tray_factory.create_tray(False)
     peg_solid = tray_factory.create_peg()
     peg_cap_solid = tray_factory.create_peg_cap()
     watering_hole_cap_solid = tray_factory.create_watering_hole_cap()
@@ -377,7 +379,7 @@ def export_all():
     export_3mf(tray_solid_pieces, peg_solid, peg_cap_solid, watering_hole_cap_solid)
 
     clear()
-    for piece in tray_solid_pieces:
+    for piece in [*tray_solid_pieces, *tray_solid_pieces_no_peg_holes]:
         export(piece)
 
     export(peg_solid)
