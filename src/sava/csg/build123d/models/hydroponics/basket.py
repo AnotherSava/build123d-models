@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from math import radians, degrees, atan, tan
 from typing import Tuple
 
-from build123d import Solid, Vector, Plane, Axis, VectorLike, Wire, Edge, loft, Location, Face
+from build123d import Vector, Plane, Axis, loft, Location, Face
 
 from sava.common.common import flatten
 from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
-from sava.csg.build123d.common.geometry import Alignment, to_vector, rotate_vector, create_vector, get_angle
+from sava.csg.build123d.common.geometry import Alignment, create_vector
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_handle_wire
 from sava.csg.build123d.common.smartbox import SmartBox
@@ -19,7 +19,7 @@ from sava.csg.build123d.common.smartsolid import SmartSolid
 class BasketDimensions:
     sponge_diameter_top: float = 23
     inner_diameter_bottom: float = 11
-    height: float = 65
+    height: float = 65 # middle part of the basket
     window_angle: float = 30
     window_count: int = 8
     thickness: float = 1.6
@@ -135,7 +135,7 @@ class BasketFactory:
     def __init__(self, dim: BasketDimensions):
         self.dim = dim
 
-    def _create_basket(self) -> Tuple[SmartSolid, SmartSolid]:
+    def _create_basket(self) -> Tuple[SmartSolid, SmarterCone]:
         outer = SmarterCone(self.dim.outer_radius_bottom, self.dim.outer_radius_top, self.dim.height)
         inner = outer.create_offset_cone(-self.dim.thickness)
 
