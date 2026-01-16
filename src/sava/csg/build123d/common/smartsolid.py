@@ -36,10 +36,6 @@ def fuse(*args):
 
     return result
 
-def list_shapes(*args) -> 'SmartSolid':
-    result = SmartSolid()
-    result.solid = ShapeList(get_solid(arg) for arg in args)
-    return result
 
 class SmartSolid:
     def __init__(self, *args, label: str = None):
@@ -144,11 +140,11 @@ class SmartSolid:
         self.solid.label = color
         return self
 
-    def same_color(self, element):
-        return self.color(get_solid(element).label)
-
     def move_vector(self, vector: Vector):
         return self.move(vector.X, vector.Y, vector.Z)
+
+    def moved_vector(self, vector: Vector):
+        return self.copy().move_vector(vector)
 
     def move(self, x: float, y: float = 0, z: float = 0) -> 'SmartSolid':
         # Move each shape separately if it's a ShapeList, otherwise move the single shape
@@ -166,6 +162,9 @@ class SmartSolid:
         
         return self
 
+    def moved(self, x: float, y: float = 0, z: float = 0) -> 'SmartSolid':
+        return self.copy().move(x, y, z)
+
     def move_x(self, x: float) -> 'SmartSolid':
         return self.move(x, 0, 0)
 
@@ -182,10 +181,12 @@ class SmartSolid:
         return self.get_bounds_along_axis(axis)[1]
 
     def orient(self, rotations: VectorLike) -> 'SmartSolid':
+        self.solid = self.wrap_solid()
         self.solid.orientation = rotations
         return self
 
     def rotate_with_axis(self, axis: Axis, angle: float) -> 'SmartSolid':
+        self.solid = self.wrap_solid()
         self.solid = self.solid.rotate(axis, angle)
         return self
 
@@ -420,3 +421,6 @@ class SmartSolid:
 
     def wrap_solid(self):
         return wrap(self.solid)
+
+    def clone(self, count: int, shift: Vector) -> 'SmartSolid':
+        return SmartSolid((self.moved_vector(shift * i) for i in range(count)))

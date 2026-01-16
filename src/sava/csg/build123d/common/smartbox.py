@@ -7,10 +7,9 @@ FILLET_ENABLER_COEFFICIENT = 1.01 # coefficient between side length and fillet r
 
 
 class SmartBox(SmartSolid):
-    def __init__(self, length: float, width: float, height: float, flip_xy: bool = False):
-        super().__init__()
-
-        self.solid = Solid.make_box(width if flip_xy else length, length if flip_xy else width, height)
+    def __init__(self, length: float, width: float, height: float, flip_xy: bool = False, label: str = None):
+        solid = Solid.make_box(width if flip_xy else length, length if flip_xy else width, height)
+        super().__init__(solid, label=label)
 
     def add_cutout(self, direction: Direction, length: float, radius_bottom: float = 0, radius_top: float | None = None, width: float | None = None, height: float | None = None, shift: float = 0) -> 'SmartBox':
         assert width is not None or height is not None, "Either width or height must be specified"

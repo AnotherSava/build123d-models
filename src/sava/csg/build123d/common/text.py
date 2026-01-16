@@ -14,17 +14,16 @@ class TextDimensions:
     height: float
 
 class TextSolid(SmartSolid):
-    def __init__(self, element):
-        super().__init__(element)
+    def __init__(self, element, label: str = None):
+        super().__init__(element, label=label)
 
-    def connected(self):
-        background = SmartBox(self.x_size, self.y_size, BACKGROUND_THICKNESS)
+    def connected(self) -> SmartSolid:
+        background = SmartBox(self.x_size, self.y_size, BACKGROUND_THICKNESS, label=self.label)
         background.align_zxy(self)
-        result = background.fuse(self)
-        return result.same_color(self)
+        return background.fuse(self)
 
 
-def create_text(dim: TextDimensions, text: str, color: str = None) -> TextSolid:
+def create_text(dim: TextDimensions, text: str, label: str = None) -> TextSolid:
     text_wire = Text(text, font_size=dim.font_size, font=dim.font)
 
-    return TextSolid(extrude(text_wire, amount=dim.height)).color(color)
+    return TextSolid(extrude(text_wire, amount=dim.height), label)

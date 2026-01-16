@@ -6,7 +6,7 @@ from copy import copy
 from pathlib import Path
 from typing import Iterable
 
-from build123d import Shape, Color, Mesher, Plane, Wire
+from build123d import Shape, Color, Mesher, Plane, Wire, Compound
 
 from sava.csg.build123d.common.geometry import solidify_wire
 from sava.csg.build123d.common.smartplane import SmartPlane
@@ -137,11 +137,34 @@ def _report_labels() -> None:
         print(f"{label + ':':<15} {count} shape(s)")
 
 
+def print_dimensions() -> None:
+    """Print the combined bounding box dimensions of all exported objects."""
+
+    # Collect all solids from all labels
+    all_solids = []
+    for label, shapes in _shapes.items():
+        for shape in shapes:
+            solid = get_solid(shape)
+            if isinstance(solid, Iterable):
+                all_solids.extend(solid)
+            else:
+                all_solids.append(solid)
+
+    # Create compound and get bounding box
+    bbox = Compound(all_solids).bounding_box()
+
+    # Print dimensions
+    print(f"Combined dimensions: {bbox.size.X:.2f} x {bbox.size.Y:.2f} x {bbox.size.Z:.2f} mm")
+
+
 def save_3mf(location: str = None, current: bool = False) -> None:
     """Save all shapes to a single 3MF file."""
     actual_location = create_file_path(location or CURRENT_MODEL_LOCATION_3MF)
     print(f"\nExporting 3mf file to: {actual_location}\n")
     _save_3mf(actual_location)
+
+    if not location or current:
+        print_dimensions()
 
     if location and current:
         current_model_location = create_file_path(CURRENT_MODEL_LOCATION_3MF)
