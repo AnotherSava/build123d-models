@@ -143,8 +143,8 @@ class Pencil:
         self.location = destination_abs
         return self
 
-    def arc(self, midpoint_vector: Vector, destination_vector: Vector):
-        return self.arc_abs(self.location + midpoint_vector, self.location + destination_vector)
+    def arc(self, midpoint_vector: VectorLike, destination_vector: VectorLike):
+        return self.arc_abs(self.location + to_vector(midpoint_vector), self.location + to_vector(destination_vector))
 
     def arc_with_vector_to_intersection(self, vector_to_tangents_intersection: Vector, angle: float):
         direction_to_centre = get_angle(vector_to_tangents_intersection) + 90 * (-1 if angle % 360 < 180 else 1)

@@ -268,8 +268,8 @@ class SmartSolid:
     def colocate(self, solid: 'SmartSolid') -> 'SmartSolid':
         assert solid.is_simple()
 
-        for shape in self.shapes:
-            shape.location = solid.solid.location
+        self.solid = self.wrap_solid()
+        self.solid.location = solid.solid.location
 
         return self
 
