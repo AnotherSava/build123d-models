@@ -4,7 +4,7 @@ from typing import Tuple
 
 from build123d import Vector, mirror, Plane, Solid, Axis, Location, Face, Polyline, extrude
 
-from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl, show_green, show_blue
+from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
 from sava.csg.build123d.common.geometry import create_vector, Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_tapered_box, create_tapered_box_delta
@@ -39,19 +39,21 @@ class ProngDimensions:
 
 
 class LockDimensions:
-    gap: float = 0.3  # clearance between lid and box
+    gap: float = 0.3  # clearance between hook tip and catch point
     length: float = 20.0  # snap lock length at top
     length_bottom: float = 16.0  # snap lock length at bottom (tapered)
     height: float = 35.0  # total height of lock mechanism
     padding: float = 0.2  # padding around lock for protrusion cutout
-    tip_thickness: float = 3  # thickness of the catch tip
+    tip_thickness: float = 1.5  # thickness of the catch tip
     tip_distance: float = 4.0  # distance from box top to catch point
     cantilever_attachment_height: float = 15  # height where cantilever meets lid wall
     cantilever_thickness: float = 2  # thickness of flexible cantilever arm
-    slot_thickness_coefficient: float = 1.1  # multiplier for slot width clearance
+    slot_thickness_coefficient: float = 1.2  # multiplier for slot width clearance
     slot_radius: float = 2.5  # rounded corner radius in lock slot
     hardening_height: float = 20.0  # height of reinforcement bulge
-    hardening_thickness: float = 1.5  # thickness of reinforcement bulge
+    hardening_height_extra: float = 5.0  # height of reinforcement bulge thinning down
+    length_extra: float = 10.0  # length of reinforcement bulge thinning to the sides (combined)
+    hardening_thickness: float = 2  # thickness of reinforcement bulge
     hook_angle: float = 30
     tip_height: float = 0  # height of catch point from box bottom (computed)
 
@@ -156,21 +158,26 @@ class PowerAdapterLid(PowerAdapterBase):
         for orientation, alignment in [[180, Alignment.LR], [0, Alignment.RL]]:
             snap.orient((0, 0, orientation)).align_x(lid, alignment).align_y(lid).align_z(snap_thinning, Alignment.LR)
             snaps.append(snap.intersected(snap_thinning))
-            break
+
+        snaps = SmartSolid(snaps, label="snaps")
 
         text = create_text(self.dim.text, self.dim.label, "text")
         text.align_zxy(lid, Alignment.RL)
 
-        snaps = SmartSolid(snaps, label="snaps")
         return lid.cut(snaps, text), snaps, text.connected()
 
     # Creates profile for thinning snap lock cantilever
     def create_snap_thinning(self) -> SmartSolid:
+        dim = self.dim.lock
+
         pencil = Pencil(plane=Plane.YZ)
-        pencil.right(self.dim.lock.length_bottom / 2)
-        pencil.up(self.dim.box_height)
-        pencil.double_arc(Vector((self.dim.lock.length - self.dim.lock.length_bottom) / 2, self.dim.lock.cantilever_attachment_height - self.dim.lock.tip_height))
-        pencil.up(self.dim.lid_height - self.dim.lock.cantilever_attachment_height)
+        pencil.right(dim.length_bottom / 2)
+        pencil.up(dim.tip_height + dim.tip_distance)
+        pencil.double_arc(Vector((dim.length - dim.length_bottom) / 2, dim.cantilever_attachment_height - pencil.location.Y))
+
+        pencil.up_to(dim.height)
+        pencil.right(dim.length_extra / 2)
+        pencil.up_to(self.dim.lid_height - dim.padding)
         pencil.left()
         return SmartSolid(pencil.extrude_mirrored_y(self.dim.box_length))
 
@@ -186,13 +193,12 @@ class PowerAdapterLid(PowerAdapterBase):
         #     /  /
         #    I  D
         #    |  |
-        #    |  C--B
-        #    |    /
-        #    J---A
+        #    |  C-B
+        #    |   /
+        #    J--A
         #
 
         dim = self.dim.lock
-        extra_height = dim.hardening_height / 4
         pencil = Pencil(plane=Plane.XZ)
 
         # A → B: from origin to tip base
@@ -203,16 +209,16 @@ class PowerAdapterLid(PowerAdapterBase):
         pencil.up(dim.tip_distance)
 
         # D → E: S-curve to cantilever base
-        arc_destination_vector = Vector(dim.tip_thickness, dim.cantilever_attachment_height - self.dim.lid_cutout_height)
+        arc_destination_vector = Vector(dim.slot_radius, dim.cantilever_attachment_height - pencil.location.Y)
         pencil.double_arc(arc_destination_vector)
 
         # E → F: cantilever vertical arm
-        pencil.up(dim.height - dim.cantilever_attachment_height - dim.hardening_height / 2 - extra_height)
+        pencil.up(dim.height - dim.cantilever_attachment_height - dim.hardening_height / 2 - dim.hardening_height_extra)
         # F → G: lid wall attachment
         pencil.left(dim.cantilever_thickness)
 
         # G → H: inner cantilever vertical arm
-        pencil.down(dim.height - dim.cantilever_attachment_height - dim.hardening_height / 2 - extra_height)
+        pencil.down(dim.height - dim.cantilever_attachment_height - dim.hardening_height / 2 - dim.hardening_height_extra)
 
         # H → I: S-curve back towards inner edge, tension=0.57
         pencil.double_arc(-arc_destination_vector, 0.57)
@@ -222,12 +228,12 @@ class PowerAdapterLid(PowerAdapterBase):
 
         solid = SmartSolid(pencil.extrude(dim.length))
 
-        reinforcement = self.create_reinforcement(dim.length, dim.cantilever_thickness, self.dim.lid_wall_thickness, dim.hardening_thickness, dim.hardening_height, extra_height)
+        reinforcement = self.create_reinforcement(dim.length, dim.length_extra, dim.cantilever_thickness, self.dim.lid_wall_thickness, dim.hardening_thickness, dim.hardening_height, dim.hardening_height_extra)
         reinforcement.orient((0, 0, 180)).align_y(solid).align_z(solid, Alignment.RR).align_x(solid, Alignment.RL)
 
         return solid.fuse(reinforcement)
 
-    def create_reinforcement(self, length: float, thickness_bottom: float, thickness_top: float, thickness_extra: float, height: float, height_extra: float) -> SmartSolid:
+    def create_reinforcement(self, length: float, length_extra: float, thickness_bottom: float, thickness_top: float, thickness_extra: float, height: float, height_extra: float) -> SmartSolid:
 
         pencil = Pencil(plane=Plane.XZ)
         pencil.right(thickness_bottom)
@@ -237,12 +243,13 @@ class PowerAdapterLid(PowerAdapterBase):
         pencil.left(thickness_top)
         side = pencil.create_face()
 
-
         left = (0, 0, 0)
+        extra_left = (0, -length_extra / 2, 0)
         middle = (0, length / 2, -height_extra)
         right = (0, length, 0)
+        extra_right = (0, length + length_extra / 2, 0)
 
-        top_sweep = SweepSolid(side, Polyline(left, right), Plane.YZ)
+        top_sweep = SweepSolid(side, Polyline(extra_left, extra_right), Plane.YZ)
         bottom_sweep = SweepSolid(side, Polyline(left, middle, right), Plane.YZ)
 
 
@@ -323,10 +330,10 @@ class PowerAdapterBox(PowerAdapterBase):
 
         pencil.arc_with_radius(self.dim.lock.slot_radius, 180, 90)
         pencil.down(self.dim.lock.tip_distance - self.dim.lock.gap - self.dim.lock.slot_radius)
-        pencil.right(self.dim.lock.tip_thickness)
+        pencil.right(self.dim.lock.slot_radius)
         pencil.down(self.dim.box_height - self.dim.lock.tip_distance + self.dim.lock.gap)
-        pencil.left((self.dim.lock.tip_thickness * 2 + self.dim.lock.cantilever_thickness) * self.dim.lock.slot_thickness_coefficient)
-        pencil.up(self.dim.box_height)
+        pencil.left(self.dim.lock.slot_radius + (self.dim.lock.tip_thickness + self.dim.lock.cantilever_thickness) * self.dim.lock.slot_thickness_coefficient)
+        pencil.up()
 
         return SmartSolid(pencil.extrude(self.dim.lock.length_bottom + self.dim.box_taper_diff * 2))
 
@@ -354,7 +361,8 @@ def export_stl(box: SmartSolid, prongs: SmartSolid, lid: SmartSolid, snaps: Smar
     clear()
 
     lid.orient((180, 0, 0))
-    text.orient((180, 0, 0)).align_zxy(lid, Alignment.LR)
+    snaps.colocate(lid)
+    text.colocate(lid)
 
     export(box)
     export(prongs)

@@ -210,9 +210,31 @@ class Pencil:
         length = length or self.start.Y - self.location.Y
         return self.draw(length, 0)
 
+    def y_to(self, y_pos: float):
+        return self.jump_from_start((self.location.X, y_pos))
+
+    def up_to(self, y_pos: float):
+        assert y_pos > self.location.Y
+        return self.y_to(y_pos)
+
+    def down_to(self, y_pos: float):
+        assert y_pos < self.location.Y
+        return self.y_to(y_pos)
+
     def left(self, length: float = None):
         length = length or self.location.X - self.start.X
         return self.draw(length, 90)
+
+    def x_to(self, x_pos: float):
+        return self.jump_from_start((x_pos, self.location.Y))
+
+    def right_to(self, x_pos: float):
+        assert x_pos > self.location.X
+        return self.x_to(x_pos)
+
+    def left_to(self, x_pos: float):
+        assert x_pos < self.location.X
+        return self.x_to(x_pos)
 
     def down(self, length: float = None):
         length = length or self.location.Y - self.start.Y
