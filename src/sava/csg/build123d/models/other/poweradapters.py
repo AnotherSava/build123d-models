@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from math import tan, radians
 from typing import Tuple
 
-from build123d import Vector, mirror, Plane, Axis, Location, Face, Polyline, extrude
+from build123d import Vector, Plane, Axis, Location, Face, Polyline, extrude
 
 from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
 from sava.csg.build123d.common.geometry import create_vector, Alignment
@@ -25,11 +25,14 @@ class RecessDimensions:
     bottom_length: float = 24.5
     bottom_length_flat: float = 15.6
 
-    depth: float = 7
+    depth_bottom: float = 7
+    depth_top: float = 3
+    top_fillet_radius: float = 7.0
 
 
 class LockDimensions:
-    gap: float = 0.3  # clearance between hook tip and catch point
+    hook_gap: float = 0.3  # clearance between hook and catch point
+    tip_gap: float = 0.3  # minimal clearance tip end and bottom of the box
     length: float = 20.0  # snap lock length at top
     length_bottom: float = 16.0  # snap lock length at bottom (tapered)
     height: float = 35.0  # total height of lock mechanism
@@ -37,13 +40,13 @@ class LockDimensions:
     tip_thickness: float = 1.5  # thickness of the catch tip
     tip_distance: float = 4.0  # distance from box top to catch point
     cantilever_attachment_height: float = 15  # height where cantilever meets lid wall
-    cantilever_thickness: float = 2  # thickness of flexible cantilever arm
+    cantilever_thickness: float = 1.6  # thickness of flexible cantilever arm
     slot_thickness_coefficient: float = 1.2  # multiplier for slot width clearance
     slot_radius: float = 2.5  # rounded corner radius in lock slot
     hardening_height: float = 20.0  # height of reinforcement bulge
     hardening_height_extra: float = 5.0  # height of reinforcement bulge thinning down
     length_extra: float = 10.0  # length of reinforcement bulge thinning to the sides (combined)
-    hardening_thickness: float = 2  # thickness of reinforcement bulge
+    hardening_thickness: float = 1.6  # thickness of reinforcement bulge
     hook_angle: float = 30
     tip_height: float = 0  # height of catch point from box bottom (computed)
 
@@ -52,7 +55,6 @@ class LockDimensions:
 class PowerAdapterBoxDimensions:
     recess: RecessDimensions = field(default_factory=RecessDimensions)
     lock: LockDimensions = field(default_factory=LockDimensions)
-
     text: TextDimensions = field(default_factory=lambda: TextDimensions(font_size=24, font="Liberation Sans", height=0.8))
 
     label: str = "Travel Adapter Set"
@@ -68,14 +70,24 @@ class PowerAdapterBoxDimensions:
     box_taper_diff: float = 0.6
 
     lid_internal_height: float = 63.0
-    lid_ceiling_thickness: float = 2
+    lid_ceiling_thickness: float = 1.6
 
-    lid_wall_thickness: float = 2.4
+    lid_wall_thickness: float = 2
 
     box_width: float = 100.0
 
+    @property
+    def lock_shift_from_centre(self) -> float:
+        # Centre of the first socket recess
+        row_half_width = self.get_side_length(self.sockets_per_row) / 2
+        first_socket_centre = self.socket_padding + self.socket_side / 2
+        return row_half_width - first_socket_centre
+
     def __post_init__(self):
-        self.lock.tip_height = self.box_height - self.lock.tip_distance - self.lock.gap
+        box_max = self.box_height - self.lock.tip_distance - self.lock.tip_gap
+        tip_max = (self.lock.tip_thickness + self.lock.cantilever_thickness) / tan(radians(self.lock.hook_angle))
+
+        self.lock.tip_height = min(box_max, tip_max)
 
     @property
     def lid_length_internal(self):
@@ -87,7 +99,7 @@ class PowerAdapterBoxDimensions:
 
     @property
     def lid_cutout_height(self):
-        return self.box_height / 4 * 3
+        return self.box_height / 8 * 7
 
     @property
     def lid_height(self):
@@ -95,11 +107,11 @@ class PowerAdapterBoxDimensions:
 
     @property
     def box_length(self):
-        return self.get_side_length(self.sockets_per_row) + self.box_length_padding * 2
+        return self.get_side_length(self.sockets_per_row) + self.box_length_padding
 
     @property
     def box_height(self):
-        return self.floor_thickness + self.recess.depth
+        return self.floor_thickness + self.recess.depth_bottom + self.recess.depth_top
 
     @property
     def box_wider_height(self):
@@ -113,10 +125,20 @@ class PowerAdapterBase:
         self.dim = dim
 
     # Creates tapered box protrusion that connects box and lid
-    def create_protrusion(self, filleted: bool):
-        protrusion_bottom_width = self.dim.lock.length + self.dim.lock.padding * 2 + self.dim.protrusion_side_delta
+    def create_protrusions(self, filleted: bool):
+        protrusion_base_length = self.dim.lock.length + self.dim.lock.padding * 2 + self.dim.protrusion_side_delta
         radius = self.dim.protrusion_fillet_radius if filleted else 0
-        return create_tapered_box(self.dim.box_length, protrusion_bottom_width, self.dim.lid_cutout_height, self.dim.box_length, protrusion_bottom_width - self.dim.box_taper_diff * 2, radius)
+        protrusion = create_tapered_box(protrusion_base_length, self.dim.box_width, self.dim.lid_cutout_height, protrusion_base_length - self.dim.box_taper_diff * 2, self.dim.box_width, radius)
+        return protrusion.clone(2, (self.dim.lock_shift_from_centre * 2, 0))
+
+    def orient(self, solid: SmartSolid, base: SmartSolid):
+        result = []
+        solid.align_z(base, Alignment.LR)
+        for orientation, alignment in [[270, Alignment.LR], [90, Alignment.RL]]:
+            for direction in [-1, 1]:
+                copy = solid.oriented((0, 0, orientation)).align_x(base, Alignment.C, self.dim.lock_shift_from_centre * direction).align_y(base, alignment)
+                result.append(copy)
+        return SmartSolid(result)
 
 
 class PowerAdapterLid(PowerAdapterBase):
@@ -129,26 +151,19 @@ class PowerAdapterLid(PowerAdapterBase):
 
         lid.cut(lid_internal).fillet_z(self.dim.box_fillet_radius)
 
-        lock_bottom = SmartBox(lid.x_size, self.dim.lock.length + self.dim.lock.padding * 2, self.dim.lock.height).align_xy(lid).align_z(lid, Alignment.LR)
-        lid.cut(lock_bottom)
+        lock_bottom = SmartBox(self.dim.lid_wall_thickness, self.dim.lock.length + self.dim.lock.padding * 2, self.dim.lock.height + self.dim.lock.tip_distance - self.dim.box_wider_height)
+        lid.cut(self.orient(lock_bottom, lid))
 
-        box_protrusion = self.create_protrusion(False)
-        box_protrusion.align(lid).align_z(lid, Alignment.LR)
-        lid.cut(box_protrusion)
+        box_protrusions = self.create_protrusions(False)
+        box_protrusions.align(lid).align_z(lid, Alignment.LR)
+        lid.cut(box_protrusions)
 
-        lid.fillet_positional(self.dim.lid_fillet_radius, Axis.X, *box_protrusion.create_positional_filters_plane(Plane.YZ))
+        lid.fillet_positional(self.dim.lid_fillet_radius, Axis.X, *box_protrusions.create_positional_filters_plane(Plane.YZ))
 
-        snap = self.create_snap()
+        thinning = self.create_snap_thinning()
+        snap = self.create_snap().align_zxy(thinning, Alignment.LR).intersect(thinning)
 
-        snap_thinning = self.create_snap_thinning()
-        snap_thinning.align(lid).align_z(lid, Alignment.LR, self.dim.lock.gap - self.dim.box_wider_height)
-
-        snaps = []
-        for orientation, alignment in [[180, Alignment.LR], [0, Alignment.RL]]:
-            snap.orient((0, 0, orientation)).align_x(lid, alignment).align_y(lid).align_z(snap_thinning, Alignment.LR)
-            snaps.append(snap.intersected(snap_thinning))
-
-        snaps = SmartSolid(snaps, label="snaps")
+        snaps = SmartSolid(self.orient(snap, lid), label="snaps").align_z(lid, Alignment.LR, self.dim.lid_cutout_height -self.dim.lock.tip_distance - self.dim.lock.tip_height)
 
         text = create_text(self.dim.text, self.dim.label, "text")
         text.align_zxy(lid, Alignment.RL)
@@ -161,14 +176,16 @@ class PowerAdapterLid(PowerAdapterBase):
 
         pencil = Pencil(plane=Plane.YZ)
         pencil.right(dim.length_bottom / 2)
-        pencil.up(dim.tip_height + dim.tip_distance)
-        pencil.double_arc(Vector((dim.length - dim.length_bottom) / 2, dim.cantilever_attachment_height - pencil.location.Y))
+        pencil.up(dim.tip_distance)
+        pencil.double_arc(Vector((dim.length - dim.length_bottom) / 2, dim.cantilever_attachment_height - dim.tip_distance))
 
         pencil.up_to(dim.height)
-        pencil.right(dim.length_extra / 2)
-        pencil.up_to(self.dim.lid_height - dim.padding)
+        pencil.right(self.dim.lock.padding)
+        pencil.down(self.dim.lock.hardening_height / 2)
+        pencil.right(dim.length_extra / 2 - self.dim.lock.padding)
+        pencil.up_to(dim.height + self.dim.lock.hardening_height / 2)
         pencil.left()
-        return SmartSolid(pencil.extrude_mirrored_y(self.dim.box_length))
+        return SmartSolid(pencil.extrude_mirrored_y(dim.hardening_thickness + self.dim.lid_wall_thickness))
 
     # Creates cantilever snap lock that clips into box
     def create_snap(self) -> SmartSolid:
@@ -256,46 +273,49 @@ class PowerAdapterBox(PowerAdapterBase):
     def create_box(self) -> SmartSolid:
         box_top = create_tapered_box_delta(self.dim.lid_length_internal, self.dim.lid_width_internal, self.dim.lid_cutout_height, -self.dim.box_taper_diff, self.dim.box_fillet_radius)
 
-        box_protrusion = self.create_protrusion(True)
-        box_protrusion.align(box_top)
+        box_protrusions = self.create_protrusions(True)
+        box_protrusions.align(box_top)
 
         box_bottom = SmartBox(self.dim.box_length, self.dim.box_width, self.dim.box_wider_height).fillet_z(self.dim.box_fillet_radius)
         box_bottom.align_zxy(box_top, Alignment.LL)
 
-        box = SmartSolid(box_top, box_bottom, box_protrusion, label="box")
+        box = SmartSolid(box_top, box_bottom, box_protrusions, label="box")
 
-        element = self.create_socket_recess()
-
-        recess_row = element.clone(self.dim.sockets_per_row, Vector(self.dim.socket_side + self.dim.socket_padding, 0))
+        recess_row = self.create_socket_recess().clone(self.dim.sockets_per_row, Vector(self.dim.socket_side + self.dim.socket_padding, 0))
         recess_row.fuse(recess_row.mirrored().align_y(recess_row, Alignment.RR, self.dim.socket_padding))
         recess_row.align_xy(box).align_z(box, Alignment.RL)
         box.cut(recess_row)
 
-        slot = self.create_lock_slot()
-        for orientation, alignment in [[180, Alignment.LR], [0, Alignment.RL]]:
-            slot.orient((0, 0, orientation)).align_x(box, alignment).align_y(box).align_z(box, Alignment.LR)
-            box.cut(slot)
+        slots = self.orient(self.create_lock_slot(), box)
+        box.cut(slots)
+
         return box
 
     # Creates shaped recess for one power adapter socket
     def create_socket_recess(self):
+        dim = self.dim.recess
+
         pencil = Pencil()
-        pencil.right(self.dim.recess.top_length_flat / 2)
-        pencil.arc_with_vector_to_intersection(Vector((self.dim.recess.top_length - self.dim.recess.top_length_flat) / 2, 0, 0), self.dim.recess.top_angle)
-        pencil.arc_with_destination(create_vector(self.dim.recess.side_flat_length, self.dim.recess.top_angle + 90), self.dim.recess.side_angle)
-        pencil.arc_with_vector_to_intersection(create_vector((self.dim.recess.bottom_length - self.dim.recess.bottom_length_flat) / 2, self.dim.recess.top_angle + 90), 180 - self.dim.recess.top_angle)
+        pencil.right(dim.top_length_flat / 2)
+        pencil.arc_with_vector_to_intersection(Vector((dim.top_length - dim.top_length_flat) / 2, 0, 0), dim.top_angle)
+        pencil.arc_with_destination(create_vector(dim.side_flat_length, dim.top_angle + 90), dim.side_angle)
+        pencil.arc_with_vector_to_intersection(create_vector((dim.bottom_length - dim.bottom_length_flat) / 2, dim.top_angle + 90), 180 - dim.top_angle)
         pencil.left(pencil.location.X)
-        solid = pencil.extrude(self.dim.recess.depth)
-        return SmartSolid(solid, mirror(solid, Plane.YZ))
+        recess_bottom = SmartSolid(pencil.extrude_mirrored_y(dim.depth_bottom))
+
+        recess_top = SmartBox(self.dim.socket_side, self.dim.socket_side, dim.depth_top).fillet_z(dim.top_fillet_radius)
+        recess_top.align_zxy(recess_bottom, Alignment.RR)
+
+        return SmartSolid(recess_bottom, recess_top)
 
     # Creates slot in box for snap lock tip
     def create_lock_slot(self) -> SmartSolid:
         pencil = Pencil(plane=Plane.XZ)
 
         pencil.arc_with_radius(self.dim.lock.slot_radius, 180, 90)
-        pencil.down(self.dim.lock.tip_distance - self.dim.lock.gap - self.dim.lock.slot_radius)
+        pencil.down_to(self.dim.lock.hook_gap - self.dim.lock.tip_distance)
         pencil.right(self.dim.lock.slot_radius)
-        pencil.down(self.dim.box_height - self.dim.lock.tip_distance + self.dim.lock.gap)
+        pencil.down_to(-self.dim.box_height)
         pencil.left(self.dim.lock.slot_radius + (self.dim.lock.tip_thickness + self.dim.lock.cantilever_thickness) * self.dim.lock.slot_thickness_coefficient)
         pencil.up()
 
@@ -307,8 +327,7 @@ power_adapter_box = PowerAdapterBox(dimensions)
 power_adapter_lid = PowerAdapterLid(dimensions)
 
 def export_3mf(box: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartSolid):
-    export(lid)
-    export(snaps)
+    export(lid.fuse(snaps), "lid")
     export(text)
 
     box.align_zxy(lid, Alignment.RR, -dimensions.lid_height - dimensions.box_wider_height)
@@ -324,8 +343,8 @@ def export_stl(box: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartS
     text.colocate(lid)
 
     export(box)
-    export(lid)
-    export(snaps)
+    export(lid.fuse(snaps), "lid")
+    # export(snaps)
     export(text)
 
     save_stl("models/other/power_adapters/stl")

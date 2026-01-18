@@ -5,7 +5,7 @@ from typing import Iterable
 from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid
 
 from sava.common.common import flatten
-from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation
+from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector
 
 
 @dataclass
@@ -422,5 +422,6 @@ class SmartSolid:
     def wrap_solid(self):
         return wrap(self.solid)
 
-    def clone(self, count: int, shift: Vector) -> 'SmartSolid':
+    def clone(self, count: int, shift: VectorLike) -> 'SmartSolid':
+        shift = to_vector(shift)
         return SmartSolid((self.moved_vector(shift * i) for i in range(count)))
