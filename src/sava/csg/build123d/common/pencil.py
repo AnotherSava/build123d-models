@@ -41,16 +41,17 @@ def _reconstruct_edge(edge: Edge) -> Edge:
 
 
 class Pencil:
-    def __init__(self, start: VectorLike = (0, 0), plane: Plane = Plane.XY):
+    def __init__(self, plane: Plane = Plane.XY, start: VectorLike = (0, 0)):
         self.curves = []
-        self.start = to_vector(start)
-        self.location = self.start
-        self.plane = plane
+        self.location = Vector(0, 0, 0)
+        # Shift plane origin by start vector (in plane's local coordinates)
+        start = to_vector(start)
+        self.plane = Plane(plane.origin + plane.x_dir * start.X + plane.y_dir * start.Y, x_dir=plane.x_dir, z_dir=plane.z_dir)
 
     def process_vector_input(self, vector: VectorLike) -> Vector:
         vector = to_vector(vector)
-        vector = Vector(snap_to(vector.X, self.start.X), snap_to(vector.Y, self.start.Y), snap_to(vector.Z, self.start.Z))
-        assert vector.Z == self.start.Z
+        vector = Vector(snap_to(vector.X, 0), snap_to(vector.Y, 0), snap_to(vector.Z, 0))
+        assert vector.Z == 0
         return vector
 
     def double_arc(self, destination: VectorLike, shift_coefficient: float = 0.5, angle: float = None):
@@ -206,50 +207,43 @@ class Pencil:
     def jump(self, destination: VectorLike):
         return self.jump_to(to_vector(destination) + self.location)
 
-    def jump_from_start(self, destination: VectorLike):
-        return self.jump_to(to_vector(destination) + self.start)
-
     def draw(self, length: float, angle: float):
         abs_destination = shift_vector(self.location, length, angle)
         return self.jump_to(abs_destination)
 
-    def up(self, length: float = None):
-        length = length or self.start.Y - self.location.Y
-        return self.draw(length, 0)
-
     def y_to(self, y_pos: float):
-        return self.jump_from_start((self.location.X, y_pos))
+        return self.jump_to((self.location.X, y_pos))
 
     def up_to(self, y_pos: float):
         assert y_pos > self.location.Y
         return self.y_to(y_pos)
 
+    def up(self, length: float = None):
+        return self.y_to(0 if length is None else self.location.Y + length)
+
     def down_to(self, y_pos: float):
         assert y_pos < self.location.Y
         return self.y_to(y_pos)
 
-    def left(self, length: float = None):
-        length = length or self.location.X - self.start.X
-        return self.draw(length, 90)
+    def down(self, length: float = None):
+        return self.y_to(0 if length is None else self.location.Y - length)
 
     def x_to(self, x_pos: float):
-        return self.jump_from_start((x_pos, self.location.Y))
+        return self.jump_to((x_pos, self.location.Y))
 
     def right_to(self, x_pos: float):
         assert x_pos > self.location.X
         return self.x_to(x_pos)
 
+    def right(self, length: float = None):
+        return self.x_to(0 if length is None else self.location.X + length)
+
     def left_to(self, x_pos: float):
         assert x_pos < self.location.X
         return self.x_to(x_pos)
 
-    def down(self, length: float = None):
-        length = length or self.location.Y - self.start.Y
-        return self.draw(length, 180)
-
-    def right(self, length: float = None):
-        length = length or self.start.X - self.location.X
-        return self.draw(length, -90)
+    def left(self, length: float = None):
+        return self.x_to(0 if length is None else self.location.X - length)
 
     def extrude(self, height: float, label: str = None) -> SmartSolid:
         from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -261,8 +255,8 @@ class Pencil:
 
     def create_wire(self, enclose: bool = True) -> Wire:
         curves = self.curves.copy()
-        if enclose and self.location != self.start:
-            curves.append(Line(self.location, self.start))
+        if enclose and self.location != Vector(0, 0, 0):
+            curves.append(Line(self.location, Vector(0, 0, 0)))
 
         # Create wire in local 2D coordinates
         local_wire = Wire(curves)
@@ -311,18 +305,18 @@ class Pencil:
         # Add segments to/from center to create a closed path for mirroring
         if mirror_around_x_axis:
             # Mirroring around X axis at Y=center
-            center = snap_to(center, self.start.Y, self.location.Y)
-            if self.start.Y != center:
-                self.curves.insert(0, Line(Vector(self.start.X, center), self.start))
+            center = snap_to(center, 0, self.location.Y)
+            if center != 0:
+                self.curves.insert(0, Line(Vector(0, center), Vector(0, 0, 0)))
             if self.location.Y != center:
-                self.jump_to((self.location.X, center))
+                self.y_to(center)
         else:
             # Mirroring around Y axis at X=center
-            center = snap_to(center, self.start.X, self.location.X)
-            if self.start.X != center:
-                self.curves.insert(0, Line(Vector(center, self.start.Y), self.start))
+            center = snap_to(center, 0, self.location.X)
+            if center != 0:
+                self.curves.insert(0, Line(Vector(center, 0), Vector(0, 0, 0)))
             if self.location.X != center:
-                self.jump_to((center, self.location.Y))
+                self.x_to(center)
 
         # Create wire and locate it to the plane
         wire_with_start = Wire(self.curves)

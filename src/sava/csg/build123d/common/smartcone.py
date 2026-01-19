@@ -76,7 +76,7 @@ class SmartCone(SmartSolid):
 
         first_segment = create_vector(outer_length, -cone_angle)
 
-        pencil = Pencil(-first_segment, Plane.XZ)
+        pencil = Pencil(Plane.XZ, -first_segment)
         pencil.jump(first_segment)
         pencil.down(thickness / sin(angle_rad))
         pencil.draw(inner_length, 180 - cone_angle)

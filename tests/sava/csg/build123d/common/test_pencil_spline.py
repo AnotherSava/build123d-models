@@ -97,14 +97,15 @@ class TestPencilSpline(unittest.TestCase):
     def test_intermediate_points_are_relative_to_current_location(self):
         """Test that intermediate points are relative to current location, not origin."""
         pencil = Pencil(start=(10, 10))
-        pencil.jump((20, 20))  # Move to (30, 30) absolute
+        pencil.jump((20, 20))  # Move to (20, 20) in local coords (30, 30 in world)
 
         # Now draw spline with intermediate point relative to current location
         pencil.spline((50, 50), (1, 0), intermediate_points=[(25, 25)])
 
-        # Final location should be current + destination = (30,30) + (50,50) = (80,80)
-        self.assertAlmostEqual(pencil.location.X, 80)
-        self.assertAlmostEqual(pencil.location.Y, 80)
+        # Final local location should be (20,20) + (50,50) = (70,70)
+        # (In world coordinates this is (80,80) due to start offset)
+        self.assertAlmostEqual(pencil.location.X, 70)
+        self.assertAlmostEqual(pencil.location.Y, 70)
 
     def test_very_close_intermediate_point_to_start_raises_error(self):
         """Test that intermediate point very close to start location raises ValueError."""

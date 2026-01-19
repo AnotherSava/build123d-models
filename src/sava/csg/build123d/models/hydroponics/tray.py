@@ -211,7 +211,7 @@ class TrayFactory:
         v2 = self.dim.get_hole_offset(4, 0)
         delta_x = self.dim.tray_height / 4 # since cut goes 45 degrees to the left
         start = (v1 + v2) / 2 + Vector(tray.x_mid + delta_x, tray.y_mid, tray.z_mid)
-        pencil = Pencil(start - create_vector(self.dim.outer_width / 2, angle))
+        pencil = Pencil(start=start - create_vector(self.dim.outer_width / 2, angle))
         pencil.draw(self.dim.outer_width / 2 + l / 2, angle)
         pencil.draw(l, -angle)
         pencil.draw(l, angle)

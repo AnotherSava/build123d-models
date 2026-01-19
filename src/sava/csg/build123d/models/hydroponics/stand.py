@@ -160,7 +160,7 @@ class HydroponicsStand:
     def create_pipe_cover_face_middle(self, pipe: SweepSolid) -> Face:
         dim = self.dim.pipe
 
-        pencil = Pencil((-self.dim.pipe.radius_outer, 0, 0), pipe.create_path_plane())
+        pencil = Pencil(pipe.create_path_plane(), (-self.dim.pipe.radius_outer, 0, 0))
         pencil.up(dim.length_straight)
         pencil.arc_with_radius(dim.bend_radius + dim.radius_outer, -90, -dim.bend_angle)
         pencil.draw(self.dim.pipe_extra_distance, -dim.bend_angle)
@@ -170,7 +170,7 @@ class HydroponicsStand:
     def create_pipe_cover_face_wider(self, pipe: SweepSolid, shift_z: float = 0, offset_z: float = 0, skip_height: float = 0) -> Face:
         dim = self.dim.pipe
 
-        pencil = Pencil((0, 0, shift_z), pipe.create_path_plane())
+        pencil = Pencil(pipe.create_path_plane(), (0, 0, shift_z))
         if skip_height < dim.length_straight:
             pencil.up(dim.length_straight - skip_height)
             skip_angle = 0
@@ -208,7 +208,7 @@ class HydroponicsStand:
 
         plane = create_plane((0, 0, 0), (-inlet_connector_bottom.x_mid, -inlet_connector_bottom.y_mid, 0), (0, 0, 1))
 
-        path = Pencil(plane=plane)
+        path = Pencil(plane)
         path.up(dim.length_straight)
         path.arc_with_radius(dim.bend_radius, -90, -dim.bend_angle)
         path.draw(self.dim.pipe_extra_distance, -dim.bend_angle)
@@ -233,7 +233,7 @@ class HydroponicsStand:
 
         x = tube.get_bound_box(plane_path).center().X
 
-        path = Pencil(plane=plane_path)
+        path = Pencil(plane_path)
         path.draw(x / sin(self.dim.pipe.bend_angle_rad) - self.dim.hose_holder.bend_radius * tan(self.dim.pipe.bend_angle_rad / 2), -self.dim.pipe.bend_angle)
         path.arc_with_radius(self.dim.hose_holder.bend_radius, 90 - self.dim.pipe.bend_angle, self.dim.pipe.bend_angle)
         wire = path.create_wire(False)
@@ -275,7 +275,7 @@ class HydroponicsStand:
         shapes = []
         for i in range(self.dim.handles.count):
             plane = create_plane(x_axis=create_vector(1, i * 360 / self.dim.handles.count), y_axis=(0, 0, 1))
-            pencil = Pencil(plane=plane)
+            pencil = Pencil(plane)
             pencil.right(self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness + self.dim.handles.thickness)
             pencil.double_arc((-self.dim.handles.thickness * 1.01, self.dim.handles.height))
             pencil.left()

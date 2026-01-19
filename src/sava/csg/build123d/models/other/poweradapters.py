@@ -174,7 +174,7 @@ class PowerAdapterLid(PowerAdapterBase):
     def create_snap_thinning(self) -> SmartSolid:
         dim = self.dim.lock
 
-        pencil = Pencil(plane=Plane.YZ)
+        pencil = Pencil(Plane.YZ)
         pencil.right(dim.length_bottom / 2)
         pencil.up(dim.tip_distance)
         pencil.double_arc(Vector((dim.length - dim.length_bottom) / 2, dim.cantilever_attachment_height - dim.tip_distance))
@@ -205,7 +205,7 @@ class PowerAdapterLid(PowerAdapterBase):
         #
 
         dim = self.dim.lock
-        pencil = Pencil(plane=Plane.XZ)
+        pencil = Pencil(Plane.XZ)
 
         # A → B: from origin to tip base
         pencil.jump(Vector(self.dim.lock.tip_height * tan(radians(dim.hook_angle)), self.dim.lock.tip_height))
@@ -241,7 +241,7 @@ class PowerAdapterLid(PowerAdapterBase):
 
     def create_reinforcement(self, length: float, length_extra: float, thickness_bottom: float, thickness_top: float, thickness_extra: float, height: float, height_extra: float) -> SmartSolid:
 
-        pencil = Pencil(plane=Plane.XZ)
+        pencil = Pencil(Plane.XZ)
         pencil.right(thickness_bottom)
         pencil.up(height_extra)
         pencil.double_arc(Vector(thickness_extra + (thickness_top - thickness_bottom) / 2, height / 2))
@@ -310,7 +310,7 @@ class PowerAdapterBox(PowerAdapterBase):
 
     # Creates slot in box for snap lock tip
     def create_lock_slot(self) -> SmartSolid:
-        pencil = Pencil(plane=Plane.XZ)
+        pencil = Pencil(Plane.XZ)
 
         pencil.arc_with_radius(self.dim.lock.slot_radius, 180, 90)
         pencil.down_to(self.dim.lock.hook_gap - self.dim.lock.tip_distance)

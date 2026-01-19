@@ -134,7 +134,7 @@ from build123d import Plane, Axis
 
 # Works in any plane orientation, not just XY
 tilted_plane = Plane.XY.rotated((30, 45, 15))
-pencil = Pencil(plane=tilted_plane)
+pencil = Pencil(tilted_plane)
 pencil.draw(50, 45)
 face = pencil.create_mirrored_face(Axis.X)  # Mirrors correctly in tilted plane
 ```

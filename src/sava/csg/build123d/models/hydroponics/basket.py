@@ -152,7 +152,7 @@ class BasketFactory:
 
         # Create half of pentagonal window to mirror across "Y" axis
         # Start at top middle, trace right side down to triangle tip
-        pencil = Pencil(plane=Plane.YZ)
+        pencil = Pencil(Plane.YZ)
         pencil.right(width / 2)
         pencil.down(self.dim.window_height - width / 2)
         pencil.jump((-width / 2, -width / 2))
@@ -263,8 +263,8 @@ class BasketFactory:
     def create_foundation_support_triangle(self, radius: float, thickness: float) -> Face:
         pencil = Pencil()
         pencil.arc_with_radius(radius, 90, self.dim.foundation_hook_arc_angle / 3)
-        pencil.jump_from_start((-thickness, 0))
-        return pencil.create_mirrored_face_x(0)
+        pencil.jump_to((-thickness, 0))
+        return pencil.create_mirrored_face_x()
 
     def create_foundation_support(self, foundation_inner: SmarterCone) -> SmartSolid:
         top = self.create_foundation_support_triangle(foundation_inner.top_radius, self.dim.cap_foundation_support_thickness).move(Location((0, 0, foundation_inner.z_size)))
@@ -301,7 +301,7 @@ class BasketFactory:
         pencil.jump((self.dim.cap_latch_thickness / 2 - gap, self.dim.cap_latch_thickness / 2 - gap))
         pencil.jump((-self.dim.cap_latch_thickness / 2 + gap, self.dim.cap_latch_thickness / 2 - gap))
         pencil.up((self.dim.cap_thickness - self.dim.cap_latch_thickness) / 2 + gap)
-        latch = pencil.extrude_mirrored_y(self.dim.basket_cap_radius_wide, center=0)
+        latch = pencil.extrude_mirrored_y(self.dim.basket_cap_radius_wide)
         latch.label = label
         latch = latch.rotate((90, 0, 0))
         latch.align_zxy(cap, Alignment.C, 0, Alignment.C, 0, Alignment.CL, 0)
