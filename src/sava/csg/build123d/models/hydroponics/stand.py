@@ -279,7 +279,7 @@ class HydroponicsStand:
             pencil.right(self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness + self.dim.handles.thickness)
             pencil.double_arc((-self.dim.handles.thickness * 1.01, self.dim.handles.height))
             pencil.left()
-            handle = SmartSolid(pencil.extrude(self.dim.handles.width))
+            handle = pencil.extrude(self.dim.handles.width)
             handle.align_z(plane=plane)
             shapes.append(handle)
 

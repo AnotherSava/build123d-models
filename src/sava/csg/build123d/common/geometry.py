@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 from enum import IntEnum, auto
 from math import cos, sin, radians, atan2, degrees
-from typing import Tuple
+from typing import TYPE_CHECKING, Tuple
 
-from build123d import Vector, Axis, Wire, Face, extrude, Part, Polyline, Plane, VectorLike, sweep, Solid
+from build123d import Vector, Axis, Wire, Face, Plane, VectorLike, sweep, Solid
 from build123d.topology import Mixin1D
+
+# TYPE_CHECKING import for type hints only; runtime import is lazy to avoid circular dependency
+if TYPE_CHECKING:
+    from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 # Ways to align one 2d vector (or another else) to another
@@ -458,7 +464,8 @@ def choose_wire_diameter(wire: Wire) -> float:
 def choose_vertex_diameter(wire: Wire) -> float:
     return choose_wire_diameter(wire) * 2
 
-def solidify_wire(wire: Wire) -> list[Part]:
+def solidify_wire(wire: Wire) -> SmartSolid:
+    from sava.csg.build123d.common.smartsolid import SmartSolid
     radius = choose_wire_diameter(wire) / 2
     shapes = []
 
@@ -470,8 +477,7 @@ def solidify_wire(wire: Wire) -> list[Part]:
 
         # Create a circle profile in this plane and sweep it along just this edge
         circle_wire = Wire.make_circle(radius, profile_plane)
-        segment_solid = sweep(Face(circle_wire), edge)
-        shapes.append(segment_solid)
+        shapes.append(sweep(Face(circle_wire), edge))
 
     # Add spheres at each vertex to smooth the joints between segments
     # Collect all shapes (swept segments + spheres)
@@ -480,4 +486,4 @@ def solidify_wire(wire: Wire) -> list[Part]:
         sphere.position = vertex.center()
         shapes.append(sphere)
 
-    return shapes
+    return SmartSolid(shapes)

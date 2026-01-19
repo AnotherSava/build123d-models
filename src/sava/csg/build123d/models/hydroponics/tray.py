@@ -252,7 +252,7 @@ class TrayFactory:
         pencil.draw(l, 180 + self.dim.cutout_angle)
         pencil.arc_with_radius(self.dim.cutout_diameter / 2, 90 + self.dim.cutout_angle, -90 - self.dim.cutout_angle)
 
-        return SmartSolid(pencil.extrude_mirrored_y(self.dim.tray_height, pencil.location.X))
+        return pencil.extrude_mirrored_y(self.dim.tray_height, pencil.location.X)
 
     def create_watering_hole(self, radius_delta: float = 0) -> SmartSolid:
         radius_wide = self.dim.watering_hole_radius_wide - radius_delta

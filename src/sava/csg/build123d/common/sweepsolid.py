@@ -7,12 +7,12 @@ from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 class SweepSolid(SmartSolid):
-    def __init__(self, sketch: SweepType, path: Wire, path_plane: Plane):
+    def __init__(self, sketch: SweepType, path: Wire, path_plane: Plane, label: str = None):
         self.sketch = sketch
         self.path = path
         self.plane_path = path_plane
 
-        super().__init__(sweep(sketch, path))
+        super().__init__(sweep(sketch, path), label=label)
         
         # Store the initial solid center to track movement (center reflects actual global position)
         self.initial_solid_center = self.solid.center()

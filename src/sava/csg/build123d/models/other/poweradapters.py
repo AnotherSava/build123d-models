@@ -185,7 +185,7 @@ class PowerAdapterLid(PowerAdapterBase):
         pencil.right(dim.length_extra / 2 - self.dim.lock.padding)
         pencil.up_to(dim.height + self.dim.lock.hardening_height / 2)
         pencil.left()
-        return SmartSolid(pencil.extrude_mirrored_y(dim.hardening_thickness + self.dim.lid_wall_thickness))
+        return pencil.extrude_mirrored_y(dim.hardening_thickness + self.dim.lid_wall_thickness)
 
     # Creates cantilever snap lock that clips into box
     def create_snap(self) -> SmartSolid:
@@ -232,7 +232,7 @@ class PowerAdapterLid(PowerAdapterBase):
         # I → J: inner edge down to base
         pencil.down()
 
-        solid = SmartSolid(pencil.extrude(dim.length))
+        solid = pencil.extrude(dim.length)
 
         reinforcement = self.create_reinforcement(dim.length, dim.length_extra, dim.cantilever_thickness, self.dim.lid_wall_thickness, dim.hardening_thickness, dim.hardening_height, dim.hardening_height_extra)
         reinforcement.orient((0, 0, 180)).align_y(solid).align_z(solid, Alignment.RR).align_x(solid, Alignment.RL)
@@ -301,7 +301,7 @@ class PowerAdapterBox(PowerAdapterBase):
         pencil.arc_with_destination(create_vector(dim.side_flat_length, dim.top_angle + 90), dim.side_angle)
         pencil.arc_with_vector_to_intersection(create_vector((dim.bottom_length - dim.bottom_length_flat) / 2, dim.top_angle + 90), 180 - dim.top_angle)
         pencil.left(pencil.location.X)
-        recess_bottom = SmartSolid(pencil.extrude_mirrored_y(dim.depth_bottom))
+        recess_bottom = pencil.extrude_mirrored_y(dim.depth_bottom)
 
         recess_top = SmartBox(self.dim.socket_side, self.dim.socket_side, dim.depth_top).fillet_z(dim.top_fillet_radius)
         recess_top.align_zxy(recess_bottom, Alignment.RR)
@@ -319,7 +319,7 @@ class PowerAdapterBox(PowerAdapterBase):
         pencil.left(self.dim.lock.slot_radius + (self.dim.lock.tip_thickness + self.dim.lock.cantilever_thickness) * self.dim.lock.slot_thickness_coefficient)
         pencil.up()
 
-        return SmartSolid(pencil.extrude(self.dim.lock.length_bottom + self.dim.box_taper_diff * 2))
+        return pencil.extrude(self.dim.lock.length_bottom + self.dim.box_taper_diff * 2)
 
 
 dimensions = PowerAdapterBoxDimensions()

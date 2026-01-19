@@ -422,6 +422,6 @@ class SmartSolid:
     def wrap_solid(self):
         return wrap(self.solid)
 
-    def clone(self, count: int, shift: VectorLike) -> 'SmartSolid':
+    def clone(self, count: int, shift: VectorLike, label: str = None) -> 'SmartSolid':
         shift = to_vector(shift)
-        return SmartSolid((self.moved_vector(shift * i) for i in range(count)))
+        return SmartSolid((self.moved_vector(shift * i) for i in range(count)), label=label)

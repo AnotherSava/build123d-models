@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from build123d import Wire, sweep, Sketch, Axis, Plane
+from build123d import Wire, sweep, Sketch, Plane
 
 from sava.csg.build123d.common.geometry import solidify_wire
 from sava.csg.build123d.common.pencil import Pencil
@@ -38,7 +38,7 @@ def _calculate_triangle_size(model: SmartSolid, wires: list[Wire]) -> float:
     # Create extended model that includes both the model and wires
     extended = model.copy()
     for wire in wires:
-        extended.fuse(SmartSolid(solidify_wire(wire)))
+        extended.fuse(solidify_wire(wire))
 
     # Calculate triangle size from bounding box
     bbox = extended.bound_box

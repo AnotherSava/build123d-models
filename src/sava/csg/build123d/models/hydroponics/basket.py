@@ -301,7 +301,9 @@ class BasketFactory:
         pencil.jump((self.dim.cap_latch_thickness / 2 - gap, self.dim.cap_latch_thickness / 2 - gap))
         pencil.jump((-self.dim.cap_latch_thickness / 2 + gap, self.dim.cap_latch_thickness / 2 - gap))
         pencil.up((self.dim.cap_thickness - self.dim.cap_latch_thickness) / 2 + gap)
-        latch = SmartSolid(pencil.extrude_mirrored_y(self.dim.basket_cap_radius_wide, center=0), label=label).rotate((90, 0, 0))
+        latch = pencil.extrude_mirrored_y(self.dim.basket_cap_radius_wide, center=0)
+        latch.label = label
+        latch = latch.rotate((90, 0, 0))
         latch.align_zxy(cap, Alignment.C, 0, Alignment.C, 0, Alignment.CL, 0)
 
         return latch.cut(hole).intersect(cap)

@@ -1,9 +1,16 @@
-from math import radians, degrees, sin, cos, tan, atan
+from __future__ import annotations
 
-from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, Part, revolve, VectorLike, Edge
+from math import radians, degrees, sin, cos, tan, atan
+from typing import TYPE_CHECKING
+
+from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, revolve, VectorLike, Edge
 
 from sava.common.advanced_math import advanced_mod
 from sava.csg.build123d.common.geometry import shift_vector, get_angle, to_vector, validate_points_unique, snap_to
+
+# TYPE_CHECKING import for type hints only; runtime import is lazy to avoid circular dependency
+if TYPE_CHECKING:
+    from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 def _reconstruct_edge(edge: Edge) -> Edge:
@@ -244,9 +251,10 @@ class Pencil:
         length = length or self.start.X - self.location.X
         return self.draw(length, -90)
 
-    def extrude(self, height: float):
+    def extrude(self, height: float, label: str = None) -> SmartSolid:
+        from sava.csg.build123d.common.smartsolid import SmartSolid
         face = self.create_face()
-        return extrude(face, height)
+        return SmartSolid(extrude(face, height), label=label)
 
     def create_face(self, enclose: bool = True) -> Face:
         return Face(self.create_wire(enclose))
@@ -261,15 +269,17 @@ class Pencil:
         # Transform from local to global using the plane's location
         return local_wire.locate(Location(self.plane))
 
-    def extrude_mirrored_x(self, height: float, center: float = 0) -> Part:
+    def extrude_mirrored_x(self, height: float, center: float = 0, label: str = None) -> SmartSolid:
         """Extrude a face mirrored around the local X axis at the specified Y coordinate."""
+        from sava.csg.build123d.common.smartsolid import SmartSolid
         face = self.create_mirrored_face_x(center)
-        return extrude(face, height)
+        return SmartSolid(extrude(face, height), label=label)
 
-    def extrude_mirrored_y(self, height: float, center: float = 0) -> Part:
+    def extrude_mirrored_y(self, height: float, center: float = 0, label: str = None) -> SmartSolid:
         """Extrude a face mirrored around the local Y axis at the specified X coordinate."""
+        from sava.csg.build123d.common.smartsolid import SmartSolid
         face = self.create_mirrored_face_y(center)
-        return extrude(face, height)
+        return SmartSolid(extrude(face, height), label=label)
 
     def create_mirrored_face_x(self, center: float = 0) -> Face:
         """Create a face mirrored around the local X axis at the specified Y coordinate."""
@@ -354,5 +364,6 @@ class Pencil:
 
         return Wire(reconstructed_edges)
 
-    def revolve(self, angle: float = 360, axis: Axis = Axis.Y, enclose: bool = True) -> Part:
-        return revolve(self.create_face(enclose), axis, angle)
+    def revolve(self, angle: float = 360, axis: Axis = Axis.Y, enclose: bool = True, label: str = None) -> SmartSolid:
+        from sava.csg.build123d.common.smartsolid import SmartSolid
+        return SmartSolid(revolve(self.create_face(enclose), axis, angle), label=label)
