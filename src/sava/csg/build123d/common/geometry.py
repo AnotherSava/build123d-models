@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import IntEnum, auto
+from enum import Enum, IntEnum, auto
 from math import cos, sin, radians, atan2, degrees
 from typing import TYPE_CHECKING, Tuple
 
@@ -53,23 +53,30 @@ def calculate_position(left: float, right: float, self_size: float, alignment: A
     raise RuntimeError(f"Invalid alignment: {alignment.name} = {alignment.value}")
 
 
-class Direction(IntEnum):
-    S = 180
-    E = 270
-    N = 0
-    W = 90
-
-    @property
-    def horizontal(self) -> bool:
-        return self in (Direction.E, Direction.W)
+class Direction(Enum):
+    N = Vector(0, 1, 0)   # North (+Y)
+    S = Vector(0, -1, 0)  # South (-Y)
+    E = Vector(1, 0, 0)   # East (+X)
+    W = Vector(-1, 0, 0)  # West (-X)
+    U = Vector(0, 0, 1)   # Up (+Z)
+    D = Vector(0, 0, -1)  # Down (-Z)
 
     @property
     def axis(self) -> Axis:
-        return Axis.X if self.horizontal else Axis.Y
+        return Axis((0, 0, 0), self.value)
 
-    @property
-    def orthogonal_axis(self) -> Axis:
-        return Axis.Y if self.horizontal else Axis.X
+    def rotate(self, angle: int, axis: Axis = Axis.Z) -> 'Direction':
+        return Direction.from_vector(self.value.rotate(axis, angle))
+
+    @staticmethod
+    def from_vector(vector: VectorLike, threshold: float = 0.9) -> 'Direction':
+        # Normalization ensures threshold represents angle, not magnitude × angle
+        normalized = to_vector(vector).normalized()
+        best = max(Direction, key=lambda d: d.value.dot(normalized))
+        if best.value.dot(normalized) < threshold:
+            raise ValueError(f"Vector {vector} is not close enough to any cardinal direction")
+        return best
+
 
 def to_vector(vector: VectorLike) -> Vector:
     """Converts a VectorLike to a Vector if it isn't already.
