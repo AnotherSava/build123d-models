@@ -7,7 +7,6 @@ from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, Geo
 from sava.common.common import flatten
 from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector
 
-
 @dataclass
 class PositionalFilter:
     axis: Axis
@@ -185,13 +184,16 @@ class SmartSolid:
         self.solid.orientation = rotations
         return self
 
-    def rotate_with_axis(self, axis: Axis, angle: float) -> 'SmartSolid':
+    def oriented(self, rotations: VectorLike, label: str = None) -> 'SmartSolid':
+        return self.copy(label).orient(rotations)
+
+    def rotate(self, axis: Axis, angle: float) -> 'SmartSolid':
         self.solid = self.wrap_solid()
         self.solid = self.solid.rotate(axis, angle)
         return self
 
-    def rotated_with_axis(self, axis: Axis, angle: float) -> 'SmartSolid':
-        return self.copy().rotate_with_axis(axis, angle)
+    def rotated(self, axis: Axis, angle: float) -> 'SmartSolid':
+        return self.copy().rotate(axis, angle)
 
     # Orientation in build123d works a bit weird:
     # (a, b, c) input does rotate "a" degrees around axis X, then "b" degrees around axis Y, then "c" degrees around axis Z.
@@ -203,21 +205,16 @@ class SmartSolid:
     # This method helps to navigate those complexities with the following set of rules:
     #  - while following the same order of rotations, axis are not attached to the object, but fixed to a plane specified as a parameter
     #  - rotations are incremental, and (0,0,0) param will not change orientation no matter what
-    def rotate(self, rotations: VectorLike, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def rotate_multi(self, rotations: VectorLike, plane: Plane = Plane.XY) -> 'SmartSolid':
         self.orient(rotate_orientation(self.solid.orientation, rotations, plane))
         return self
 
-    def rotated(self, rotations: VectorLike, plane: Plane = Plane.XY, label: str = None) -> 'SmartSolid':
-        return self.copy(label).rotate(rotations, plane)
+    def rotated_multi(self, rotations: VectorLike, plane: Plane = Plane.XY, label: str = None) -> 'SmartSolid':
+        return self.copy(label).rotate_multi(rotations, plane)
 
-    def oriented(self, rotations: VectorLike, label: str = None) -> 'SmartSolid':
-        return self.copy(label).orient(rotations)
-
-    def get_side_length(self, direction: Direction):
-        return self.y_size if direction.horizontal else self.x_size
-
-    def get_other_side_length(self, direction: Direction):
-        return self.x_size if direction.horizontal else self.y_size
+    def get_size(self, axis: Axis):
+        bounds = self.get_bounds_along_axis(axis)
+        return bounds[1] - bounds[0]
 
     def get_bounds_along_axis(self, axis: Axis) -> tuple[float, float]:
         """Get min and max coordinates of the solid along the specified axis direction.
@@ -376,7 +373,7 @@ class SmartSolid:
         #
         # pencil = Pencil().up(notch_height).left(self.get_side_length(direction))
         # notch = SmartSolid(pencil.extrude(self.get_side_length(direction)))
-        # notch.orient((90, 90 + direction.value, 0))
+        ## notch.orient((90, 90 + direction.(update this)value, 0))
         # notch.align_z(self, Alignment.LR, -depth).align_axis(self, direction.axis, direction.alignment_closer).align_axis(self, direction.orthogonal_axis)
         #
         # extended_shape = self.scaled(1, 1, depth / self.z_size)

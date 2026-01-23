@@ -166,12 +166,12 @@ class TestSweepSolid(unittest.TestCase):
         # Apply transformations in the specified order
         if order == "rotation_first":
             rotation, movement = transform1, transform2
-            sweep_solid.rotate(rotation)
+            sweep_solid.rotate_multi(rotation)
             sweep_solid.move_vector(Vector(movement))
         else:  # movement_first
             movement, rotation = transform1, transform2
             sweep_solid.move_vector(Vector(movement))
-            sweep_solid.rotate(rotation)
+            sweep_solid.rotate_multi(rotation)
         
         # Test that (0,0,0) in final plane coordinate system maps correctly
         final_plane_end = sweep_solid.create_plane_end()
@@ -209,7 +209,7 @@ class TestSweepSolid(unittest.TestCase):
         print(f"Initial end world: {initial_end_world}")
         
         # Apply rotation around Y axis to see the effect on the 3D wire
-        sweep_solid.rotate((0, 90, 0))  # 90 degree rotation around Y axis
+        sweep_solid.rotate_multi((0, 90, 0))  # 90 degree rotation around Y axis
         
         # Get solid center after rotation
         rotated_solid_center = sweep_solid.solid.center()
@@ -262,7 +262,7 @@ class TestSweepSolid(unittest.TestCase):
         print(f"Initial end world: {initial_end_world}")
         
         # Apply rotation around Z axis
-        sweep_solid.rotate((0, 0, 90))
+        sweep_solid.rotate_multi((0, 0, 90))
         
         # Debug: Check orientation after rotation
         print(f"Rotated solid orientation: {sweep_solid.solid.orientation}")
@@ -317,7 +317,7 @@ class TestSweepSolid(unittest.TestCase):
         
         # Test movement then rotation
         sweep_solid.move(5, 10, 15)
-        sweep_solid.rotate((0, 0, 45))
+        sweep_solid.rotate_multi((0, 0, 45))
         
         # Test that coordinate mapping still works for start plane
         plane_start = sweep_solid.create_plane_start()
@@ -379,7 +379,7 @@ class TestSweepSolidPathPlane(unittest.TestCase):
         sweep_solid = SweepSolid(sketch, wire, original_path_plane)
         
         # Rotate the sweep solid 90 degrees around Z axis
-        sweep_solid.rotate((0, 0, 90))
+        sweep_solid.rotate_multi((0, 0, 90))
         
         # Get the path plane after rotation
         path_plane = sweep_solid.create_path_plane()
@@ -402,7 +402,7 @@ class TestSweepSolidPathPlane(unittest.TestCase):
         sweep_solid = SweepSolid(sketch, wire, original_path_plane)
         
         # Rotate the sweep solid 90 degrees around Z axis
-        sweep_solid.rotate((0, 0, 90))
+        sweep_solid.rotate_multi((0, 0, 90))
         
         # Get the path plane after rotation
         path_plane = sweep_solid.create_path_plane()
@@ -425,7 +425,7 @@ class TestSweepSolidPathPlane(unittest.TestCase):
         sweep_solid = SweepSolid(sketch, wire, original_path_plane)
         
         # Apply rotation first, then movement
-        sweep_solid.rotate((0, 0, 90))
+        sweep_solid.rotate_multi((0, 0, 90))
         sweep_solid.move(10, 20, 30)
         
         # Get the path plane after transformations
@@ -456,7 +456,7 @@ class TestSweepSolidPathPlane(unittest.TestCase):
         sweep_solid = SweepSolid(sketch, wire, Plane.XY)
         
         # Apply rotation and movement
-        sweep_solid.rotate(rotation)
+        sweep_solid.rotate_multi(rotation)
         sweep_solid.move(5, 10, 15)
         
         # Get the path plane

@@ -52,7 +52,7 @@ class HydroponicsSplitterFactory:
         # show_red(connector_inner)
 
         side_pipe_outer = SmartSolid(Solid.make_cylinder(pipe_diameter_outer / 2, self.dim.side_pipe_length))
-        side_pipe_outer.rotate((0, 90))
+        side_pipe_outer.rotate_multi((0, 90))
         side_pipe_outer.align_x(connector, Alignment.CR)
         side_pipe_outer.align_y(connector)
         side_pipe_outer_z = (self.dim.pipe_length + self.dim.length) / 2

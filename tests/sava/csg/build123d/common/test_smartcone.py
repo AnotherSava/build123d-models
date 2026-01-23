@@ -80,7 +80,7 @@ class TestSmartConeCreateAxis(unittest.TestCase):
     ])
     def test_create_axis_with_solid_rotation(self, rotation):
         """Test create_axis when the solid has been rotated"""
-        self.cone.rotate(rotation)
+        self.cone.rotate_multi(rotation)
         
         # Test both inner and outer axes
         outer_axis = self.cone.create_axis(inner=False)
@@ -110,7 +110,7 @@ class TestSmartConeCreateAxis(unittest.TestCase):
         rotation = (30, 60, 45)
         
         self.cone.move_vector(movement)
-        self.cone.rotate(rotation)
+        self.cone.rotate_multi(rotation)
         
         # Test outer cone axis
         outer_axis = self.cone.create_axis(inner=False)
@@ -239,7 +239,7 @@ class TestSmartConeCreateAxis(unittest.TestCase):
         for rotation in extreme_rotations:
             with self.subTest(rotation=rotation):
                 cone = SmartCone.create_empty(30.0, 10.0, 2.0, 60.0)
-                cone.rotate(rotation)
+                cone.rotate_multi(rotation)
                 
                 outer_axis = cone.create_axis(inner=False)
                 inner_axis = cone.create_axis(inner=True)
@@ -255,7 +255,7 @@ class TestSmartConeCreateAxis(unittest.TestCase):
         
         # Move and rotate the cone
         self.cone.move(2, 3, 4)
-        self.cone.rotate((15, 25, 35))
+        self.cone.rotate_multi((15, 25, 35))
         
         outer_axis = self.cone.create_axis(inner=False)
         inner_axis = self.cone.create_axis(inner=True)
@@ -347,7 +347,7 @@ class TestSmartConeCreatePlaneWithOffset(unittest.TestCase):
         """Test create_plane_with_offset when cone has been rotated"""
         # Rotate the cone
         rotation = (45, 30, 60)
-        self.cone.rotate(rotation)
+        self.cone.rotate_multi(rotation)
         
         offset = 4.0
         plane = self.cone._create_plane_with_offset(offset)
@@ -370,7 +370,7 @@ class TestSmartConeCreatePlaneWithOffset(unittest.TestCase):
         rotation = (30, 60, 45)
         
         self.cone.move_vector(movement)
-        self.cone.rotate(rotation)
+        self.cone.rotate_multi(rotation)
         
         offset = 7.0
         plane = self.cone._create_plane_with_offset(offset)

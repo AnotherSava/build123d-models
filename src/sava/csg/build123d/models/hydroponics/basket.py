@@ -181,7 +181,7 @@ class BasketFactory:
             angle_step = 360 / self.dim.window_count
             for i in range(self.dim.window_count):
                 # Create a copy and rotate it around Z axis at origin
-                windows.append(template_window.copy().move_z(-current_offset_from_top).solid.rotate(Axis.Z, (i + 0.5) * angle_step))
+                windows.append(template_window.copy().move_z(-current_offset_from_top).solid.rotate_multi(Axis.Z, (i + 0.5) * angle_step))
 
         return windows
 
@@ -282,12 +282,12 @@ class BasketFactory:
         foundation_inner = SmarterCone.with_base_angle_and_height(self.dim.foundation_hook_inner_radius, segment_height, base_angle, angle=segment_angle)
         foundation_inner.align_z(foundation_outer)
 
-        foundation = foundation_outer.cut(foundation_inner).rotate_with_axis(Axis.Z, -segment_angle / 2)
+        foundation = foundation_outer.cut(foundation_inner).rotate(Axis.Z, -segment_angle / 2)
 
         if with_hooks:
             foundation_support = self.create_foundation_support(foundation_inner).align_z(foundation).align_x(foundation, Alignment.RL, -self.dim.foundation_thickness)
             foundation.fuse(foundation_support)
-            foundation_hooks = [foundation.rotated_with_axis(Axis.Z, 360 / self.dim.window_count * (index + 0.5)) for index in [-1, 0, 3, 4]]
+            foundation_hooks = [foundation.rotated(Axis.Z, 360 / self.dim.window_count * (index + 0.5)) for index in [-1, 0, 3, 4]]
             return foundation_hooks
         else:
             foundation_cut = SmartBox(hole.top_radius * 2, self.dim.basket_cap_radius_wide, foundation_outer.z_size)
@@ -303,7 +303,7 @@ class BasketFactory:
         pencil.up((self.dim.cap_thickness - self.dim.cap_latch_thickness) / 2 + gap)
         latch = pencil.extrude_mirrored_y(self.dim.basket_cap_radius_wide)
         latch.label = label
-        latch = latch.rotate((90, 0, 0))
+        latch = latch.rotate_multi((90, 0, 0))
         latch.align_zxy(cap, Alignment.C, 0, Alignment.C, 0, Alignment.CL, 0)
 
         return latch.cut(hole).intersect(cap)

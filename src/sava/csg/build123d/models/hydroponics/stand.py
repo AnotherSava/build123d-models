@@ -198,7 +198,7 @@ class HydroponicsStand:
         plane = inlet_pipe_outer.create_plane_end()
 
         connector_top.solid.location = Location(plane)
-        connector_top.rotate((180, 0, 0), plane)
+        connector_top.rotate_multi((180, 0, 0), plane)
         connector_top.align_z(inlet_pipe_outer, Alignment.RR, 0, plane)
 
         return connector_top
@@ -314,7 +314,7 @@ class HydroponicsStand:
         cone_bottom_angle = self.dim.support_free_angle - self.dim.tube_floor_angle
 
         invert = SmartCone.create_empty(90 - self.dim.support_free_angle, self.dim.tube_internal_diameter, self.dim.tube_floor_thickness, cone_bottom_angle)
-        invert.rotate((0, 180, 0))
+        invert.rotate_multi((0, 180, 0))
         pipe_path_plane = outlet_pipe_outer.create_path_plane()
 
         height_outlet = self.dim.tube_wall_thickness * 2.25

@@ -39,7 +39,7 @@ class TestSmartSolidOrient(unittest.TestCase):
     def test_orient_xz_plane(self):
         """Test orient relative to XZ plane"""
         box = SmartSolid(Box(10, 20, 30))
-        box.rotate((0, 0, 90), plane=Plane.XZ)
+        box.rotate_multi((0, 0, 90), plane=Plane.XZ)
         
         # Rotation of 90 degrees in XZ plane coordinate system
         # should swap X and Z dimensions
@@ -56,7 +56,7 @@ class TestSmartSolidRotate(unittest.TestCase):
         box = SmartSolid(Box(10, 20, 30))
         
         # Apply rotation (90, 90, 0) using fixed axes
-        box.rotate((90, 90, 0))
+        box.rotate_multi((90, 90, 0))
         
         # Should result in orientation (90, 0, -90) due to fixed-axis composition
         orientation = box.solid.orientation
@@ -75,14 +75,14 @@ class TestSmartSolidRotate(unittest.TestCase):
         
         # Set some initial orientation
         initial_orientation = (45, 30, 60)
-        box.rotate(initial_orientation, plane)
+        box.rotate_multi(initial_orientation, plane)
         
         # Store the orientation after initial setup
         before_rotation = box.solid.orientation
         before_x, before_y, before_z = before_rotation.X, before_rotation.Y, before_rotation.Z
         
         # Apply zero rotation
-        box.rotate((0, 0, 0), plane)
+        box.rotate_multi((0, 0, 0), plane)
         
         # Orientation should remain unchanged
         after_rotation = box.solid.orientation
@@ -175,6 +175,48 @@ class TestSmartSolidBoundsAlongAxis(unittest.TestCase):
         
         actual_diameter = max_coord - min_coord
         self.assertAlmostEqual(actual_diameter, 20.0, places=3)
+
+
+class TestSmartSolidShapeList(unittest.TestCase):
+    """Tests for SmartSolid containing ShapeList (multiple shapes)."""
+
+    def _create_shape_list_solid(self):
+        """Create a SmartSolid containing multiple shapes (ShapeList)."""
+        box1 = SmartSolid(Box(10, 10, 10))
+        box2 = SmartSolid(Box(10, 10, 10))
+        box2.move(20, 0, 0)
+        return SmartSolid([box1, box2])
+
+    def test_orient_shapelist_works(self):
+        """Test that orient() works on ShapeList - it wraps to Compound first."""
+        solid = self._create_shape_list_solid()
+
+        solid.orient((0, 0, 90))
+
+        # After 90 degree rotation around Z, the shape should have different bounds
+        # Original: two boxes at x=0 and x=20, total x_size ~30
+        # After rotation: should be ~10 in X (the width becomes the length)
+        self.assertAlmostEqual(solid.x_size, 10, places=1)
+        self.assertAlmostEqual(solid.y_size, 30, places=1)
+
+    def test_rotate_shapelist_fails(self):
+        """Test that rotate() fails on ShapeList - reads .orientation before wrapping."""
+        solid = self._create_shape_list_solid()
+
+        with self.assertRaises(AttributeError):
+            solid.rotate_multi((0, 0, 90))
+
+    def test_rotate_with_axis_shapelist_works(self):
+        """Test that rotate_with_axis() works on ShapeList by wrapping first."""
+        solid = self._create_shape_list_solid()
+
+        solid.rotate(Axis.Z, 90)
+
+        # After 90 degree rotation around Z, the shape should have different bounds
+        # Original: two boxes at x=0 and x=20, total x_size ~30
+        # After rotation: should be ~10 in X (the width becomes the length)
+        self.assertAlmostEqual(solid.x_size, 10, places=1)
+        self.assertAlmostEqual(solid.y_size, 30, places=1)
 
 
 if __name__ == '__main__':
