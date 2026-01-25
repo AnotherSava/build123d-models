@@ -78,7 +78,7 @@ def clear() -> None:
     _index = 1
 
 
-def export(shape, label: str = None) -> None:
+def export(shape, label: str = None):
     """Add shape to export storage under the given label."""
     global _index
     label = label or shape.label
@@ -90,20 +90,22 @@ def export(shape, label: str = None) -> None:
         _shapes[label] = []
     _shapes[label].append(shape)
 
+    return shape
 
-def show_red(shape) -> None:
+
+def show_red(shape):
     """Export shape with 'red' label."""
-    export(shape, "red")
+    return export(shape, "red")
 
 
-def show_blue(shape) -> None:
+def show_blue(shape):
     """Export shape with 'blue' label."""
-    export(shape, "blue")
+    return export(shape, "blue")
 
 
-def show_green(shape) -> None:
+def show_green(shape):
     """Export shape with 'green' label."""
-    export(shape, "green")
+    return export(shape, "green")
 
 
 def get_project_root_folder() -> Path:

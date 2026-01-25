@@ -219,6 +219,7 @@ class Pencil:
         return self.y_to(y_pos)
 
     def up(self, length: float = None):
+        assert length is None or length > 0
         return self.y_to(0 if length is None else self.location.Y + length)
 
     def down_to(self, y_pos: float):
@@ -226,6 +227,7 @@ class Pencil:
         return self.y_to(y_pos)
 
     def down(self, length: float = None):
+        assert length is None or length > 0
         return self.y_to(0 if length is None else self.location.Y - length)
 
     def x_to(self, x_pos: float):
