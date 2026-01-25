@@ -177,7 +177,7 @@ class TrayFactory:
             for direction_x in [-1, 1]:
                 for direction_y in [-1, 1]:
                     peg_hole_inner.align_xy(tray, Alignment.C, direction_x * self.dim.peg_hole_offset_x, direction_y * self.dim.watering_hole_offset_y).align_z(tray)
-                    peg_hole_outer.align(peg_hole_inner)
+                    peg_hole_outer.align_old(peg_hole_inner)
                     tray.cut(peg_hole_inner).fuse(peg_hole_outer)
 
         # Cut tray between columns 2 and 3
@@ -226,7 +226,7 @@ class TrayFactory:
 
         print_size_x = 300
         print_size_y = 300
-        print_area = SmartBox(print_size_x, print_size_y, 60).align(tray)
+        print_area = SmartBox(print_size_x, print_size_y, 60).align_old(tray)
         return tray.intersect(print_area)
 
     def create_basket_hole(self) -> SmartSolid:

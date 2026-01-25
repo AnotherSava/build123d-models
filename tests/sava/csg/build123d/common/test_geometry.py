@@ -1,7 +1,7 @@
 import unittest
 from math import sqrt
 
-from build123d import Vector, Axis, Plane
+from build123d import Vector, Axis, Plane, Box
 from parameterized import parameterized
 
 from sava.csg.build123d.common.geometry import rotate_vector, multi_rotate_vector, convert_orientation_to_rotations, orient_axis, calculate_orientation

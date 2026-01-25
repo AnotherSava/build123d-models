@@ -2,10 +2,11 @@ from copy import copy
 from dataclasses import dataclass
 from typing import Iterable
 
-from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid
+from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean
 
 from sava.common.common import flatten
-from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector
+from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, filter_edges_by_position, filter_edges_by_axis
+
 
 @dataclass
 class PositionalFilter:
@@ -13,6 +14,48 @@ class PositionalFilter:
     minimum: float = None
     maximum: float = None
     inclusive: tuple[bool, bool] = None
+
+
+class AlignmentBuilder:
+    """Fluent builder for chaining alignment operations on a SmartSolid."""
+
+    def __init__(self, target: 'SmartSolid', reference: 'SmartSolid | None', plane: Plane = Plane.XY):
+        self.target = target
+        self.reference = reference
+        self.plane = plane
+
+    def _parse_args(self, alignment_or_shift: 'Alignment | float', shift: float) -> tuple['Alignment', float]:
+        if isinstance(alignment_or_shift, Alignment):
+            return alignment_or_shift, shift  # .z(LL, 5) -> (LL, 5)
+        return Alignment.C, alignment_or_shift  # .z(15) -> (C, 15)
+
+    def x(self, alignment_or_shift: 'Alignment | float' = Alignment.C, shift: float = 0) -> 'AlignmentBuilder':
+        alignment, shift = self._parse_args(alignment_or_shift, shift)
+        self.target.align_x(self.reference, alignment, shift, self.plane)
+        return self
+
+    def y(self, alignment_or_shift: 'Alignment | float' = Alignment.C, shift: float = 0) -> 'AlignmentBuilder':
+        alignment, shift = self._parse_args(alignment_or_shift, shift)
+        self.target.align_y(self.reference, alignment, shift, self.plane)
+        return self
+
+    def z(self, alignment_or_shift: 'Alignment | float' = Alignment.C, shift: float = 0) -> 'AlignmentBuilder':
+        alignment, shift = self._parse_args(alignment_or_shift, shift)
+        self.target.align_z(self.reference, alignment, shift, self.plane)
+        return self
+
+    def xy(self, alignment: 'Alignment' = Alignment.C, shift_x: float = 0, shift_y: float = 0) -> 'AlignmentBuilder':
+        return self.x(alignment, shift_x).y(alignment, shift_y)
+
+    def xz(self, alignment: 'Alignment' = Alignment.C, shift_x: float = 0, shift_z: float = 0) -> 'AlignmentBuilder':
+        return self.x(alignment, shift_x).z(alignment, shift_z)
+
+    def yz(self, alignment: 'Alignment' = Alignment.C, shift_y: float = 0, shift_z: float = 0) -> 'AlignmentBuilder':
+        return self.y(alignment, shift_y).z(alignment, shift_z)
+
+    def then(self) -> 'SmartSolid':
+        """Return the SmartSolid for further chaining with other methods."""
+        return self.target
 
 def get_solid(element):
     return element.solid if isinstance(element, SmartSolid) else element
@@ -22,7 +65,14 @@ def fuse_two(shape1: Shape | None, shape2: Shape | None):
         return shape2
     if shape2 is None:
         return shape1
-    return shape2 + shape1 if isinstance(shape1, ShapeList) else shape1 + shape2
+    result = shape2 + shape1 if isinstance(shape1, ShapeList) else shape1 + shape2
+    # Workaround for build123d bug: ShapeUpgrade_UnifySameDomain corrupts geometry
+    # when fusing tapered shapes with shared edges. Retry without cleaning if invalid.
+    # https://github.com/gumyr/build123d/issues/1215
+    if not wrap(result).is_valid:
+        with SkipClean():
+            result = shape2 + shape1 if isinstance(shape1, ShapeList) else shape1 + shape2
+    return result
 
 def wrap(element):
     return Compound(element) if isinstance(element, ShapeList) else element
@@ -68,7 +118,7 @@ class SmartSolid:
     def create_bound_box(self, plane: Plane = Plane.XY) -> 'SmartSolid':
         bound_box = self.get_bound_box(plane)
         box_solid = Solid.make_box(bound_box.size.X, bound_box.size.Y, bound_box.size.Z, plane)
-        return SmartSolid(box_solid).align(self, plane=plane)
+        return SmartSolid(box_solid).align_old(self, plane=plane)
 
     @property
     def x_min(self) -> float:
@@ -244,7 +294,14 @@ class SmartSolid:
         return bound_box.min.Z, bound_box.max.Z
 
     def cut(self, *args) -> 'SmartSolid':
-        self.solid = wrap(self.solid) - fuse(args)
+        original = self.solid
+        cutter = fuse(args)
+        self.solid = wrap(original) - cutter
+        # Workaround for build123d bug: retry without cleaning if invalid
+        # https://github.com/gumyr/build123d/issues/1215
+        if not self.wrap_solid().is_valid:
+            with SkipClean():
+                self.solid = wrap(original) - cutter
         self.assert_valid()
         return self
 
@@ -299,11 +356,33 @@ class SmartSolid:
     def align_yz(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift_y: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_y(solid, alignment, shift_y, plane).align_z(solid, alignment, shift_z, plane)
 
-    def align(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def align_old(self, solid: 'SmartSolid' = None, alignment: Alignment = Alignment.C, shift_x: float = 0, shift_y: float = 0, shift_z: float = 0, plane: Plane = Plane.XY) -> 'SmartSolid':
         return self.align_x(solid, alignment, shift_x, plane).align_y(solid, alignment, shift_y, plane).align_z(solid, alignment, shift_z, plane)
 
-    def _fillet(self, axis_orientational: Axis, radius: float, axis_positional: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] | None = None) -> 'SmartSolid':
-        edges = self.solid.edges().filter_by(axis_orientational)
+    def align(self, solid: 'SmartSolid' = None, plane: Plane = Plane.XY) -> AlignmentBuilder:
+        """Align to reference solid with center alignment on all axes, then allow customization.
+
+        First aligns all three axes (x, y, z) to the reference using Alignment.C (center).
+        Returns an AlignmentBuilder for further customization of specific axes.
+
+        Args:
+            solid: Reference solid to align to (None = align to origin)
+            plane: Coordinate plane for alignment directions
+
+        Returns:
+            AlignmentBuilder for chaining .x(), .y(), .z() calls to customize alignment
+
+        Example:
+            box.align(ref)  # Centers box on ref (all axes)
+            box.align(ref).x(Alignment.LL)  # Centers on ref, then aligns x to left-left
+            box.align(ref).x(Alignment.LL).y(10)  # Centers, aligns x, then shifts y by 10
+            box.align(ref).then().move(10, 0, 0)  # Centers on ref, then moves
+        """
+        self.align_old(solid, plane=plane)
+        return AlignmentBuilder(self, solid, plane)
+
+    def _fillet(self, axis_orientational: Axis, radius: float, axis_positional: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] | None = None, angle_tolerance: float = 1e-5) -> 'SmartSolid':
+        edges = filter_edges_by_axis(self.solid.edges(), axis_orientational, angle_tolerance)
         edges = self._filter_positional(edges, PositionalFilter(axis_positional, minimum, maximum, inclusive))
         self.solid = fillet(edges, radius)
         return self
@@ -314,7 +393,6 @@ class SmartSolid:
             edges = edges.filter_by(axis_orientational)
         for position_filter in position_filters:
             edges = self._filter_positional(edges, position_filter)
-        print(f"Edges filleted: {len(edges)}")
         self.solid = fillet(edges, radius)
         return self
 
@@ -331,16 +409,18 @@ class SmartSolid:
             actual_max = actual_min if positional_filter.maximum is None else positional_filter.maximum
             actual_inclusive = (True, True) if positional_filter.inclusive is None else positional_filter.inclusive
 
-        return edges.filter_by_position(positional_filter.axis, actual_min, actual_max, actual_inclusive)
+        result = filter_edges_by_position(edges, positional_filter.axis, actual_min, actual_max, actual_inclusive)
+        print(f"Fillet positional filter along Axis {axis_to_string(positional_filter.axis)} {'[' if actual_inclusive[0] else '('}{actual_min}, {actual_max}{']' if actual_inclusive[1] else ')'}: {len(edges)} -> {len(result)}")
+        return result
 
-    def fillet_x(self, radius: float, axis: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] = (True, True)) -> 'SmartSolid':
-        return self._fillet(Axis.X, radius, axis, minimum, maximum, inclusive)
+    def fillet_x(self, radius: float, axis: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] = (True, True), angle_tolerance: float = 1e-5) -> 'SmartSolid':
+        return self._fillet(Axis.X, radius, axis, minimum, maximum, inclusive, angle_tolerance)
 
-    def fillet_y(self, radius: float, axis: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] = (True, True)) -> 'SmartSolid':
-        return self._fillet(Axis.Y, radius, axis, minimum, maximum, inclusive)
+    def fillet_y(self, radius: float, axis: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] = (True, True), angle_tolerance: float = 1e-5) -> 'SmartSolid':
+        return self._fillet(Axis.Y, radius, axis, minimum, maximum, inclusive, angle_tolerance)
 
-    def fillet_z(self, radius: float, axis: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] = (True, True)) -> 'SmartSolid':
-        return self._fillet(Axis.Z, radius, axis, minimum, maximum, inclusive)
+    def fillet_z(self, radius: float, axis: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] = (True, True), angle_tolerance: float = 1e-5) -> 'SmartSolid':
+        return self._fillet(Axis.Z, radius, axis, minimum, maximum, inclusive, angle_tolerance)
 
     def fillet_xy(self, radius_x: float, radius_y: float = None) -> 'SmartSolid':
         return self.fillet_x(radius_x).fillet_y(radius_y or radius_x)

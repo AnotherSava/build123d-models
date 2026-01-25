@@ -55,10 +55,10 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions):
     outer_box = SmartBox(dim.outer_length, dim.outer_width, dim.outer_height)
 
     card_box = SmartBox(dim.cards_length + dim.gap, dim.inner_width, dim.cards_height)
-    card_box.align(outer_box, Alignment.LR, dim.wall_thickness, dim.wall_thickness, dim.floor_thickness)
+    card_box.align_old(outer_box, Alignment.LR, dim.wall_thickness, dim.wall_thickness, dim.floor_thickness)
 
     cube_box = SmartBox(dim.cube_side + dim.gap, dim.inner_width, dim.cube_side)
-    cube_box.align(outer_box, Alignment.RL, -dim.wall_thickness, -dim.wall_thickness)
+    cube_box.align_old(outer_box, Alignment.RL, -dim.wall_thickness, -dim.wall_thickness)
 
     token_box = SmartBox(dim.tokens_length + dim.gap, dim.tokens_width + dim.gap, dim.tokens_height)
 

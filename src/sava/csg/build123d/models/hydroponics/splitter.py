@@ -42,7 +42,7 @@ class HydroponicsSplitterFactory:
         pipe_diameter_outer = thread_bottom.root_radius * 2
 
         thread_bottom_solid = SmartSolid(thread_bottom)
-        core = SmartSolid(Solid.make_cylinder(thread_bottom.root_radius, self.dim.length)).align(thread_bottom_solid)
+        core = SmartSolid(Solid.make_cylinder(thread_bottom.root_radius, self.dim.length)).align_old(thread_bottom_solid)
 
         connector = self.host_connector_factory.create_hose_connector(self.dim.pipe_diameter_outer, self.dim.pipe_length)
         connector.align_zxy(core, Alignment.LL)

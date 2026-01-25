@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from enum import Enum, IntEnum, auto
-from math import cos, sin, radians, atan2, degrees
+from math import cos, sin, radians, atan2, degrees, acos
 from typing import TYPE_CHECKING, Tuple
 
-from build123d import Vector, Axis, Wire, Face, Plane, VectorLike, sweep, Solid
+from build123d import Vector, Axis, Wire, Face, Plane, VectorLike, sweep, Solid, ShapeList, Edge
 from build123d.topology import Mixin1D
 
 # TYPE_CHECKING import for type hints only; runtime import is lazy to avoid circular dependency
@@ -12,17 +12,24 @@ if TYPE_CHECKING:
     from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
-# Ways to align one 2d vector (or another else) to another
 class Alignment(IntEnum):
-    LL = auto() # left side, attach to the left
-    L = auto() # left side, attach to the centre
-    LR = auto() # left side, attach to the right
-    CL = auto() # centre, attach to the left
-    C = auto() # align both centres
-    CR = auto() # centre, attach to the right
-    RL = auto() # right side, attach to the left
-    R = auto() # right side, attach to the centre
-    RR = auto() # right side, attach to the right
+    """
+    Two-letter alignment codes: [reference position][direction].
+    - First letter (L/C/R): position on reference (Left/Center/Right edge)
+    - Second letter (L/C/R): direction self extends from that position (Left/Center/Right)
+
+    Example with align_x(reference, Alignment.LR):
+    Self's left edge aligns to reference's left edge, self extends rightward.
+    """
+    LL = auto()  # at reference's left edge, self extends leftward (self.max = ref.min)
+    L = auto()   # at reference's left edge, self centered on it
+    LR = auto()  # at reference's left edge, self extends rightward (self.min = ref.min)
+    CL = auto()  # at reference's center, self extends leftward (self.max = ref.center)
+    C = auto()   # at reference's center, self centered on it (centers aligned)
+    CR = auto()  # at reference's center, self extends rightward (self.min = ref.center)
+    RL = auto()  # at reference's right edge, self extends leftward (self.max = ref.max)
+    R = auto()   # at reference's right edge, self centered on it
+    RR = auto()  # at reference's right edge, self extends rightward (self.min = ref.max)
 
     def shift_towards_centre(self, value: float) -> float:
         assert self != Alignment.C
@@ -77,6 +84,30 @@ class Direction(Enum):
             raise ValueError(f"Vector {vector} is not close enough to any cardinal direction")
         return best
 
+def axis_to_string(axis: Axis) -> str:
+    """Convert an axis to its name (X, Y, or Z).
+
+    Args:
+        axis: The axis to identify
+
+    Returns:
+        The axis name as a string
+
+    Raises:
+        ValueError: If the axis is not X, Y, or Z
+    """
+    if are_points_too_close(axis.direction, Axis.X.direction):
+        return "X"
+    if are_points_too_close(axis.direction, Axis.Y.direction):
+        return "Y"
+    if are_points_too_close(axis.direction, Axis.Z.direction):
+        return "Z"
+
+    return str(axis)
+
+def format_float(value: float) -> str:
+    """Format a float with two decimal places."""
+    return f"{value:.2f}"
 
 def to_vector(vector: VectorLike) -> Vector:
     """Converts a VectorLike to a Vector if it isn't already.
@@ -133,6 +164,66 @@ def are_numbers_too_close(num1: float, num2: float, tolerance: float = 1e-6) -> 
         True if numbers are closer than tolerance, False otherwise
     """
     return abs(num1 - num2) < tolerance
+
+def is_within_interval(value: float, minimum: float, maximum: float, inclusive: tuple[bool, bool], tolerance: float = 1e-6) -> bool:
+    """Check if a value is within an interval using tolerance-aware boundary comparisons.
+
+    Args:
+        value: The value to check
+        minimum: Lower bound of the interval
+        maximum: Upper bound of the interval
+        inclusive: Tuple of (include_min, include_max) for boundary inclusion
+        tolerance: Tolerance for boundary comparisons. Default is 1e-6.
+
+    Returns:
+        True if value is within the interval, False otherwise
+    """
+    if are_numbers_too_close(value, minimum, tolerance):
+        return inclusive[0]
+    if are_numbers_too_close(value, maximum, tolerance):
+        return inclusive[1]
+    return minimum < value < maximum
+
+def filter_edges_by_position(edges: ShapeList[Edge], axis: Axis, minimum: float, maximum: float, inclusive: tuple[bool, bool]) -> ShapeList[Edge]:
+    """Filter edges by position along an axis with tolerance-aware boundary comparisons.
+
+    Args:
+        edges: List of edges to filter
+        axis: Axis to measure position along
+        minimum: Lower bound of the interval
+        maximum: Upper bound of the interval
+        inclusive: Tuple of (include_min, include_max) for boundary inclusion
+
+    Returns:
+        Filtered list of edges within the interval
+    """
+    axis_dir = axis.direction.normalized()
+    filtered = [edge for edge in edges if is_within_interval(edge.center().dot(axis_dir), minimum, maximum, inclusive)]
+    return ShapeList(filtered)
+
+def filter_edges_by_axis(edges: ShapeList[Edge], axis: Axis, angle_tolerance: float = 1e-5) -> ShapeList[Edge]:
+    """Filter edges by alignment to an axis, checking tangent direction regardless of geometry type.
+
+    Unlike build123d's filter_by(Axis), this works on all edge types (LINE, BSPLINE, BEZIER, etc.)
+    by checking the actual tangent vector rather than relying on geometry type.
+
+    Args:
+        edges: List of edges to filter
+        axis: Axis to filter by (edges parallel to this axis are selected)
+        angle_tolerance: Maximum angle deviation from axis in degrees. Default is 1e-5.
+
+    Returns:
+        Filtered list of edges aligned with the axis
+    """
+    axis_dir = axis.direction.normalized()
+    filtered = []
+    for edge in edges:
+        tangent = edge.tangent_at(0).normalized()
+        dot = abs(tangent.dot(axis_dir))
+        angle = degrees(acos(min(1.0, dot)))
+        if angle <= angle_tolerance:
+            filtered.append(edge)
+    return ShapeList(filtered)
 
 def are_points_too_close(pt1: VectorLike, pt2: VectorLike, tolerance: float = 1e-6) -> bool:
     """Checks if two points are too close together.

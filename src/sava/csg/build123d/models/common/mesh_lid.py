@@ -109,7 +109,7 @@ class MeshLid(SmartBox):
 
         if self.dimensions.inner_space_height:
             space_below = SmartBox(self.dimensions.length - self.dimensions.wall_thickness * 2, self.dimensions.width - self.dimensions.wall_thickness * 2, self.dimensions.inner_space_height)
-            space_below.align(self).align_z(self, Alignment.RL)
+            space_below.align_old(self).align_z(self, Alignment.RL)
             lid.cut(space_below)
 
         lid.cut(self.create_lid_mesh())

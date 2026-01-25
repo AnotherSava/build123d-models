@@ -76,6 +76,6 @@ class HoseConnectorFactory:
             cap = SmartSolid(Solid.make_cylinder(pipe_diameter_outer / 2, pipe_length))
             result.fuse(cap.align_zxy(result, Alignment.RR))
 
-        internal = SmartSolid(Solid.make_cylinder(self.dim.diameter_inner / 2, result.z_size)).align(result)
+        internal = SmartSolid(Solid.make_cylinder(self.dim.diameter_inner / 2, result.z_size)).align_old(result)
 
         return result, internal

@@ -161,7 +161,7 @@ class PowerAdapterLid(PowerAdapterBase):
         lid.cut(self.orient(lock_bottom, lid))
 
         box_protrusions = self.create_protrusions(False)
-        box_protrusions.align(lid).align_z(lid, Alignment.LR)
+        box_protrusions.align_old(lid).align_z(lid, Alignment.LR)
         lid.cut(box_protrusions)
 
         lid.fillet_positional(self.dim.lid_fillet_radius, Axis.X, *box_protrusions.create_positional_filters_plane(Plane.YZ))
@@ -282,7 +282,7 @@ class PowerAdapterBox(PowerAdapterBase):
         box_top = create_tapered_box_delta(self.dim.lid_length_internal, self.dim.lid_width_internal, self.dim.lid_cutout_height, -self.dim.box_taper_diff, self.dim.box_fillet_radius)
 
         box_protrusions = self.create_protrusions(True)
-        box_protrusions.align(box_top)
+        box_protrusions.align_old(box_top)
 
         box_bottom = SmartBox(self.dim.box_length, self.dim.box_width, self.dim.box_wider_height).fillet_z(self.dim.box_fillet_radius)
         box_bottom.align_zxy(box_top, Alignment.LL)
