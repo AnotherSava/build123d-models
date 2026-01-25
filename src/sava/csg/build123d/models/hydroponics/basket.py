@@ -137,10 +137,10 @@ class BasketFactory:
 
     def _create_basket(self) -> Tuple[SmartSolid, SmarterCone]:
         outer = SmarterCone(self.dim.outer_radius_bottom, self.dim.outer_radius_top, self.dim.height)
-        inner = outer.create_offset_cone(-self.dim.thickness)
+        inner = outer.create_offset(-self.dim.thickness)
 
         point_end = SmarterCone(0, self.dim.outer_radius_bottom, self.dim.outer_radius_bottom).align_zxy(outer, Alignment.LL)
-        point_end.shell(thickness_side=-self.dim.thickness)
+        point_end.create_shell(thickness_side=-self.dim.thickness)
 
         # Create all window cutouts
         windows = SmartSolid(self._create_all_windows()).align_z(outer, Alignment.RL)
@@ -206,7 +206,7 @@ class BasketFactory:
         cap_45_outer = SmarterCone.with_base_angle_and_height(self.dim.cap_diameter_outer_wide / 2, self.dim.cap_depth, -self.dim.cap_angle)
         cap_45_outer.align_zxy(basket_outer, Alignment.RR)
 
-        cap_45_inner = cap_45_outer.create_offset_cone(-self.dim.thickness)
+        cap_45_inner = cap_45_outer.create_offset(-self.dim.thickness)
 
         ribs = self.create_ribs(basket_outer)
 
@@ -248,7 +248,7 @@ class BasketFactory:
         cap = SmarterCone(self.dim.basket_cap_radius_narrow, self.dim.basket_cap_radius_wide, self.dim.cap_thickness, label=cap_label)
         cap.align_zxy(basket, Alignment.RL, self.dim.cap_thickness - self.dim.cap_depth)
 
-        hole = SmarterCone.with_base_angle_and_height(hole_diameter / 2, self.dim.cap_thickness, 135).align(cap)
+        hole = SmarterCone.with_base_angle_and_height(hole_diameter / 2, self.dim.cap_thickness, 135).align_old(cap)
 
         latch_cut = self.create_latch(cap, hole.top_radius * 2, hole, 0)
         latch = self.create_latch(cap, hole.top_radius * 2, hole, 0.05, f"latch_{hole_diameter}mm")

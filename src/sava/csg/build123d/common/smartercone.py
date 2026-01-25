@@ -111,7 +111,7 @@ class SmarterCone(SmartSolid):
     def cylinder(cls, radius: float, height: float, plane: Plane = Plane.XY, angle: float = 360, label: str = None) -> 'SmarterCone':
         return SmarterCone(radius, radius, height, plane, angle, label)
 
-    def create_offset_cone(self, thickness_radius: float = None, thickness_side: float = None, thickness_base: float = 0, thickness_top: float = 0, label: str = None) -> 'SmarterCone':
+    def create_offset(self, thickness_radius: float = None, thickness_side: float = None, thickness_base: float = 0, thickness_top: float = 0, label: str = None) -> 'SmarterCone':
         """
         Creates an offset cone by adjusting radii and height based on thickness parameters.
 
@@ -193,7 +193,7 @@ class SmarterCone(SmartSolid):
 
         return result
 
-    def shell(self, thickness_radius: float = None, thickness_base: float = 0, thickness_top: float = 0, thickness_side: float = None) -> 'SmarterCone':
+    def create_shell(self, thickness_radius: float = None, thickness_base: float = 0, thickness_top: float = 0, thickness_side: float = None) -> 'SmarterCone':
         """
         Creates a hollow shell from the cone.
 
@@ -233,7 +233,7 @@ class SmarterCone(SmartSolid):
         assert thickness_top == 0 or thickness_top * thickness_radius > 0, "thickness_top must have the same sign as thickness (or be zero)"
 
         # Create the offset cone
-        offset_cone = self.create_offset_cone(thickness_radius=thickness_radius, thickness_base=thickness_base, thickness_top=thickness_top)
+        offset_cone = self.create_offset(thickness_radius=thickness_radius, thickness_base=thickness_base, thickness_top=thickness_top)
 
         if thickness_radius >= 0:
             # Positive thickness: outer shell - subtract self from larger offset cone

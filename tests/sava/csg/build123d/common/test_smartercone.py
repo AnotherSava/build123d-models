@@ -29,7 +29,7 @@ class TestSmarterConeShell(unittest.TestCase):
         original_height = 100
 
         cone = SmarterCone(original_base, original_top, original_height)
-        cone.shell(thickness_radius=2)
+        cone.create_shell(thickness_radius=2)
 
         # Should store thickness values
         self.assertEqual(cone.thickness_radius, 2)
@@ -52,7 +52,7 @@ class TestSmarterConeShell(unittest.TestCase):
         original_height = 100
 
         cone = SmarterCone(original_base, original_top, original_height)
-        cone.shell(thickness_radius=-2, thickness_base=-1, thickness_top=-1)
+        cone.create_shell(thickness_radius=-2, thickness_base=-1, thickness_top=-1)
 
         # Should store all thickness values
         self.assertEqual(cone.thickness_radius, -2)
@@ -68,11 +68,11 @@ class TestSmarterConeShell(unittest.TestCase):
     def test_shell_prevents_double_shelling(self):
         """Test that shell cannot be called twice"""
         cone = SmarterCone(50, 30, 100)
-        cone.shell(thickness_radius=2)
+        cone.create_shell(thickness_radius=2)
 
         # Second call should raise assertion error
         with self.assertRaises(AssertionError) as context:
-            cone.shell(thickness_radius=1)
+            cone.create_shell(thickness_radius=1)
 
         self.assertIn("Already a shell", str(context.exception))
 
@@ -81,7 +81,7 @@ class TestSmarterConeShell(unittest.TestCase):
         cone = SmarterCone(50, 30, 100)
 
         with self.assertRaises(AssertionError) as context:
-            cone.shell(thickness_radius=0)
+            cone.create_shell(thickness_radius=0)
 
         self.assertIn("thickness must be non-zero", str(context.exception))
 
@@ -91,7 +91,7 @@ class TestSmarterConeShell(unittest.TestCase):
 
         # Positive radius, negative base should fail
         with self.assertRaises(AssertionError) as context:
-            cone.shell(thickness_radius=2, thickness_base=-1)
+            cone.create_shell(thickness_radius=2, thickness_base=-1)
 
         self.assertIn("thickness_base must have the same sign", str(context.exception))
 
@@ -101,7 +101,7 @@ class TestSmarterConeShell(unittest.TestCase):
 
         # Positive radius, negative top should fail
         with self.assertRaises(AssertionError) as context:
-            cone.shell(thickness_radius=2, thickness_top=-1)
+            cone.create_shell(thickness_radius=2, thickness_top=-1)
 
         self.assertIn("thickness_top must have the same sign", str(context.exception))
 
@@ -117,7 +117,7 @@ class TestSmarterConeShell(unittest.TestCase):
     def test_shell_various_valid_combinations(self, thickness_radius, thickness_base, thickness_top):
         """Test shell with various valid thickness combinations"""
         cone = SmarterCone(50, 30, 100)
-        cone.shell(thickness_radius=thickness_radius, thickness_base=thickness_base, thickness_top=thickness_top)
+        cone.create_shell(thickness_radius=thickness_radius, thickness_base=thickness_base, thickness_top=thickness_top)
 
         self.assertEqual(cone.thickness_radius, thickness_radius)
         self.assertEqual(cone.thickness_base, thickness_base)
@@ -126,7 +126,7 @@ class TestSmarterConeShell(unittest.TestCase):
     def test_shell_returns_self(self):
         """Test that shell returns self for method chaining"""
         cone = SmarterCone(50, 30, 100)
-        result = cone.shell(thickness_radius=2)
+        result = cone.create_shell(thickness_radius=2)
 
         self.assertIs(result, cone)
 
@@ -141,7 +141,7 @@ class TestSmarterConeShell(unittest.TestCase):
         # Initially inner_cone should be None
         self.assertIsNone(cone.inner_cone)
 
-        cone.shell(thickness_radius=2, thickness_base=1, thickness_top=1)
+        cone.create_shell(thickness_radius=2, thickness_base=1, thickness_top=1)
 
         # After shelling, inner_cone should be set to the original cone
         self.assertIsNotNone(cone.inner_cone)
@@ -163,7 +163,7 @@ class TestSmarterConeShell(unittest.TestCase):
         # Initially inner_cone should be None
         self.assertIsNone(cone.inner_cone)
 
-        cone.shell(thickness_radius=-2, thickness_base=-1, thickness_top=-1)
+        cone.create_shell(thickness_radius=-2, thickness_base=-1, thickness_top=-1)
 
         # After shelling, inner_cone should be set to the offset cone
         self.assertIsNotNone(cone.inner_cone)
@@ -187,7 +187,7 @@ class TestSmarterConeShell(unittest.TestCase):
     def test_shell_inner_cone_inherits_properties(self):
         """Test that inner_cone inherits plane and angle from parent"""
         cone = SmarterCone(50, 30, 100, plane=Plane.XZ, angle=180)
-        cone.shell(thickness_radius=2)
+        cone.create_shell(thickness_radius=2)
 
         # Inner cone should have same plane and angle
         self.assertEqual(cone.inner_cone.plane, Plane.XZ)
@@ -196,7 +196,7 @@ class TestSmarterConeShell(unittest.TestCase):
     def test_copy_returns_smartercone(self):
         """Test that copy() returns a SmarterCone instance"""
         cone = SmarterCone(50, 30, 100, plane=Plane.XZ, angle=180)
-        cone.shell(thickness_radius=2, thickness_base=1, thickness_top=1)
+        cone.create_shell(thickness_radius=2, thickness_base=1, thickness_top=1)
 
         copied = cone.copy()
 
@@ -219,7 +219,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
     def test_create_offset_cone_positive_radius(self):
         """Test creating offset cone with positive radial thickness"""
         original = SmarterCone(50, 30, 100)
-        offset = original.create_offset_cone(thickness_radius=2)
+        offset = original.create_offset(thickness_radius=2)
 
         # Should be larger
         self.assertAlmostEqual(offset.base_radius, 52, places=5)
@@ -229,7 +229,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
     def test_create_offset_cone_negative_radius(self):
         """Test creating offset cone with negative radial thickness"""
         original = SmarterCone(50, 30, 100)
-        offset = original.create_offset_cone(thickness_radius=-2)
+        offset = original.create_offset(thickness_radius=-2)
 
         # Should be smaller
         self.assertAlmostEqual(offset.base_radius, 48, places=5)
@@ -239,7 +239,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
     def test_create_offset_cone_with_base_and_top(self):
         """Test creating offset cone with base and top thickness"""
         original = SmarterCone(50, 30, 100)
-        offset = original.create_offset_cone(thickness_radius=2, thickness_base=5, thickness_top=10)
+        offset = original.create_offset(thickness_radius=2, thickness_base=5, thickness_top=10)
 
         # Calculate expected values
         slope = (30 - 50) / 100  # -0.2
@@ -256,7 +256,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
         original = SmarterCone(50, 30, 100)
 
         # Should not raise an error (unlike shell method)
-        offset = original.create_offset_cone(thickness_radius=0)
+        offset = original.create_offset(thickness_radius=0)
 
         # Should have same dimensions
         self.assertAlmostEqual(offset.base_radius, 50, places=5)
@@ -268,7 +268,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
         original = SmarterCone(50, 30, 100)
 
         # Should not raise an error (unlike shell method)
-        offset = original.create_offset_cone(thickness_radius=2, thickness_base=-1, thickness_top=1)
+        offset = original.create_offset(thickness_radius=2, thickness_base=-1, thickness_top=1)
 
         # Calculate expected values
         slope = (30 - 50) / 100
@@ -283,7 +283,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
     def test_create_offset_cone_inherits_plane_and_angle(self):
         """Test that offset cone inherits plane and angle from original"""
         original = SmarterCone(50, 30, 100, plane=Plane.XZ, angle=180)
-        offset = original.create_offset_cone(thickness_radius=2)
+        offset = original.create_offset(thickness_radius=2)
 
         self.assertEqual(offset.plane, Plane.XZ)
         self.assertEqual(offset.angle, 180)
@@ -291,14 +291,14 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
     def test_create_offset_cone_returns_smartercone(self):
         """Test that create_offset_cone returns SmarterCone instance"""
         original = SmarterCone(50, 30, 100)
-        offset = original.create_offset_cone(thickness_radius=2)
+        offset = original.create_offset(thickness_radius=2)
 
         self.assertIsInstance(offset, SmarterCone)
 
     def test_create_offset_cone_inverted_cone(self):
         """Test create_offset_cone on inverted cone (top > base)"""
         original = SmarterCone(30, 50, 100)
-        offset = original.create_offset_cone(thickness_radius=2, thickness_base=1, thickness_top=1)
+        offset = original.create_offset(thickness_radius=2, thickness_base=1, thickness_top=1)
 
         slope = (50 - 30) / 100  # 0.2
         expected_base = 30 - slope * 1 + 2  # 30 - 0.2 + 2 = 31.8
@@ -314,7 +314,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
         # Create cone where large negative thickness_radius would make top negative
         original = SmarterCone(50, 30, 100)
         # thickness_radius = -40 would make top_radius = 30 + (-40) = -10
-        offset = original.create_offset_cone(thickness_radius=-40, thickness_top=0)
+        offset = original.create_offset(thickness_radius=-40, thickness_top=0)
 
         # Top radius should be clamped to 0 (pointed cone)
         self.assertAlmostEqual(offset.top_radius, 0, places=5)
@@ -336,7 +336,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
         original = SmarterCone(50, 30, 100)
         # If thickness_base/top are non-zero, don't adjust even if radii would be small
         # Use smaller negative thickness to keep radii positive
-        offset = original.create_offset_cone(thickness_radius=-10, thickness_base=1, thickness_top=1)
+        offset = original.create_offset(thickness_radius=-10, thickness_base=1, thickness_top=1)
 
         # Radii calculation should proceed without adjustment
         slope = (30 - 50) / 100
@@ -351,7 +351,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
         """Test that creating a pointed cone (one radius = 0) is valid"""
         original = SmarterCone(50, 30, 100)
         # Create offset that makes top = 0 (pointed cone)
-        offset = original.create_offset_cone(thickness_radius=-30)
+        offset = original.create_offset(thickness_radius=-30)
 
         # Top should be 0, base should be 20
         self.assertAlmostEqual(offset.top_radius, 0, places=5)
@@ -361,7 +361,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
     def test_create_offset_cone_positioning_positive_thickness(self):
         """Test that offset cone is positioned correctly with positive thickness"""
         original = SmarterCone(50, 30, 100)
-        offset = original.create_offset_cone(thickness_radius=2, thickness_base=5, thickness_top=3)
+        offset = original.create_offset(thickness_radius=2, thickness_base=5, thickness_top=3)
 
         # With positive thickness_base, offset cone should extend downward
         # Original base at z=0, offset should be at z=-5
@@ -372,7 +372,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
     def test_create_offset_cone_positioning_negative_thickness(self):
         """Test that offset cone is positioned correctly with negative thickness"""
         original = SmarterCone(50, 30, 100)
-        offset = original.create_offset_cone(thickness_radius=-2, thickness_base=-5, thickness_top=-3)
+        offset = original.create_offset(thickness_radius=-2, thickness_base=-5, thickness_top=-3)
 
         # With negative thickness_base, offset cone should start higher
         # Original base at z=0, offset should be at z=+5
@@ -384,7 +384,7 @@ class TestSmarterConeCreateOffsetCone(unittest.TestCase):
         """Test positioning with pointed base (0 radius) and negative thickness"""
         # This is the specific case reported by the user
         original = SmarterCone(0, 50, 100)
-        offset = original.create_offset_cone(thickness_radius=-2, thickness_base=-5, thickness_top=-5)
+        offset = original.create_offset(thickness_radius=-2, thickness_base=-5, thickness_top=-5)
 
         # Inner shell should be positioned INSIDE (higher z_min)
         self.assertAlmostEqual(offset.z_min, original.z_min + 5, places=5)
@@ -397,7 +397,7 @@ class TestSmarterConeThicknessSide(unittest.TestCase):
         """Test creating offset cone with thickness_side parameter"""
         from math import sqrt
         original = SmarterCone(50, 30, 100)
-        offset = original.create_offset_cone(thickness_side=2)
+        offset = original.create_offset(thickness_side=2)
 
         # Calculate expected thickness_radius from thickness_side
         slope = (30 - 50) / 100  # -0.2
@@ -412,7 +412,7 @@ class TestSmarterConeThicknessSide(unittest.TestCase):
         original = SmarterCone(50, 30, 100)
 
         with self.assertRaises(AssertionError) as context:
-            original.create_offset_cone(thickness_radius=2, thickness_side=2)
+            original.create_offset(thickness_radius=2, thickness_side=2)
 
         self.assertIn("exactly one", str(context.exception))
 
@@ -421,7 +421,7 @@ class TestSmarterConeThicknessSide(unittest.TestCase):
         original = SmarterCone(50, 30, 100)
 
         with self.assertRaises(AssertionError) as context:
-            original.create_offset_cone(thickness_base=1)
+            original.create_offset(thickness_base=1)
 
         self.assertIn("exactly one", str(context.exception))
 
@@ -430,7 +430,7 @@ class TestSmarterConeThicknessSide(unittest.TestCase):
         from math import sqrt
         original = SmarterCone(50, 30, 100)
         cone = SmarterCone(50, 30, 100)
-        cone.shell(thickness_side=2)
+        cone.create_shell(thickness_side=2)
 
         # Should store converted thickness_radius
         slope = (30 - 50) / 100
@@ -441,7 +441,7 @@ class TestSmarterConeThicknessSide(unittest.TestCase):
         """Test shell with negative thickness_side (inner shell)"""
         from math import sqrt
         cone = SmarterCone(50, 30, 100)
-        cone.shell(thickness_base=-1, thickness_top=-1, thickness_side=-2)
+        cone.create_shell(thickness_base=-1, thickness_top=-1, thickness_side=-2)
 
         # Should store converted negative thickness_radius
         slope = (30 - 50) / 100
@@ -453,14 +453,14 @@ class TestSmarterConeThicknessSide(unittest.TestCase):
         cone = SmarterCone(50, 30, 100)
 
         with self.assertRaises(AssertionError) as context:
-            cone.shell(thickness_radius=2, thickness_side=2)
+            cone.create_shell(thickness_radius=2, thickness_side=2)
 
         self.assertIn("exactly one", str(context.exception))
 
     def test_thickness_side_cylinder(self):
         """Test thickness_side on cylinder (slope=0)"""
         cone = SmarterCone(50, 50, 100)  # Cylinder
-        offset = cone.create_offset_cone(thickness_side=2)
+        offset = cone.create_offset(thickness_side=2)
 
         # For cylinder, slope=0, so thickness_side = thickness_radius
         # sqrt(1 + 0^2) = 1
@@ -471,7 +471,7 @@ class TestSmarterConeThicknessSide(unittest.TestCase):
         """Test thickness_side on steep cone"""
         from math import sqrt
         cone = SmarterCone(50, 10, 100)
-        offset = cone.create_offset_cone(thickness_side=5)
+        offset = cone.create_offset(thickness_side=5)
 
         # Calculate expected conversion
         slope = (10 - 50) / 100  # -0.4
