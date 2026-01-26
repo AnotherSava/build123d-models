@@ -209,6 +209,18 @@ def test_flatten(input, expected):
 - Never mention "Claude Code" or AI assistance in commit messages
 - Do not push to remote unless explicitly requested
 
+### Windows Bash Commands
+
+When running commands via Bash on Windows, always use forward slashes (`/`) in paths, not backslashes (`\`). Backslashes are interpreted as escape characters by bash and get stripped.
+
+```bash
+# Good
+cd D:/projects/3d/build123d-models && ./venv/Scripts/python.exe -m pytest tests/
+
+# Bad - backslashes will be stripped
+D:\projects\3d\build123d-models\venv\Scripts\python.exe -m pytest tests/
+```
+
 ### Formatting
 
 - Leave an empty line at the end of every file
