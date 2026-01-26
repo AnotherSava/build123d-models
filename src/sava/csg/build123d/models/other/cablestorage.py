@@ -1,121 +1,143 @@
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from math import radians, tan
+from typing import Callable, Tuple
 
-from build123d import Axis
+from build123d import Axis, Plane
 
-from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl, show_red
+from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl, show_red, show_blue
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
-from sava.csg.build123d.common.smartsolid import SmartSolid
+from sava.csg.build123d.common.smartercone import SmarterCone
+from sava.csg.build123d.common.smartsolid import SmartSolid, PositionalFilter
+
+
+class ConnectorRecesses:
+    def __init__(self, dim: 'CableStorageDimensions'):
+        self.dim = dim
+
+    def generic(self, length: float, width: float, height: float) -> Tuple[SmartSolid, SmartBox]:
+        extra_width = height / tan(radians(self.dim.cable_holder_angle))
+        connector_cut = SmartBox.with_base_angles_and_height(length + extra_width, width + extra_width, -height, 90, self.dim.cable_holder_angle)
+        connector_offset = connector_cut.create_offset(self.dim.cable_holder_width, up=0, down=0)
+        return connector_cut, connector_offset
+
+    def dvi(self, length: float, width: float, height: float) -> Tuple[SmartSolid, SmartBox]:
+        connector_cut, connector_fuse = self.generic(length, width, height)
+
+        extra_holes = []
+        for x_offset in [0, 33]:
+            for y_offset in [0, width / 2]:
+                extra_holes.append(SmarterCone.cylinder(7.5 / 2, 16.5).move(x_offset, y_offset))
+
+        holes = SmartSolid(extra_holes)
+        holes.align(connector_cut).z(Alignment.RL)
+        connector_cut.fuse(holes)
+
+        return connector_cut, connector_fuse
+
+
+# Type alias for recess functions (unbound method signature)
+RecessFn = Callable[['ConnectorRecesses', float, float, float], Tuple[SmartSolid, SmartBox]]
 
 
 @dataclass(frozen=True)
-class ConnectorDimensions:
-    length: float
-    width: float
-
-
-class ConnectorType(Enum):
-    TYPE_E_ANGLED = ConnectorDimensions(48.0, 36.2)
-    TYPE_C = ConnectorDimensions(13.9, 35.4)
-    NEMA_1_15P = ConnectorDimensions(19.2, 27) # Type A male
-    NEMA_5_15P = ConnectorDimensions(23.2, 24.5) # Type A grounded male
-    EIC_C13 = ConnectorDimensions(15.3, 27.3) # PSU female
-    EIC_C14 = ConnectorDimensions(16.3, 26.5) # PSU male
-    EIC_C7 = ConnectorDimensions(11.9, 16) # Barrel
-    EIC_C5 = ConnectorDimensions(16.9, 22.4) # Cloverleaf
-    DVI = ConnectorDimensions(15.0, 40.5)
-    HDMI = ConnectorDimensions(11.2, 20.9)
-
-class DoubleConnectorDimensions:
-    cable_hole_width: float = 14
-    cable_hole_length: float = 29
-    cable_hole_shift: float = 0
-    cable_holder_height: float = 15
-    holder_length: float = 63
-
 class SidewaysConnectorDimensions:
-    cable_diameter: float = 7
-    cable_hole_length: float = 28
-    cable_hole_width: float = 13.8
-    cable_hole_shift: float = 2
-    holder_length: float = 65
+    cable_diameter: float # ~1 mm gap
+    holder_length: float # max length of the connectors, no gap
+    cable_hole_length: float # max length on the cable level, no gap
+    cable_hole_width: float # max width on the cable level, no gap
+    cable_hole_height: float # depth of the cable holder compartment
+    cable_hole_x_alignment: Alignment = Alignment.C
+    cable_hole_x_shift_custom: float = 0
+    recess_fn: RecessFn = ConnectorRecesses.generic
+
+
+class SidewayConnector(Enum):
+    TYPE_E_ANGLED_TO_EIC_C13 = SidewaysConnectorDimensions(7, 63, 28, 13.8, 19, Alignment.LR) # Type E angled - PSU female
+    EIC_C14_TO_EIC_C13 = SidewaysConnectorDimensions(7.5, 36, 32, 13.8, 22) # PSU female - PSU male
+    DVI_TO_DVI = SidewaysConnectorDimensions(6, 41, 13, 26, 9, recess_fn=ConnectorRecesses.dvi)
+    # NEMA_5_15P (Type A grounded male)
+    # NEMA_1_15P (Type A male)
+    # EIC_C7 (Barrel)
+    # EIC_C5 (Cloverleaf)
+
 
 class CableStorageDimensions:
     width: float = 42.0
-    height: float = 4.0
+    height: float = 8.0
     cable_holder_width: float = 2
-    cable_holder_height: float = 13
-    cable_holder_angle: float = 85
-    length_padding: float = 1.0
-    wall_length_minimal: float = 2.0
-    railing_width: float = 1
-    railing_depth: float = 1
+    cable_holder_angle: float = 87.5
+    length_padding: float = 2.0
+    railing_width: float = 2
+    railing_offset: float = 2
+    railing_ceiling_thickness: float = 2
     cable_diameter_gap: float = 1
+    cable_hole_fillet_radius: float = 0.9
+    railing_fillet_radius: float = 1
 
 class CableStorage:
     def __init__(self, dim: CableStorageDimensions):
         self.dim = dim
 
-    def create_holder(self, dim: DoubleConnectorDimensions) -> SmartSolid:
-        box = self.create_top_surface(dim.holder_length)
-
-        pencil = Pencil()
-        pencil.right(dim.cable_hole_length + dim.cable_hole_shift + self.dim.length_padding)
-        pencil.arc_with_radius(dim.cable_hole_width / 2, 0, 180)
-        pencil.left()
-        cut = pencil.extrude(self.dim.height)
-        cut.align(box).xz(Alignment.LR)
-
-        extra_width = self.dim.cable_holder_height / tan(radians(self.dim.cable_holder_angle)) + 2 * self.dim.cable_holder_width
-        cable_holder = SmartBox.with_base_angles_and_height(cut.x_size + extra_width, cut.y_size + extra_width, self.dim.cable_holder_height, -90, -self.dim.cable_holder_angle)
-        cable_holder.align(box).x(Alignment.LR).z(Alignment.LL)
-        cable_holder = cable_holder.create_shell(north=-self.dim.cable_holder_width, south=-self.dim.cable_holder_width, east=-self.dim.cable_holder_width)
-
-        return SmartSolid(box, cable_holder, label="holder").cut(cut)
-
     def create_top_surface(self, length: float) -> SmartSolid:
-        box_top = SmartBox(length + self.dim.length_padding * 2, self.dim.width, self.dim.railing_depth)
-        box_bottom = SmartBox(box_top.length, box_top.width - self.dim.railing_width * 2, self.dim.height - box_top.height)
-        box_bottom.align(box_top).z(Alignment.LL)
-        return box_top.fuse(box_bottom)
+        dim = self.dim
 
-    def create_sideways_holder(self, dim: SidewaysConnectorDimensions) -> SmartSolid:
+        pencil = Pencil(Plane.YZ)
+        pencil.right(dim.width / 2)
+        pencil.down(dim.height)
+        pencil.jump((-dim.railing_offset, dim.railing_offset))
+        pencil.up_to(-dim.railing_ceiling_thickness - dim.railing_width / 2)
+        pencil.arc_with_radius(dim.railing_width / 2, 90, 180)
+        pencil.down_to(dim.railing_offset - dim.height)
+        pencil.jump((-dim.railing_offset, -dim.railing_offset))
+        solid = pencil.extrude_mirrored_y(length + self.dim.length_padding * 2)
+        solid.fillet_x(self.dim.railing_fillet_radius, Axis.Z, dim.railing_offset - dim.height)
+        return solid
+
+    def get_cable_holder_x_offset(self, dim: SidewaysConnectorDimensions) -> float:
+        if dim.cable_hole_x_alignment == Alignment.LR:
+            return max(dim.cable_hole_x_shift_custom, self.dim.length_padding)
+
+        if dim.cable_hole_x_alignment == Alignment.RL:
+            return -max(dim.cable_hole_x_shift_custom, self.dim.length_padding)
+
+        return dim.cable_hole_x_shift_custom
+
+    def create_sideways_holder(self, connector: SidewayConnector) -> SmartSolid:
+        dim = connector.value
         box = self.create_top_surface(dim.holder_length)
 
-        extra_width = self.dim.cable_holder_height / tan(radians(self.dim.cable_holder_angle))
-        print(f"extra_width: {extra_width}")
-        connector_cut = SmartBox.with_base_angles_and_height(dim.cable_hole_length + extra_width, dim.cable_hole_width + extra_width, -self.dim.cable_holder_height, 90, self.dim.cable_holder_angle, "connector_cut")
-        connector_cut.align(box).x(Alignment.LR, dim.cable_hole_shift).z(Alignment.RL)
+        recesses = ConnectorRecesses(self.dim)
+        connector_cut, connector_fuse = dim.recess_fn(recesses, dim.cable_hole_length, dim.cable_hole_width, dim.cable_hole_height)
 
-        cable_cut = SmartBox(dim.cable_diameter, self.dim.width / 2, self.dim.cable_holder_height, label="cable_cut")
-        cable_cut.align(connector_cut).y(Alignment.CR)
+        connector_cut.align(box).x(dim.cable_hole_x_alignment, self.get_cable_holder_x_offset(dim)).z(Alignment.RL)
+        connector_fuse.align(connector_cut).z(Alignment.RL)
 
-        connector_offset = connector_cut.create_offset(self.dim.cable_holder_width, up=0, down=0)
+        cable_cut = SmartBox(dim.cable_diameter, self.dim.width / 2, dim.cable_hole_height, label="cable_cut")
+        cable_cut.align(connector_cut).y(Alignment.CR).z(Alignment.RL)
 
-        result = SmartSolid(box, connector_offset, label="holder").cut(connector_cut, cable_cut)
-        result.fillet_z(0.5, Axis.X, inclusive=(False, False), angle_tolerance=(90 - self.dim.cable_holder_angle) * 1.01)
+        result = SmartSolid(box, connector_fuse, label=f"holder {connector.name.lower()}").cut(connector_cut, cable_cut)
+        result.fillet_positional(self.dim.cable_hole_fillet_radius, Axis.Z, PositionalFilter(Axis.Y, box.y_max), PositionalFilter(Axis.X))
+        connector_fuse_filters = [PositionalFilter(Axis.Y, connector_fuse.y_min, connector_fuse.y_max), PositionalFilter(Axis.X, connector_fuse.x_min, connector_fuse.x_max)]
+        result.fillet_positional(self.dim.cable_hole_fillet_radius, Axis.Z, *connector_fuse_filters, angle_tolerance=(90 - self.dim.cable_holder_angle))
 
         return result
 
+# logging.getLogger('sava').setLevel(logging.DEBUG)
 
 dimensions = CableStorageDimensions()
 cable_storage = CableStorage(dimensions)
 
-def export_3mf(holder: SmartSolid):
-    export(holder)
-    save_3mf("models/other/cable_storage/export.3mf", True)
+for connector in SidewayConnector:
+    holder_solid = cable_storage.create_sideways_holder(connector)
+    export(holder_solid.oriented((180, 0, 0)))
 
-def export_stl(holder: SmartSolid):
-    clear()
-    export(holder)
-    save_stl("models/other/cable_storage/stl")
+save_stl("models/other/cable_storage/stl")
+clear()
 
-
-holder_solid = cable_storage.create_sideways_holder(SidewaysConnectorDimensions())
-# holder_solid = cable_storage.create_holder(DoubleConnectorDimensions())
-export_3mf(holder_solid)
-export_stl(holder_solid)
-
+export(cable_storage.create_sideways_holder(SidewayConnector.DVI_TO_DVI))
+save_3mf()
+# save_3mf("models/other/cable_storage/export.3mf", True)
