@@ -201,16 +201,17 @@ def filter_edges_by_position(edges: ShapeList[Edge], axis: Axis, minimum: float,
     filtered = [edge for edge in edges if is_within_interval(edge.center().dot(axis_dir), minimum, maximum, inclusive)]
     return ShapeList(filtered)
 
-def filter_edges_by_axis(edges: ShapeList[Edge], axis: Axis, angle_tolerance: float = 1e-5) -> ShapeList[Edge]:
-    """Filter edges by alignment to an axis, checking tangent direction regardless of geometry type.
+def filter_edges_by_axis(edges: ShapeList[Edge], axis: Axis, angle_tolerance: float = 1e-5, num_samples: int = 10) -> ShapeList[Edge]:
+    """Filter edges by alignment to an axis, checking tangents at multiple points.
 
-    Unlike build123d's filter_by(Axis), this works on all edge types (LINE, BSPLINE, BEZIER, etc.)
-    by checking the actual tangent vector rather than relying on geometry type.
+    For an edge to pass, the tangent at every sampled point must be within the
+    angle tolerance of the axis. This correctly handles arcs and curved edges.
 
     Args:
         edges: List of edges to filter
         axis: Axis to filter by (edges parallel to this axis are selected)
         angle_tolerance: Maximum angle deviation from axis in degrees. Default is 1e-5.
+        num_samples: Number of points along the edge to check tangent. Default is 10.
 
     Returns:
         Filtered list of edges aligned with the axis
@@ -218,10 +219,16 @@ def filter_edges_by_axis(edges: ShapeList[Edge], axis: Axis, angle_tolerance: fl
     axis_dir = axis.direction.normalized()
     filtered = []
     for edge in edges:
-        tangent = edge.tangent_at(0).normalized()
-        dot = abs(tangent.dot(axis_dir))
-        angle = degrees(acos(min(1.0, dot)))
-        if angle <= angle_tolerance:
+        max_angle = 0.0
+        for i in range(num_samples):
+            t = i / (num_samples - 1) if num_samples > 1 else 0.5
+            tangent = edge.tangent_at(t).normalized()
+            dot = abs(tangent.dot(axis_dir))
+            angle = degrees(acos(min(1.0, dot)))
+            max_angle = max(max_angle, angle)
+            if angle > angle_tolerance:
+                break  # No need to check more points
+        if max_angle <= angle_tolerance:
             filtered.append(edge)
     return ShapeList(filtered)
 
@@ -556,32 +563,61 @@ def calculate_orientation(x_axis: Axis, y_axis: Axis, z_axis: Axis) -> Vector:
     
     return Vector(angle_x, angle_y, angle_z)
 
-def choose_wire_diameter(wire: Wire) -> float:
-    return wire.length / 100
+def _choose_diameter(total_length: float) -> float:
+    return total_length / 100
 
-def choose_vertex_diameter(wire: Wire) -> float:
-    return choose_wire_diameter(wire) * 2
+def _choose_vertex_diameter(total_length: float) -> float:
+    return _choose_diameter(total_length) * 2
 
-def solidify_wire(wire: Wire) -> SmartSolid:
+def _solidify_edges_with_length(edges: list[Edge], total_length: float) -> 'SmartSolid':
+    """Core implementation for solidifying edges into 3D tubes."""
     from sava.csg.build123d.common.smartsolid import SmartSolid
-    radius = choose_wire_diameter(wire) / 2
+    radius = _choose_diameter(total_length) / 2
+    vertex_radius = _choose_vertex_diameter(total_length) / 2
     shapes = []
 
-    # Break wire into individual edges and sweep each separately
-    # This ensures each segment has a circular profile perpendicular to its direction
-    for edge in wire.edges():
-        # Create a plane perpendicular to the edge's starting direction
+    # Sweep a circle along each edge
+    for edge in edges:
         profile_plane = create_wire_tangent_plane(edge, 0)
-
-        # Create a circle profile in this plane and sweep it along just this edge
         circle_wire = Wire.make_circle(radius, profile_plane)
         shapes.append(sweep(Face(circle_wire), edge))
 
-    # Add spheres at each vertex to smooth the joints between segments
-    # Collect all shapes (swept segments + spheres)
-    for vertex in wire.vertices():
-        sphere = Solid.make_sphere(choose_vertex_diameter(wire) / 2)
-        sphere.position = vertex.center()
-        shapes.append(sphere)
+    # Add spheres at endpoints to smooth joints
+    seen_positions = set()
+    for edge in edges:
+        for pos in [edge.position_at(0), edge.position_at(1)]:
+            pos_key = (round(pos.X, 6), round(pos.Y, 6), round(pos.Z, 6))
+            if pos_key not in seen_positions:
+                seen_positions.add(pos_key)
+                sphere = Solid.make_sphere(vertex_radius)
+                sphere.position = pos
+                shapes.append(sphere)
 
     return SmartSolid(shapes)
+
+def choose_wire_diameter(wire: Wire) -> float:
+    return _choose_diameter(wire.length)
+
+def choose_vertex_diameter(wire: Wire) -> float:
+    return _choose_vertex_diameter(wire.length)
+
+def solidify_wire(wire: Wire) -> 'SmartSolid':
+    return _solidify_edges_with_length(list(wire.edges()), wire.length)
+
+def solidify_edges(*edges: Edge, max_length: float = None) -> 'SmartSolid':
+    """Convert edges to 3D solids by sweeping a circular profile along each edge.
+
+    Creates tubes along each edge with spheres at vertices to smooth joints.
+    The diameter is automatically calculated based on the provided max_length
+    or the longest edge if not provided.
+
+    Args:
+        *edges: One or more Edge objects to solidify
+        max_length: Length used to calculate tube diameter. If not provided, uses longest edge.
+
+    Returns:
+        SmartSolid containing the solidified edges
+    """
+    if max_length is None:
+        max_length = max(edge.length for edge in edges)
+    return _solidify_edges_with_length(list(edges), max_length)

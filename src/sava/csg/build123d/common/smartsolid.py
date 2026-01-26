@@ -5,6 +5,7 @@ from typing import Iterable
 from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean
 
 from sava.common.common import flatten
+from sava.common.logging import logger
 from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, filter_edges_by_position, filter_edges_by_axis
 
 
@@ -387,19 +388,16 @@ class SmartSolid:
         self.solid = fillet(edges, radius)
         return self
 
-    def fillet_positional(self, radius: float, axis_orientational: Axis | None, *position_filters: PositionalFilter) -> 'SmartSolid':
+    def fillet_positional(self, radius: float, axis_orientational: Axis | None, *position_filters: PositionalFilter, angle_tolerance: float = 1e-5) -> 'SmartSolid':
         edges = self.solid.edges()
         if axis_orientational is not None:
-            edges = edges.filter_by(axis_orientational)
+            edges = filter_edges_by_axis(edges, axis_orientational, angle_tolerance)
         for position_filter in position_filters:
             edges = self._filter_positional(edges, position_filter)
         self.solid = fillet(edges, radius)
         return self
 
     def _filter_positional(self, edges: ShapeList[Edge], positional_filter: PositionalFilter) -> ShapeList[Edge]:
-        if positional_filter.axis is None:
-            return edges
-
         if positional_filter.minimum is None:
             actual_min = self.get_from(positional_filter.axis)
             actual_max = self.get_to(positional_filter.axis)
@@ -407,10 +405,10 @@ class SmartSolid:
         else:
             actual_min = positional_filter.minimum
             actual_max = actual_min if positional_filter.maximum is None else positional_filter.maximum
-            actual_inclusive = (True, True) if positional_filter.inclusive is None else positional_filter.inclusive
+            actual_inclusive = (True, True) if positional_filter.inclusive is None or positional_filter.maximum is None else positional_filter.inclusive
 
         result = filter_edges_by_position(edges, positional_filter.axis, actual_min, actual_max, actual_inclusive)
-        print(f"Fillet positional filter along Axis {axis_to_string(positional_filter.axis)} {'[' if actual_inclusive[0] else '('}{actual_min}, {actual_max}{']' if actual_inclusive[1] else ')'}: {len(edges)} -> {len(result)}")
+        logger.debug(f"Fillet positional filter along Axis {axis_to_string(positional_filter.axis)} {'[' if actual_inclusive[0] else '('}{actual_min}, {actual_max}{']' if actual_inclusive[1] else ')'}: {len(edges)} -> {len(result)}")
         return result
 
     def fillet_x(self, radius: float, axis: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] = (True, True), angle_tolerance: float = 1e-5) -> 'SmartSolid':
@@ -434,8 +432,13 @@ class SmartSolid:
     def fillet(self, radius_x: float, radius_y: float = None, radius_z: float = None) -> 'SmartSolid':
         return self.fillet_x(radius_x).fillet_y(radius_y or radius_x).fillet_z(radius_z or radius_y or radius_x)
 
-    def fillet_edges(self, filter_by: ShapePredicate | Axis | Plane | GeomType | property, radius: float, reverse: bool = False) -> 'SmartSolid':
-        edges = self.solid.edges().filter_by(filter_by, reverse)
+    def fillet_edges(self, filter_by: ShapePredicate | Axis | Plane | GeomType | property, radius: float, reverse: bool = False, angle_tolerance: float = 1e-5) -> 'SmartSolid':
+        if isinstance(filter_by, Axis):
+            edges = filter_edges_by_axis(self.solid.edges(), filter_by, angle_tolerance)
+            if reverse:
+                edges = ShapeList([e for e in self.solid.edges() if e not in edges])
+        else:
+            edges = self.solid.edges().filter_by(filter_by, reverse)
         self.solid = fillet(edges, radius)
         return self
 

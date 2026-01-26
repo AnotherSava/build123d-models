@@ -155,6 +155,9 @@ class TestPrepareShape(unittest.TestCase):
 
 class TestClear(unittest.TestCase):
 
+    def setUp(self):
+        clear()
+
     def test_clear_removes_shapes(self):
         """Test that clear removes all stored shapes"""
         export(Box(10, 10, 10), "test")

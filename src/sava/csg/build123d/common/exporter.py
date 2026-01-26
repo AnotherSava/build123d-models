@@ -6,9 +6,10 @@ from copy import copy
 from pathlib import Path
 from typing import Iterable
 
-from build123d import Shape, Color, Mesher, Plane, Wire, Compound
+from build123d import Shape, Color, Mesher, Plane, Wire, Compound, Edge, BoundBox
 
-from sava.csg.build123d.common.geometry import solidify_wire
+from sava.common.logging import logger
+from sava.csg.build123d.common.geometry import solidify_wire, solidify_edges
 from sava.csg.build123d.common.smartplane import SmartPlane
 from sava.csg.build123d.common.smartsolid import get_solid
 
@@ -48,19 +49,27 @@ def _get_color_for_label(label: str) -> str:
     raise RuntimeError(f"All {len(BASIC_COLORS)} colors exhausted. Cannot assign color to label '{label}'.")
 
 
-def _prepare_shape(shape, label: str) -> Iterable[Shape]:
+def _prepare_shape(shape, label: str, edge_max_length: float = None) -> Iterable[Shape]:
     """Convert shape to exportable shape(s) and assign color based on label."""
+    from build123d import Box, Location
     result = []
     if isinstance(shape, Plane):
         extracted = SmartPlane(shape).solid
     elif isinstance(shape, Wire):
-        extracted = solidify_wire(shape)
+        extracted = solidify_wire(shape).solid
+    elif isinstance(shape, Edge):
+        extracted = solidify_edges(shape, max_length=edge_max_length).solid
+    elif isinstance(shape, BoundBox):
+        # Convert BoundBox to a visible box solid
+        box = Box(shape.size.X, shape.size.Y, shape.size.Z)
+        box.locate(Location(shape.center()))
+        extracted = box
     else:
         extracted = get_solid(shape)
 
     if isinstance(extracted, Iterable):
         for item in extracted:
-            result += _prepare_shape(item, label)
+            result += _prepare_shape(item, label, edge_max_length)
     else:
         shape_copy = copy(extracted)
         shape_copy.color = Color(_get_color_for_label(label))
@@ -132,31 +141,54 @@ def _resolve_path(location: str) -> str:
     return os.path.normpath(get_path(location))
 
 
-def _report_labels() -> None:
+def _report_labels(edge_max_length: float = None) -> None:
     """Print summary of shapes by label."""
     for label, shapes in _shapes.items():
-        count = sum(len(_prepare_shape(s, label)) for s in shapes)
-        print(f"{label + ':':<15} {count} shape(s)")
+        count = sum(len(_prepare_shape(s, label, edge_max_length)) for s in shapes)
+        count_suffix = f": {count} shapes" if count > 1 else ""
+        print(f"  - {label}{count_suffix}")
+
+
+def _get_shapes_bounding_box() -> BoundBox | None:
+    """Get bounding box of all exported shapes."""
+    bboxes = []
+    for label, shapes in _shapes.items():
+        for shape in shapes:
+            if isinstance(shape, BoundBox):
+                bboxes.append(shape)
+            elif isinstance(shape, (Plane, Wire, Edge)):
+                bboxes.append(shape.bounding_box())
+            else:
+                solid = get_solid(shape)
+                if isinstance(solid, Iterable):
+                    for s in solid:
+                        bboxes.append(s.bounding_box())
+                else:
+                    bboxes.append(solid.bounding_box())
+
+    if not bboxes:
+        return None
+
+    # Combine all bounding boxes
+    result = bboxes[0]
+    for bbox in bboxes[1:]:
+        result = result.add(bbox)
+    return result
+
+
+def _get_edge_max_length() -> float | None:
+    """Get max dimension for edge visualization."""
+    bbox = _get_shapes_bounding_box()
+    if bbox:
+        return max(bbox.size.X, bbox.size.Y, bbox.size.Z)
+    return None
 
 
 def print_dimensions() -> None:
     """Print the combined bounding box dimensions of all exported objects."""
-
-    # Collect all solids from all labels
-    all_solids = []
-    for label, shapes in _shapes.items():
-        for shape in shapes:
-            solid = get_solid(shape)
-            if isinstance(solid, Iterable):
-                all_solids.extend(solid)
-            else:
-                all_solids.append(solid)
-
-    # Create compound and get bounding box
-    bbox = Compound(all_solids).bounding_box()
-
-    # Print dimensions
-    print(f"Combined dimensions: {bbox.size.X:.2f} x {bbox.size.Y:.2f} x {bbox.size.Z:.2f} mm")
+    bbox = _get_shapes_bounding_box()
+    if bbox:
+        logger.info(f"Combined dimensions: {bbox.size.X:.2f} x {bbox.size.Y:.2f} x {bbox.size.Z:.2f} mm")
 
 
 def save_3mf(location: str = None, current: bool = False) -> None:
@@ -173,15 +205,16 @@ def save_3mf(location: str = None, current: bool = False) -> None:
         print(f"\nCopying 3MF to use as a current model: {current_model_location}\n")
         shutil.copy2(actual_location, current_model_location)
 
-    print(f"\nDone")
+    logger.info("Done")
 
 def _save_3mf(location: str) -> None:
     """Save all shapes to a single 3MF file."""
+    edge_max_length = _get_edge_max_length()
 
     mesher = Mesher()
     for label, shapes in _shapes.items():
         for shape in shapes:
-            for prepared in _prepare_shape(shape, label):
+            for prepared in _prepare_shape(shape, label, edge_max_length):
                 with warnings.catch_warnings(record=True) as caught_warnings:
                     warnings.simplefilter("always")
                     mesher.add_shape(prepared)
@@ -190,7 +223,7 @@ def _save_3mf(location: str) -> None:
                     for w in caught_warnings:
                         print(f"WARNING: Shape with label '{label}': {w.message}")
 
-    _report_labels()
+    _report_labels(edge_max_length)
 
     # Write to the temporary file first, then copy to the actual location
     # Writing it to the actual location exactly may be slow enough for F3D viewer to close
@@ -225,14 +258,16 @@ def save_stl(directory: str = None) -> None:
     actual_directory = _resolve_path(base_dir)
     print(f"\nExporting STL files to {actual_directory}\n")
 
+    edge_max_length = _get_edge_max_length()
+
     for label, shapes in _shapes.items():
         mesher = Mesher()
         for shape in shapes:
-            for prepared in _prepare_shape(shape, label):
+            for prepared in _prepare_shape(shape, label, edge_max_length):
                 mesher.add_shape(prepared)
 
         file_path = create_file_path(actual_directory, f"{label}.stl")
         mesher.write(str(file_path))
         print(f"  - {os.path.basename(file_path)}")
 
-    print(f"\nDone")
+    logger.info("Done")

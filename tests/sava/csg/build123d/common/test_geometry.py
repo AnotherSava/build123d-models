@@ -1,10 +1,10 @@
 import unittest
-from math import sqrt
+from math import sqrt, sin, cos, radians
 
-from build123d import Vector, Axis, Plane, Box
+from build123d import Vector, Axis, Plane, Box, Edge, ShapeList
 from parameterized import parameterized
 
-from sava.csg.build123d.common.geometry import rotate_vector, multi_rotate_vector, convert_orientation_to_rotations, orient_axis, calculate_orientation
+from sava.csg.build123d.common.geometry import rotate_vector, multi_rotate_vector, convert_orientation_to_rotations, orient_axis, calculate_orientation, filter_edges_by_axis, filter_edges_by_position
 from tests.sava.csg.build123d.test_utils import assertVectorAlmostEqual
 
 
@@ -294,6 +294,317 @@ class TestCalculateOrientation(unittest.TestCase):
         self.assertAlmostEqual(normalize_angle(result.X), normalize_angle(expected.X), places=1)
         self.assertAlmostEqual(normalize_angle(result.Y), normalize_angle(expected.Y), places=1)
         self.assertAlmostEqual(normalize_angle(result.Z), normalize_angle(expected.Z), places=1)
+
+
+class TestFilterEdgesByAxis(unittest.TestCase):
+
+    def _create_edge_at_angle(self, angle_degrees: float, length: float = 10) -> Edge:
+        """Create an edge in XY plane at given angle from X axis."""
+        end_x = length * cos(radians(angle_degrees))
+        end_y = length * sin(radians(angle_degrees))
+        return Edge.make_line((0, 0, 0), (end_x, end_y, 0))
+
+    def test_exact_alignment_passes(self):
+        """Edge exactly aligned with axis should pass with any tolerance."""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=0)
+        self.assertEqual(len(result), 1)
+
+    def test_perpendicular_edge_fails(self):
+        """Edge perpendicular to axis should fail."""
+        edge = Edge.make_line((0, 0, 0), (0, 10, 0))  # Along Y axis
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=45)
+        self.assertEqual(len(result), 0)
+
+    @parameterized.expand([
+        (5, 10, 1),   # 5° edge with 10° tolerance -> passes
+        (5, 5, 1),    # 5° edge with 5° tolerance -> passes (at boundary)
+        (5, 4, 0),    # 5° edge with 4° tolerance -> fails
+        (10, 15, 1),  # 10° edge with 15° tolerance -> passes
+        (10, 10, 1),  # 10° edge with 10° tolerance -> passes (at boundary)
+        (10, 9, 0),   # 10° edge with 9° tolerance -> fails
+        (0.5, 1, 1),  # 0.5° edge with 1° tolerance -> passes
+        (0.5, 0.4, 0),  # 0.5° edge with 0.4° tolerance -> fails
+    ])
+    def test_angle_tolerance_boundary(self, edge_angle, tolerance, expected_count):
+        """Test that angle_tolerance correctly filters edges at various angles."""
+        edge = self._create_edge_at_angle(edge_angle)
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=tolerance)
+        self.assertEqual(len(result), expected_count, f"Edge at {edge_angle}° with tolerance {tolerance}° should {'pass' if expected_count else 'fail'}")
+
+    def test_multiple_edges_mixed_angles(self):
+        """Test filtering multiple edges with different angles."""
+        edges = ShapeList([
+            self._create_edge_at_angle(0),   # exactly aligned
+            self._create_edge_at_angle(3),   # 3° off
+            self._create_edge_at_angle(7),   # 7° off
+            self._create_edge_at_angle(12),  # 12° off
+            self._create_edge_at_angle(45),  # 45° off
+        ])
+
+        # With 5° tolerance: only 0° and 3° should pass
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=5)
+        self.assertEqual(len(result), 2)
+
+        # With 10° tolerance: 0°, 3°, and 7° should pass
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=10)
+        self.assertEqual(len(result), 3)
+
+        # With 15° tolerance: 0°, 3°, 7°, and 12° should pass
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=15)
+        self.assertEqual(len(result), 4)
+
+    def test_negative_angle_same_as_positive(self):
+        """Edge at -5° should behave same as +5° (opposite direction)."""
+        edge_pos = self._create_edge_at_angle(5)
+        edge_neg = self._create_edge_at_angle(-5)
+
+        result_pos = filter_edges_by_axis(ShapeList([edge_pos]), Axis.X, angle_tolerance=6)
+        result_neg = filter_edges_by_axis(ShapeList([edge_neg]), Axis.X, angle_tolerance=6)
+
+        self.assertEqual(len(result_pos), 1)
+        self.assertEqual(len(result_neg), 1)
+
+    def test_opposite_direction_passes(self):
+        """Edge pointing opposite to axis direction should still pass (parallel)."""
+        edge = Edge.make_line((0, 0, 0), (-10, 0, 0))  # Opposite to X axis
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=0.001)
+        self.assertEqual(len(result), 1)
+
+    def test_3d_edge_angle(self):
+        """Test edge at angle in 3D space."""
+        # Edge at 45° in XZ plane (from X axis towards Z)
+        edge = Edge.make_line((0, 0, 0), (10, 0, 10))
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=44)
+        self.assertEqual(len(result), 0)
+
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=46)
+        self.assertEqual(len(result), 1)
+
+    def test_arc_with_curved_tangents_fails(self):
+        """Test that arc edges are filtered by checking tangents at all points.
+
+        An arc that curves significantly should fail because tangents along the
+        arc deviate from the axis, even if endpoints might be aligned.
+        """
+        # Arc from (0,0,0) to (10,0,0) through (5,2,0) - endpoints are X-aligned
+        # but the arc curves through Y, so tangents at the apex deviate from X
+        arc = Edge.make_three_point_arc((0, 0, 0), (5, 2, 0), (10, 0, 0))
+        edges = ShapeList([arc])
+
+        # Even though endpoints are X-aligned, tangents at apex point ~44° off X
+        # So with 5° tolerance it should fail
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=5)
+        self.assertEqual(len(result), 0)
+
+        # With 45° tolerance it should pass (tangents deviate ~44° at apex)
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=45)
+        self.assertEqual(len(result), 1)
+
+    def test_nearly_straight_arc_passes(self):
+        """Test that a nearly-straight arc passes with appropriate tolerance."""
+        # Arc with very slight curve - tangents stay close to X direction
+        arc = Edge.make_three_point_arc((0, 0, 0), (5, 0.1, 0), (10, 0, 0))
+        edges = ShapeList([arc])
+
+        # Very small deviation, should pass with small tolerance
+        result = filter_edges_by_axis(edges, Axis.X, angle_tolerance=3)
+        self.assertEqual(len(result), 1)
+
+
+class TestFilterEdgesByPosition(unittest.TestCase):
+
+    def _create_edge_at_x(self, x: float, length: float = 2) -> Edge:
+        """Create a vertical edge (along Z) centered at given X position."""
+        return Edge.make_line((x, 0, 0), (x, 0, length))
+
+    def _create_edge_at_y(self, y: float, length: float = 2) -> Edge:
+        """Create a vertical edge (along Z) centered at given Y position."""
+        return Edge.make_line((0, y, 0), (0, y, length))
+
+    def _create_edge_at_z(self, z: float, length: float = 2) -> Edge:
+        """Create a horizontal edge (along X) centered at given Z position."""
+        return Edge.make_line((0, 0, z), (length, 0, z))
+
+    def test_edge_inside_interval_passes(self):
+        """Edge clearly inside the interval should pass."""
+        edge = self._create_edge_at_x(5)
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (True, True))
+        self.assertEqual(len(result), 1)
+
+    def test_edge_outside_interval_fails(self):
+        """Edge clearly outside the interval should fail."""
+        edge = self._create_edge_at_x(15)
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (True, True))
+        self.assertEqual(len(result), 0)
+
+    def test_edge_below_minimum_fails(self):
+        """Edge below the minimum should fail."""
+        edge = self._create_edge_at_x(-5)
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (True, True))
+        self.assertEqual(len(result), 0)
+
+    @parameterized.expand([
+        (True, 1),   # Inclusive minimum -> passes
+        (False, 0),  # Exclusive minimum -> fails
+    ])
+    def test_edge_at_minimum_boundary(self, include_min, expected_count):
+        """Edge exactly at minimum should pass only if inclusive."""
+        edge = self._create_edge_at_x(0)
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (include_min, True))
+        self.assertEqual(len(result), expected_count)
+
+    @parameterized.expand([
+        (True, 1),   # Inclusive maximum -> passes
+        (False, 0),  # Exclusive maximum -> fails
+    ])
+    def test_edge_at_maximum_boundary(self, include_max, expected_count):
+        """Edge exactly at maximum should pass only if inclusive."""
+        edge = self._create_edge_at_x(10)
+        edges = ShapeList([edge])
+
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (True, include_max))
+        self.assertEqual(len(result), expected_count)
+
+    def test_edge_near_minimum_within_tolerance(self):
+        """Edge very close to minimum should be treated as at minimum."""
+        # Edge at position 1e-8, which is within default tolerance of 0
+        edge = self._create_edge_at_x(1e-8)
+        edges = ShapeList([edge])
+
+        # With inclusive minimum, should pass (treated as at boundary)
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (True, True))
+        self.assertEqual(len(result), 1)
+
+        # With exclusive minimum, should fail (treated as at boundary)
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (False, True))
+        self.assertEqual(len(result), 0)
+
+    def test_edge_near_maximum_within_tolerance(self):
+        """Edge very close to maximum should be treated as at maximum."""
+        # Edge at position 10 - 1e-8, which is within default tolerance of 10
+        edge = self._create_edge_at_x(10 - 1e-8)
+        edges = ShapeList([edge])
+
+        # With inclusive maximum, should pass (treated as at boundary)
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (True, True))
+        self.assertEqual(len(result), 1)
+
+        # With exclusive maximum, should fail (treated as at boundary)
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (True, False))
+        self.assertEqual(len(result), 0)
+
+    def test_filter_along_y_axis(self):
+        """Test filtering edges by position along Y axis."""
+        edges = ShapeList([
+            self._create_edge_at_y(-5),  # Outside below
+            self._create_edge_at_y(0),   # At minimum
+            self._create_edge_at_y(5),   # Inside
+            self._create_edge_at_y(10),  # At maximum
+            self._create_edge_at_y(15),  # Outside above
+        ])
+
+        result = filter_edges_by_position(edges, Axis.Y, 0, 10, (True, True))
+        self.assertEqual(len(result), 3)  # 0, 5, 10
+
+        result = filter_edges_by_position(edges, Axis.Y, 0, 10, (False, False))
+        self.assertEqual(len(result), 1)  # Only 5
+
+    def test_filter_along_z_axis(self):
+        """Test filtering edges by position along Z axis."""
+        edges = ShapeList([
+            self._create_edge_at_z(0),
+            self._create_edge_at_z(5),
+            self._create_edge_at_z(10),
+        ])
+
+        result = filter_edges_by_position(edges, Axis.Z, 2, 8, (True, True))
+        self.assertEqual(len(result), 1)  # Only z=5
+
+    def test_multiple_edges_mixed_positions(self):
+        """Test filtering multiple edges at various positions."""
+        edges = ShapeList([
+            self._create_edge_at_x(0),
+            self._create_edge_at_x(2),
+            self._create_edge_at_x(5),
+            self._create_edge_at_x(8),
+            self._create_edge_at_x(10),
+        ])
+
+        # Narrow interval in the middle
+        result = filter_edges_by_position(edges, Axis.X, 3, 7, (True, True))
+        self.assertEqual(len(result), 1)  # Only x=5
+
+        # Wider interval
+        result = filter_edges_by_position(edges, Axis.X, 1, 9, (True, True))
+        self.assertEqual(len(result), 3)  # x=2, 5, 8
+
+    def test_negative_interval(self):
+        """Test filtering with negative coordinate range."""
+        edges = ShapeList([
+            self._create_edge_at_x(-10),
+            self._create_edge_at_x(-5),
+            self._create_edge_at_x(0),
+            self._create_edge_at_x(5),
+        ])
+
+        result = filter_edges_by_position(edges, Axis.X, -8, -2, (True, True))
+        self.assertEqual(len(result), 1)  # Only x=-5
+
+    def test_edge_center_used_for_position(self):
+        """Test that edge center (not endpoints) determines position."""
+        # Edge from x=0 to x=10, center at x=5
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        edges = ShapeList([edge])
+
+        # Interval excludes endpoints but includes center
+        result = filter_edges_by_position(edges, Axis.X, 3, 7, (True, True))
+        self.assertEqual(len(result), 1)
+
+        # Interval excludes center
+        result = filter_edges_by_position(edges, Axis.X, 6, 10, (True, True))
+        self.assertEqual(len(result), 0)
+
+    def test_empty_edge_list(self):
+        """Test filtering an empty edge list."""
+        edges = ShapeList([])
+
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (True, True))
+        self.assertEqual(len(result), 0)
+
+    def test_all_inclusive_vs_all_exclusive(self):
+        """Test the difference between all-inclusive and all-exclusive boundaries."""
+        edges = ShapeList([
+            self._create_edge_at_x(0),
+            self._create_edge_at_x(5),
+            self._create_edge_at_x(10),
+        ])
+
+        # All inclusive: 0, 5, 10 pass
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (True, True))
+        self.assertEqual(len(result), 3)
+
+        # All exclusive: only 5 passes
+        result = filter_edges_by_position(edges, Axis.X, 0, 10, (False, False))
+        self.assertEqual(len(result), 1)
 
 
 if __name__ == '__main__':

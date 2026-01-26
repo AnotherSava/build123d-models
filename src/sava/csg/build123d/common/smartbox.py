@@ -4,6 +4,7 @@ from math import radians, tan
 from build123d import Axis, Edge, Face, Location, Solid, Vector, Wire, loft
 
 from sava.common.advanced_math import advanced_mod
+from sava.common.logging import logger
 from sava.csg.build123d.common.geometry import Alignment, Direction, are_numbers_too_close, snap_to, format_float
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -51,7 +52,7 @@ class SmartBox(SmartSolid):
         if label:
             dimensions = f"{format_float(length)} x {format_float(width)}"
             tapered_dimensions = ' -> ' + (format_float(tapered_length) + ' x ' + format_float(tapered_width)) if self.tapered else ''
-            print(f"Smart box '{label}': {dimensions}{tapered_dimensions}, height: {format_float(height)}")
+            logger.info(f"Smart box '{label}': {dimensions}{tapered_dimensions}, height: {format_float(height)}")
 
         if self.tapered:
             base = Face(Wire.make_rect(length, width))
