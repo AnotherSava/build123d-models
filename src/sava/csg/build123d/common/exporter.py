@@ -87,17 +87,30 @@ def clear() -> None:
     _index = 1
 
 
+def _copy_shape_for_storage(shape):
+    """Create a copy of a shape for storage to capture current state."""
+    from sava.csg.build123d.common.smartsolid import SmartSolid
+
+    if isinstance(shape, SmartSolid):
+        return shape.copy()
+    elif isinstance(shape, Iterable) and not isinstance(shape, Shape):
+        # Consume iterator and copy each element
+        return [_copy_shape_for_storage(item) for item in shape]
+    else:
+        return copy(shape)
+
+
 def export(shape, label: str = None):
     """Add shape to export storage under the given label."""
     global _index
-    label = label or shape.label
+    label = label or getattr(shape, 'label', None)
     if label is None:
         label = f"shape_{_index}"
         _index += 1
 
     if label not in _shapes:
         _shapes[label] = []
-    _shapes[label].append(shape)
+    _shapes[label].append(_copy_shape_for_storage(shape))
 
     return shape
 

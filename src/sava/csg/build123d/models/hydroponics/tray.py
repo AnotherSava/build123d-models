@@ -358,10 +358,10 @@ def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: Smar
         for direction_y in [-1, 1]:
             peg.align_xy(tray, Alignment.C, direction_x * dimensions.peg_hole_offset_x, direction_y * dimensions.watering_hole_offset_y)
             peg.align_z(tray, Alignment.RR, -dimensions.tray_height)
-            export(peg.copy())
+            export(peg)
 
             peg_cap.align_zxy(peg, Alignment.RL, dimensions.peg_cap_handle_height)
-            export(peg_cap.copy())
+            export(peg_cap)
 
     watering_hole_cap.align_xy(tray, Alignment.C, dimensions.watering_hole_offset_x, dimensions.watering_hole_offset_y)
     watering_hole_cap.align_z(tray, Alignment.LR)
