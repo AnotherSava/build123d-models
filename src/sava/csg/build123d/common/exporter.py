@@ -6,10 +6,10 @@ from copy import copy
 from pathlib import Path
 from typing import Iterable
 
-from build123d import Shape, Color, Mesher, Plane, Wire, Compound, Edge, BoundBox
+from build123d import Shape, Color, Mesher, Plane, Wire, Compound, Edge, BoundBox, Face
 
 from sava.common.logging import logger
-from sava.csg.build123d.common.geometry import solidify_wire, solidify_edges
+from sava.csg.build123d.common.geometry import solidify_wire, solidify_edges, solidify_faces
 from sava.csg.build123d.common.smartplane import SmartPlane
 from sava.csg.build123d.common.smartsolid import get_solid
 
@@ -59,6 +59,8 @@ def _prepare_shape(shape, label: str, edge_max_length: float = None) -> Iterable
         extracted = solidify_wire(shape).solid
     elif isinstance(shape, Edge):
         extracted = solidify_edges(shape, max_length=edge_max_length).solid
+    elif isinstance(shape, Face):
+        extracted = solidify_faces(shape).solid
     elif isinstance(shape, BoundBox):
         # Convert BoundBox to a visible box solid
         box = Box(shape.size.X, shape.size.Y, shape.size.Z)
@@ -100,34 +102,38 @@ def _copy_shape_for_storage(shape):
         return copy(shape)
 
 
-def export(shape, label: str = None):
-    """Add shape to export storage under the given label."""
+def export(*shapes, label: str = None):
+    """Add shape(s) to export storage.
+
+    If label is provided, all shapes use that label.
+    Otherwise, each shape uses its own .label attribute or gets an auto-generated label.
+    """
     global _index
-    label = label or getattr(shape, 'label', None)
-    if label is None:
-        label = f"shape_{_index}"
-        _index += 1
 
-    if label not in _shapes:
-        _shapes[label] = []
-    _shapes[label].append(_copy_shape_for_storage(shape))
+    for shape in shapes:
+        shape_label = label or getattr(shape, 'label', None)
+        if shape_label is None:
+            shape_label = f"shape_{_index}"
+            _index += 1
 
-    return shape
-
-
-def show_red(shape):
-    """Export shape with 'red' label."""
-    return export(shape, "red")
+        if shape_label not in _shapes:
+            _shapes[shape_label] = []
+        _shapes[shape_label].append(_copy_shape_for_storage(shape))
 
 
-def show_blue(shape):
-    """Export shape with 'blue' label."""
-    return export(shape, "blue")
+def show_red(*shapes):
+    """Export shape(s) with 'red' label."""
+    export(*shapes, label="red")
 
 
-def show_green(shape):
-    """Export shape with 'green' label."""
-    return export(shape, "green")
+def show_blue(*shapes):
+    """Export shape(s) with 'blue' label."""
+    export(*shapes, label="blue")
+
+
+def show_green(*shapes):
+    """Export shape(s) with 'green' label."""
+    export(*shapes, label="green")
 
 
 def get_project_root_folder() -> Path:
@@ -230,7 +236,7 @@ def _save_3mf(location: str) -> None:
             for prepared in _prepare_shape(shape, label, edge_max_length):
                 with warnings.catch_warnings(record=True) as caught_warnings:
                     warnings.simplefilter("always")
-                    mesher.add_shape(prepared)
+                    mesher.add_shape(prepared, angular_deflection=0.05)
 
                     # Print any warnings with label information
                     for w in caught_warnings:

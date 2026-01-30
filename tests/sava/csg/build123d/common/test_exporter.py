@@ -28,22 +28,22 @@ class TestExport(unittest.TestCase):
     def test_export_custom_label(self):
         """Test export with custom label"""
         box = Box(10, 10, 10)
-        export(box, "custom")
+        export(box, label="custom")
 
         self.assertIn("custom", _shapes)
         self.assertEqual(len(_shapes["custom"]), 1)
 
     def test_export_multiple_shapes_same_label(self):
         """Test exporting multiple shapes with the same label"""
-        export(Box(10, 10, 10), "parts")
-        export(Box(5, 5, 5), "parts")
+        export(Box(10, 10, 10), label="parts")
+        export(Box(5, 5, 5), label="parts")
 
         self.assertEqual(len(_shapes["parts"]), 2)
 
     def test_export_multiple_labels(self):
         """Test exporting shapes with different labels"""
-        export(Box(10, 10, 10), "body")
-        export(Box(5, 5, 5), "screw")
+        export(Box(10, 10, 10), label="body")
+        export(Box(5, 5, 5), label="screw")
 
         self.assertIn("body", _shapes)
         self.assertIn("screw", _shapes)
@@ -160,7 +160,7 @@ class TestClear(unittest.TestCase):
 
     def test_clear_removes_shapes(self):
         """Test that clear removes all stored shapes"""
-        export(Box(10, 10, 10), "test")
+        export(Box(10, 10, 10), label="test")
         self.assertEqual(len(_shapes), 1)
 
         clear()
@@ -192,8 +192,8 @@ class TestSave3mf(unittest.TestCase):
 
     def test_save_3mf_with_multiple_labels(self):
         """Test that save_3mf works with multiple labels"""
-        export(Box(10, 10, 10), "body")
-        export(Box(5, 5, 5), "screw")
+        export(Box(10, 10, 10), label="body")
+        export(Box(5, 5, 5), label="screw")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             filepath = os.path.join(tmpdir, "multi_label.3mf")
@@ -210,8 +210,8 @@ class TestSaveStl(unittest.TestCase):
 
     def test_save_stl_creates_files_per_label(self):
         """Test that save_stl creates separate files for each label"""
-        export(Box(10, 10, 10), "body")
-        export(Box(5, 5, 5), "screw")
+        export(Box(10, 10, 10), label="body")
+        export(Box(5, 5, 5), label="screw")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             save_stl(tmpdir)
@@ -221,7 +221,7 @@ class TestSaveStl(unittest.TestCase):
 
     def test_save_stl_single_label(self):
         """Test that save_stl works with a single label"""
-        export(Box(10, 10, 10), "model")
+        export(Box(10, 10, 10), label="model")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             save_stl(tmpdir)

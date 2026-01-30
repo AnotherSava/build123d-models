@@ -4,7 +4,7 @@ from enum import Enum, IntEnum, auto
 from math import cos, sin, radians, atan2, degrees, acos
 from typing import TYPE_CHECKING, Tuple
 
-from build123d import Vector, Axis, Wire, Face, Plane, VectorLike, sweep, Solid, ShapeList, Edge
+from build123d import Vector, Axis, Wire, Face, Plane, VectorLike, sweep, Solid, ShapeList, Edge, extrude
 from build123d.topology import Mixin1D
 
 # TYPE_CHECKING import for type hints only; runtime import is lazy to avoid circular dependency
@@ -621,3 +621,36 @@ def solidify_edges(*edges: Edge, max_length: float = None) -> 'SmartSolid':
     if max_length is None:
         max_length = max(edge.length for edge in edges)
     return _solidify_edges_with_length(list(edges), max_length)
+
+
+def solidify_faces(*faces: Face, max_dimension: float = None) -> 'SmartSolid':
+    """Convert faces to 3D solids by extruding them to both sides.
+
+    Extrudes each face symmetrically (half thickness each direction) along its normal.
+    The thickness is automatically calculated based on the provided max_dimension
+    or the largest face dimension if not provided.
+
+    Args:
+        *faces: One or more Face objects to solidify
+        max_dimension: Dimension used to calculate extrusion thickness. If not provided,
+            uses the largest dimension across all faces.
+
+    Returns:
+        SmartSolid containing the solidified faces
+    """
+    from sava.csg.build123d.common.smartsolid import SmartSolid
+
+    if max_dimension is None:
+        max_dimension = max(max(f.bounding_box().size.X, f.bounding_box().size.Y, f.bounding_box().size.Z) for f in faces)
+
+    thickness = _choose_diameter(max_dimension)
+    half_thickness = thickness / 2
+
+    shapes = []
+    for face in faces:
+        normal = face.normal_at()
+        # Extrude half thickness in both directions
+        solid = extrude(face, half_thickness, dir=normal) + extrude(face, half_thickness, dir=-normal)
+        shapes.append(solid)
+
+    return SmartSolid(shapes)
