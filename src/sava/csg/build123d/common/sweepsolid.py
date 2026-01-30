@@ -1,118 +1,81 @@
 from copy import copy
 
-from build123d import sweep, Plane, SweepType, Wire, Vector, ShapeList
+from build123d import sweep, Plane, SweepType, Wire, Vector, Location, Axis, VectorLike
 
-from sava.csg.build123d.common.geometry import create_wire_tangent_plane, multi_rotate_vector, create_plane_from_planes
+from sava.csg.build123d.common.geometry import create_wire_tangent_plane, create_plane_from_planes, multi_rotate_vector
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 class SweepSolid(SmartSolid):
     def __init__(self, sketch: SweepType, path: Wire, path_plane: Plane, label: str = None):
         self.sketch = sketch
-        self.path = path
-        self.plane_path = path_plane
+        self.path = copy(path)
+        self.plane_path = copy(path_plane)
 
         super().__init__(sweep(sketch, path), label=label)
-        
-        # Store the initial solid center to track movement (center reflects actual global position)
-        self.initial_solid_center = self.solid.center()
-        
+
     def copy(self) -> 'SweepSolid':
         sweep_solid = SweepSolid(self.sketch, self.path, self.plane_path)
         sweep_solid.solid = copy(self.solid)
+        sweep_solid.path = copy(self.path)
+        sweep_solid.plane_path = copy(self.plane_path)
         return sweep_solid
 
-    def _get_current_orientation(self) -> Vector:
-        """Get the current orientation of the solid.
-        
-        For single shapes, returns the orientation directly.
-        For ShapeList, returns the orientation of the first shape.
+    def move(self, x: float, y: float = 0, z: float = 0) -> 'SweepSolid':
+        super().move(x, y, z)
+        location = Location(Vector(x, y, z))
+        self.path = self.path.move(location)
+        self.plane_path.origin += Vector(x, y, z)
+        return self
 
-        Returns:
-            Current orientation as Vector(X, Y, Z) in degrees
-        """
-        return self.solid[0].orientation if isinstance(self.solid, ShapeList) else  self.solid.orientation
+    def rotate(self, axis: Axis, angle: float) -> 'SweepSolid':
+        super().rotate(axis, angle)
+        self.path = self.path.rotate(axis, angle)
+        self.plane_path = self.plane_path.rotated(axis, angle)
+        return self
+
+    def orient(self, rotations: VectorLike) -> 'SweepSolid':
+        # Get solid center before orientation change for rotating plane origin around it
+        solid_center = self.solid.center()
+
+        super().orient(rotations)
+        self.path.orientation = rotations
+
+        # Rotate plane direction vectors
+        self.plane_path = self.plane_path.rotated(rotations)
+
+        # Rotate plane origin around the solid center
+        relative_origin = self.plane_path.origin - solid_center
+        rotated_origin = multi_rotate_vector(relative_origin, Plane.XY, Vector(*rotations))
+        self.plane_path.origin = solid_center + rotated_origin
+
+        return self
 
     def create_path_plane(self) -> Plane:
-        """Create a plane for the sweep path with movement and rotation tracking.
+        """Return the path plane, already transformed with the object.
 
         Returns:
-            Plane that contains the wire path, adjusted for object movement and rotation.
-            This is the original path plane transformed to account for any changes to the object.
+            Plane that contains the wire path, matching the object's current position and rotation.
         """
-        # Start with a copy of the original path plane
-        plane = copy(self.plane_path)
-        
-        # Calculate the actual movement by comparing current solid center with initial solid center
-        current_solid_center = self.solid.center()
-        movement_offset = current_solid_center - self.initial_solid_center
-        
-        # Get current rotation (initial orientation is always (0, 0, 0) for swept solids)
-        current_rotation = self._get_current_orientation()
-        
-        # Apply rotation to the plane orientation
-        plane = plane.rotated((current_rotation.X, current_rotation.Y, current_rotation.Z))
-        
-        # Rotate the plane origin around the solid center
-        relative_origin = plane.origin - self.initial_solid_center
-        rotated_relative_origin = multi_rotate_vector(relative_origin, Plane.XY, current_rotation)
-        plane.origin = self.initial_solid_center + rotated_relative_origin
-        
-        # Apply movement offset to the plane origin
-        plane.origin += movement_offset
-        
-        return plane
-
+        return copy(self.plane_path)
 
     def _create_plane_at_position(self, t: float) -> Plane:
         """Create a plane at position t along the wire with movement and rotation tracking.
         X-axis is aligned with the path plane.
-        
+
         Args:
             t: Position along wire (0.0 = start, 1.0 = end)
-            
+
         Returns:
-            Plane positioned at the wire location, adjusted for object movement and rotation,
+            Plane positioned at the wire location, matching the object's current position and rotation,
             with x-axis aligned to the path plane
         """
+        # Create tangent plane from the transformed path (already tracks movement/rotation)
         plane = create_wire_tangent_plane(self.path, t)
-        
-        # Calculate the actual movement by comparing current solid center with initial solid center
-        current_solid_center = self.solid.center()
-        movement_offset = current_solid_center - self.initial_solid_center
-        
-        # Get current rotation (initial orientation is always (0, 0, 0) for swept solids)
-        current_rotation = self._get_current_orientation()
-        
-        # Get the original wire position
-        wire_position = self.path.position_at(t)
-        
-        # Account for how the wire position moves relative to the solid center during rotation
-        rotation_center = self.initial_solid_center
-        
-        # Calculate the wire position relative to the rotation center
-        relative_wire_position = wire_position - rotation_center
-        
-        # Apply the rotation to the relative position
-        rotated_relative_position = multi_rotate_vector(relative_wire_position, Plane.XY, current_rotation)
-        
-        # Calculate the final wire position after rotation
-        rotated_wire_position = rotation_center + rotated_relative_position
-        
-        # Apply rotation to the plane orientation as well
-        plane = plane.rotated((current_rotation.X, current_rotation.Y, current_rotation.Z))
-        
-        # Get the transformed path plane for x-axis alignment
-        path_plane = self.create_path_plane()
-        
+
         # Align x-axis with the path plane
-        plane = create_plane_from_planes(plane, path_plane)
-        
-        # The target position includes both rotation and movement
-        target_position = rotated_wire_position + movement_offset
-        
-        # Adjust plane origin so that from_local_coords((0,0,0)) equals target_position
-        plane.origin = target_position
+        plane = create_plane_from_planes(plane, self.plane_path)
+
         return plane
 
     # Create a plane with the following requirements:
