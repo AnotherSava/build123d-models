@@ -54,6 +54,10 @@ class AlignmentBuilder:
     def yz(self, alignment: 'Alignment' = Alignment.C, shift_y: float = 0, shift_z: float = 0) -> 'AlignmentBuilder':
         return self.y(alignment, shift_y).z(alignment, shift_z)
 
+    def done(self) -> 'SmartSolid':
+        """Return the SmartSolid for further chaining with other methods."""
+        return self.target
+
     def then(self) -> 'SmartSolid':
         """Return the SmartSolid for further chaining with other methods."""
         return self.target
@@ -246,6 +250,15 @@ class SmartSolid:
     def rotated(self, axis: Axis, angle: float) -> 'SmartSolid':
         return self.copy().rotate(axis, angle)
 
+    def rotate_x(self, angle: float) -> 'SmartSolid':
+        return self.rotate(Axis.X, angle)
+
+    def rotate_y(self, angle: float) -> 'SmartSolid':
+        return self.rotate(Axis.Y, angle)
+
+    def rotate_z(self, angle: float) -> 'SmartSolid':
+        return self.rotate(Axis.Z, angle)
+
     # Orientation in build123d works a bit weird:
     # (a, b, c) input does rotate "a" degrees around axis X, then "b" degrees around axis Y, then "c" degrees around axis Z.
     # But those axes are not in the original coordinate system (plane), but in a coordinate system attached to the object itself.
@@ -384,7 +397,8 @@ class SmartSolid:
 
     def _fillet(self, axis_orientational: Axis, radius: float, axis_positional: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] | None = None, angle_tolerance: float = 1e-5) -> 'SmartSolid':
         edges = filter_edges_by_axis(self.solid.edges(), axis_orientational, angle_tolerance)
-        edges = self._filter_positional(edges, PositionalFilter(axis_positional, minimum, maximum, inclusive))
+        if axis_positional:
+            edges = self._filter_positional(edges, PositionalFilter(axis_positional, minimum, maximum, inclusive))
         self.solid = fillet(edges, radius)
         return self
 
@@ -443,12 +457,19 @@ class SmartSolid:
         return self
 
     def intersect(self, *args) -> 'SmartSolid':
-        self.solid = self.solid & fuse(args)
+        original = self.solid
+        other = fuse(args)
+        self.solid = original & other
+        # Workaround for build123d bug: retry without cleaning if invalid
+        # https://github.com/gumyr/build123d/issues/1215
+        if self.solid is not None and not self.wrap_solid().is_valid:
+            with SkipClean():
+                self.solid = original & other
         self.assert_valid()
         return self
 
     def intersected(self, *args, label: str = None) -> 'SmartSolid':
-        return self.copy(label).intersect(args)
+        return self.copy(label).intersect(*args)
 
     def add_notch(self, direction: Direction, depth: float, length: float):
         raise NotImplementedError("Remove dependency on pencil")
