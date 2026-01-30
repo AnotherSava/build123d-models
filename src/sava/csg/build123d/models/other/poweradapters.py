@@ -329,7 +329,7 @@ class PowerAdapterBox(PowerAdapterBase):
         text = create_text(self.dim.socket_text, label)
         if row == 1:
             recess.orient((0, 0, 180))
-            text.rotate(Axis.Z, 180)
+            text.rotate_z(180)
 
         # Position recess relative to box based on row/col
         x_offset = (self.dim.socket_padding + self.dim.socket_side) * (col - 2.5)
@@ -362,15 +362,11 @@ power_adapter_lid = PowerAdapterLid(dimensions)
 
 def export_3mf(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartSolid):
     # clear()
-    export(lid.fuse(snaps), "lid")
-    export(text)
-
     box.align_zxy(lid, Alignment.RR, -dimensions.lid_height - dimensions.box_wider_height)
     socket_texts.colocate(box)
 
-    export(box)
-    export(socket_texts)
-
+    export(lid.fuse(snaps), label="lid")
+    export(text, box, socket_texts)
     save_3mf("models/other/power_adapters/export.3mf", True)
 
 def export_stl(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartSolid):
@@ -380,11 +376,8 @@ def export_stl(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps
     snaps.colocate(lid)
     text.colocate(lid)
 
-    export(box)
-    export(socket_texts)
-    export(lid.fuse(snaps), "lid")
-    export(text)
-
+    export(box, socket_texts, text)
+    export(lid.fuse(snaps), label="lid")
     save_stl("models/other/power_adapters/stl")
 
 

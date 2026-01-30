@@ -29,8 +29,8 @@ class ConnectorRecesses:
 
         extra_holes = []
         for x_offset in [0, 33]:
-            for y_offset in [0, width / 2]:
-                extra_holes.append(SmarterCone.cylinder(7.5 / 2, 16.5).move(x_offset, y_offset))
+            for y_offset in [0, 15]:
+                extra_holes.append(SmarterCone.cylinder(7.7 / 2, 16.5).move(x_offset, y_offset))
 
         holes = SmartSolid(extra_holes)
         holes.align(connector_cut).z(Alignment.RL)
@@ -133,7 +133,7 @@ cable_storage = CableStorage(dimensions)
 
 for connector in SidewayConnector:
     holder_solid = cable_storage.create_sideways_holder(connector)
-    export(holder_solid.oriented((180, 0, 0)))
+    export(holder_solid.orient((180, 0, 0)))
 
 save_stl("models/other/cable_storage/stl")
 clear()
