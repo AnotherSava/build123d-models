@@ -4,7 +4,7 @@ from typing import Tuple, Iterable
 
 from bd_warehouse.fastener import hex_recess
 from bd_warehouse.thread import IsoThread
-from build123d import Solid, Vector, Axis, Plane, Wire, Face, loft, extrude
+from build123d import Solid, Vector, Axis, Plane, Wire, Face
 
 from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
 from sava.csg.build123d.common.geometry import Alignment, create_vector
@@ -13,6 +13,7 @@ from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_handle_wire
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
+from sava.csg.build123d.common.smartloft import SmartLoft
 from sava.csg.build123d.common.smartsolid import SmartSolid, fuse, PositionalFilter
 from sava.csg.build123d.models.hydroponics.basket import BasketDimensions
 
@@ -75,7 +76,7 @@ class TrayDimensions:
 
     @property
     def basket_hole_width(self) -> float:
-        return self.basket_dimensions.cap_diameter_outer_wide + self.basket_gap
+        return self.basket_dimensions.rim_diameter_outer_wide + self.basket_gap
 
     def __post_init__(self):
         if self.basket_dimensions is None:
@@ -231,19 +232,18 @@ class TrayFactory:
 
     def create_basket_hole(self) -> SmartSolid:
         dim = self.dim.basket_dimensions
-        cap_45_outer = SmarterCone.with_base_angle(dim.cap_diameter_outer_middle / 2 + self.dim.basket_gap, 180 - dim.cap_angle, self.dim.basket_hole_width / 2)
+        rim_outer = SmarterCone.with_base_angle(dim.rim_diameter_outer_middle / 2 + self.dim.basket_gap, 180 - dim.rim_angle, self.dim.basket_hole_width / 2)
 
-        leg_holder_boundary = SmarterCone.cylinder(dim.cap_diameter_outer_middle / 2 + self.dim.basket_gap, self.dim.tray_height)
-        leg_holder_boundary.align_zxy(cap_45_outer, Alignment.RL)
+        leg_holder_boundary = SmarterCone.cylinder(dim.rim_diameter_outer_middle / 2 + self.dim.basket_gap, self.dim.tray_height)
+        leg_holder_boundary.align_zxy(rim_outer, Alignment.RL)
 
         for angle_shift in [0, 180]:
-            start_arc_angle = self.dim.basket_notch_angle - self.dim.basket_notch_arc_angle / 2 + angle_shift
-            top = create_handle_wire(cap_45_outer.center(1), create_vector(cap_45_outer.top_radius, start_arc_angle), self.dim.basket_notch_arc_angle, self.dim.basket_notch_width)
-            bottom = create_handle_wire(cap_45_outer.center(0.5), create_vector(cap_45_outer.radius(0.5), start_arc_angle), self.dim.basket_notch_arc_angle, 0.1)
-            handle = SmartSolid(loft([Face(top), Face(bottom)]))
-            cap_45_outer.fuse(handle)
+            top = create_handle_wire(rim_outer.top_radius, self.dim.basket_notch_arc_angle, self.dim.basket_notch_width, rim_outer.center(1))
+            bottom = create_handle_wire(rim_outer.radius(0.5), self.dim.basket_notch_arc_angle, 0.1, rim_outer.center(0.5))
+            handle = SmartLoft.create(bottom, top).rotate_z(self.dim.basket_notch_angle + angle_shift)
+            rim_outer.fuse(handle)
 
-        return cap_45_outer.fuse(leg_holder_boundary)
+        return rim_outer.fuse(leg_holder_boundary)
 
     def create_cutout(self) -> SmartSolid:
         l = (self.dim.cutout_length - self.dim.cutout_diameter / 2 * (1 + sin(radians(self.dim.cutout_angle))))
@@ -327,7 +327,7 @@ class TrayFactory:
         cap_base.align_zxy(peg_cap, Alignment.RL)
 
         hex_socket_face = hex_recess(self.dim.peg_cap_hex_socket_size)
-        hex_socket = SmartSolid(extrude(hex_socket_face, self.dim.peg_cap_hex_socket_depth))
+        hex_socket = SmartLoft.extrude(hex_socket_face, self.dim.peg_cap_hex_socket_depth)
         hex_socket.align_zxy(peg_cap, Alignment.RL)
 
         return peg_cap.fuse(thread_screw_solid, cap_base).cut(hex_socket)
@@ -349,8 +349,7 @@ tray_factory = TrayFactory(dimensions)
 
 
 def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: SmartSolid, watering_hole_cap: SmartSolid):
-    for piece in tray_pieces:
-        export(piece)
+    export(*tray_pieces)
 
     tray = SmartSolid(tray_pieces)
 
@@ -379,12 +378,7 @@ def export_all():
     export_3mf(tray_solid_pieces, peg_solid, peg_cap_solid, watering_hole_cap_solid)
 
     clear()
-    for piece in [*tray_solid_pieces, *tray_solid_pieces_no_peg_holes]:
-        export(piece)
-
-    export(peg_solid)
-    export(peg_cap_solid)
-    export(watering_hole_cap_solid)
+    export(*tray_solid_pieces, *tray_solid_pieces_no_peg_holes, peg_solid, peg_cap_solid, watering_hole_cap_solid)
 
     save_stl("models/hydroponic/tray/stl")
 

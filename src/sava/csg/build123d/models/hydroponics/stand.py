@@ -3,13 +3,14 @@ from dataclasses import dataclass
 from math import radians, sin, degrees, asin
 from math import tan
 
-from build123d import Solid, Trapezoid, Circle, Location, fillet, loft, extrude, Face, revolve, Axis, Wire
+from build123d import Solid, Trapezoid, Circle, Location, fillet, Face, revolve, Axis, Wire
 
 from sava.csg.build123d.common.exporter import export, save_3mf
 from sava.csg.build123d.common.geometry import Alignment, Direction, create_plane, create_vector
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_cone_with_angle
 from sava.csg.build123d.common.smartcone import SmartCone
+from sava.csg.build123d.common.smartloft import SmartLoft
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.sweepsolid import SweepSolid
 from sava.csg.build123d.models.hydroponics.connector import HoseConnectorFactory, HoseConnectorDimensions
@@ -183,12 +184,13 @@ class HydroponicsStand:
         return pencil.create_face()
 
     def create_pipe_cover(self, inlet_pipe_outer: SweepSolid, outlet_pipe_outer: SweepSolid, tube: SmartSolid) -> SmartSolid:
-        middle_part_faces = [self.create_pipe_cover_face_middle(pipe) for pipe in [inlet_pipe_outer, outlet_pipe_outer]]
-        middle_part = SmartSolid(loft(middle_part_faces))
+        inlet_face = self.create_pipe_cover_face_middle(inlet_pipe_outer)
+        outlet_face = self.create_pipe_cover_face_middle(outlet_pipe_outer)
+        middle_part = SmartLoft.create(inlet_face, outlet_face)
 
         face1 = self.create_pipe_cover_face_wider(inlet_pipe_outer, self.dim.pipe.radius_outer)
         face2 = self.create_pipe_cover_face_wider(outlet_pipe_outer, -self.dim.pipe.radius_outer)
-        wider_part = SmartSolid(loft([face1, face2]))
+        wider_part = SmartLoft.create(face1, face2)
 
         return wider_part.fuse(middle_part).intersect(tube.scaled(2, 2, 1))
 
@@ -288,7 +290,7 @@ class HydroponicsStand:
     def create_outlet_hole(self, outlet_pipe_inner: SweepSolid):
         skip_height = -self.dim.hose_connector.connector_offset_z
         face = self.create_pipe_cover_face_wider(outlet_pipe_inner, skip_height=skip_height)
-        outlet_hole = SmartSolid(extrude(face, self.dim.pipe.diameter_inner))
+        outlet_hole = SmartLoft.extrude(face, self.dim.pipe.diameter_inner)
 
         plane = outlet_pipe_inner.create_plane_end()
         outlet_hole.align_x(None, Alignment.CR, plane=plane)
@@ -314,7 +316,7 @@ class HydroponicsStand:
         cone_bottom_angle = self.dim.support_free_angle - self.dim.tube_floor_angle
 
         invert = SmartCone.create_empty(90 - self.dim.support_free_angle, self.dim.tube_internal_diameter, self.dim.tube_floor_thickness, cone_bottom_angle)
-        invert.rotate_multi((0, 180, 0))
+        invert.rotate_y(180)
         pipe_path_plane = outlet_pipe_outer.create_path_plane()
 
         height_outlet = self.dim.tube_wall_thickness * 2.25

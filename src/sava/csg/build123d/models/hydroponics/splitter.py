@@ -52,7 +52,7 @@ class HydroponicsSplitterFactory:
         # show_red(connector_inner)
 
         side_pipe_outer = SmartSolid(Solid.make_cylinder(pipe_diameter_outer / 2, self.dim.side_pipe_length))
-        side_pipe_outer.rotate_multi((0, 90))
+        side_pipe_outer.rotate_y(90)
         side_pipe_outer.align_x(connector, Alignment.CR)
         side_pipe_outer.align_y(connector)
         side_pipe_outer_z = (self.dim.pipe_length + self.dim.length) / 2
@@ -123,11 +123,8 @@ splitter_factory = HydroponicsSplitterFactory(dimensions)
 
 
 def export_3mf(splitter: SmartSolid, screw: SmartSolid):
-    export(splitter)
-
     screw.move_x(-30).align_z(splitter, Alignment.LR)
-    export(screw)
-
+    export(splitter, screw)
     save_3mf("models/hydroponic/splitter/export.3mf", current=True)
 
 def export_all():
@@ -137,9 +134,7 @@ def export_all():
     export_3mf(splitter_solid, screw_solid)
 
     clear()
-    export(splitter_solid)
-    export(screw_solid)
-
+    export(splitter_solid, screw_solid)
     save_stl("models/hydroponic/splitter/stl")
 
 export_all()
