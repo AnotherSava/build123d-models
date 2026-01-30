@@ -250,3 +250,7 @@ D:\projects\3d\build123d-models\venv\Scripts\python.exe -m pytest tests/
   # Also acceptable for single-line if not too long
   thread = IsoThread(major_diameter=major_diameter, pitch=pitch, length=height, external=False, end_finishes=("chamfer", "fade"))
   ```
+
+### Early Returns
+
+Avoid adding early return guards like `if not items: return` when the function would behave identically without them (e.g., a `for` loop over an empty collection naturally does nothing). Only add early returns when they actually change behavior or prevent errors.
