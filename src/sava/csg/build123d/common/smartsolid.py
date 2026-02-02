@@ -1,12 +1,15 @@
 from copy import copy
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, TYPE_CHECKING
 
 from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean
 
 from sava.common.common import flatten
 from sava.common.logging import logger
 from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, filter_edges_by_position, filter_edges_by_axis
+
+if TYPE_CHECKING:
+    from sava.csg.build123d.common.smartbox import SmartBox
 
 
 @dataclass
@@ -120,10 +123,10 @@ class SmartSolid:
         transformed = solid.moved(plane.location.inverse())
         return transformed.bounding_box()
 
-    def create_bound_box(self, plane: Plane = Plane.XY) -> 'SmartSolid':
+    def create_bound_box(self, plane: Plane = Plane.XY) -> 'SmartBox':
         bound_box = self.get_bound_box(plane)
-        box_solid = Solid.make_box(bound_box.size.X, bound_box.size.Y, bound_box.size.Z, plane)
-        return SmartSolid(box_solid).align_old(self, plane=plane)
+        from sava.csg.build123d.common.smartbox import SmartBox
+        return SmartBox(bound_box.size.X, bound_box.size.Y, bound_box.size.Z, plane=plane).align_old(self, plane=plane)
 
     @property
     def x_min(self) -> float:

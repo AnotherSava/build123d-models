@@ -1,7 +1,7 @@
 from copy import copy
 from math import radians, tan
 
-from build123d import Axis, Edge, Face, Location, Solid, Vector, Wire, loft
+from build123d import Axis, Edge, Face, Location, Plane, Solid, Vector, Wire, loft
 
 from sava.common.advanced_math import advanced_mod
 from sava.common.logging import logger
@@ -31,7 +31,7 @@ class SmartBox(SmartSolid):
         angled = SmartBox.with_base_angles_and_height(100, 80, 50, 80, 80)
     """
 
-    def __init__(self, length: float, width: float, height: float, tapered_length: float = None, tapered_width: float = None, label: str = None):
+    def __init__(self, length: float, width: float, height: float, tapered_length: float = None, tapered_width: float = None, plane: Plane = Plane.XY, label: str = None):
         """
         Creates a box, optionally tapered.
 
@@ -41,6 +41,7 @@ class SmartBox(SmartSolid):
             height: Height (Z dimension)
             tapered_length: Length at the top (defaults to length if None)
             tapered_width: Width at the top (defaults to width if None)
+            plane: Plane to create the box in (default: XY)
             label: Optional label for export
         """
         self.length = length
@@ -61,10 +62,13 @@ class SmartBox(SmartSolid):
         else:
             solid = Solid.make_box(length, width, height).move(Location((-length / 2, -width / 2, 0)))
 
+        if plane != Plane.XY:
+            solid = solid.locate(Location(plane))
+
         super().__init__(solid, label=label)
 
     @classmethod
-    def with_base_angles_and_height(cls, length: float, width: float, height: float, angle_length: float, angle_width: float, label: str = None) -> 'SmartBox':
+    def with_base_angles_and_height(cls, length: float, width: float, height: float, angle_length: float, angle_width: float, plane: Plane = Plane.XY, label: str = None) -> 'SmartBox':
         """
         Creates a tapered box defined by base dimensions, height, and wall angles.
 
@@ -74,6 +78,7 @@ class SmartBox(SmartSolid):
             height: Height of the box
             angle_length: Angle of length-direction walls from horizontal (90° = vertical, <90° = inward taper)
             angle_width: Angle of width-direction walls from horizontal (90° = vertical, <90° = inward taper)
+            plane: Plane to create the box in (default: XY)
             label: Optional label for the box
 
         Returns:
@@ -113,9 +118,9 @@ class SmartBox(SmartSolid):
         # Positive angle: base params at bottom, opposite at top
         # Negative angle: base params at top, opposite at bottom
         if angle_length > 0:
-            return SmartBox(length, width, height, opposite_length, opposite_width, label)
+            return SmartBox(length, width, height, opposite_length, opposite_width, plane, label)
         else:
-            return SmartBox(opposite_length, opposite_width, height, length, width, label)
+            return SmartBox(opposite_length, opposite_width, height, length, width, plane, label)
 
     @property
     def tapered(self) -> bool:
@@ -173,7 +178,7 @@ class SmartBox(SmartSolid):
         offset_tapered_width = self.tapered_width + (n - self.slope_width * u) + (s - self.slope_width * u)
         offset_height = self.height + d + u
 
-        offset_box = SmartBox(offset_length, offset_width, offset_height, offset_tapered_length, offset_tapered_width, label)
+        offset_box = SmartBox(offset_length, offset_width, offset_height, offset_tapered_length, offset_tapered_width, label=label)
         offset_box.move(self.x_mid + (e - w) / 2, self.y_mid + (n - s) / 2, self.z_min - d)
 
         return offset_box
