@@ -271,6 +271,15 @@ def create_file_path(location: str, filename: str = None) -> str:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     return path
 
+def export_stl(directory: str, *shapes) -> None:
+    clear()
+    export(*shapes)
+    save_stl(directory)
+
+def export_3mf(directory: str, *shapes) -> None:
+    export(*shapes)
+    save_3mf(directory, True)
+
 def save_stl(directory: str = None) -> None:
     """Save each label group to separate STL files."""
     base_dir = directory or CURRENT_MODEL_LOCATION_STL
