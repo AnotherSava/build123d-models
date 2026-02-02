@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from math import radians, tan
+from math import radians, tan, cos
 from typing import Callable, Tuple
 
 from build123d import Axis, Plane
@@ -78,6 +78,10 @@ class CableStorageDimensions:
     cable_hole_fillet_radius: float = 0.9
     railing_fillet_radius: float = 1
 
+    railing_gap_between_rails: float = 0.1
+    railing_handle_height: float = 5
+    railing_gap: float = 0.05
+
 class CableStorage:
     def __init__(self, dim: CableStorageDimensions):
         self.dim = dim
@@ -126,18 +130,36 @@ class CableStorage:
 
         return result
 
+    def create_rail(self) -> SmartSolid:
+        dim = self.dim
+
+        pencil = Pencil(Plane.YZ)
+        pencil.right(dim.railing_gap_between_rails / 2 + dim.railing_gap)
+        pencil.jump((dim.railing_offset, dim.railing_offset))
+        pencil.fillet(self.dim.railing_fillet_radius)
+        pencil.up_to(dim.height - dim.railing_ceiling_thickness - dim.railing_width / 2)
+        pencil.arc_with_radius(dim.railing_width / 2 - dim.railing_gap, -90, -180)
+        pencil.down_to(dim.railing_offset-dim.railing_offset * cos(radians(45)))
+        pencil.fillet(self.dim.railing_fillet_radius)
+        pencil.jump((-dim.railing_offset, -dim.railing_offset))
+        pencil.fillet(self.dim.railing_fillet_radius)
+        pencil.down(dim.railing_handle_height)
+        pencil.left()
+        return pencil.extrude_mirrored_y(10)
+
+
 # logging.getLogger('sava').setLevel(logging.DEBUG)
 
 dimensions = CableStorageDimensions()
 cable_storage = CableStorage(dimensions)
 
+export(cable_storage.create_sideways_holder(SidewayConnector.DVI_TO_DVI))
+save_3mf("models/other/cable_storage/export.3mf", True)
+
+clear()
 for connector in SidewayConnector:
-    holder_solid = cable_storage.create_sideways_holder(connector)
-    export(holder_solid.orient((180, 0, 0)))
+    export(cable_storage.create_sideways_holder(connector).orient((180, 0, 0)))
+export(cable_storage.create_rail())
 
 save_stl("models/other/cable_storage/stl")
-clear()
 
-export(cable_storage.create_sideways_holder(SidewayConnector.DVI_TO_DVI))
-save_3mf()
-# save_3mf("models/other/cable_storage/export.3mf", True)
