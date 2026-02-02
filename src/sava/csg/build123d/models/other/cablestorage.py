@@ -130,7 +130,7 @@ class CableStorage:
 
         return result
 
-    def create_rail(self) -> SmartSolid:
+    def create_rail(self, length: float) -> SmartSolid:
         dim = self.dim
 
         pencil = Pencil(Plane.YZ)
@@ -145,7 +145,18 @@ class CableStorage:
         pencil.fillet(self.dim.railing_fillet_radius)
         pencil.down(dim.railing_handle_height)
         pencil.left()
-        return pencil.extrude_mirrored_y(10)
+        return pencil.extrude_mirrored_y(length)
+
+
+    def create_rails(self, length: float) -> SmartSolid:
+        offset = self.dim.width + self.dim.railing_gap_between_rails - dimensions.railing_gap * 2
+
+        rails = SmartSolid(self.create_rail(length).move_y(offset * i) for i in range(3))
+
+        wall_thickness = 3
+        wall = rails.create_bound_box().create_shell(east=wall_thickness, west=wall_thickness)
+
+        return rails.fuse(wall)
 
 
 # logging.getLogger('sava').setLevel(logging.DEBUG)
@@ -153,13 +164,16 @@ class CableStorage:
 dimensions = CableStorageDimensions()
 cable_storage = CableStorage(dimensions)
 
-export(cable_storage.create_sideways_holder(SidewayConnector.DVI_TO_DVI))
+holder = cable_storage.create_sideways_holder(SidewayConnector.DVI_TO_DVI)
+export(holder)
+rails = cable_storage.create_rails(150)
+rails.align(holder).z(Alignment.RL, -dimensions.railing_ceiling_thickness - dimensions.railing_gap).y(Alignment.LR, -dimensions.railing_width * 2 - dimensions.railing_gap_between_rails / 2 + dimensions.railing_gap)
+export(rails)
 save_3mf("models/other/cable_storage/export.3mf", True)
 
 clear()
 for connector in SidewayConnector:
-    export(cable_storage.create_sideways_holder(connector).orient((180, 0, 0)))
-export(cable_storage.create_rail())
+    export(cable_storage.create_sideways_holder(connector))
+export(rails)
 
 save_stl("models/other/cable_storage/stl")
-
