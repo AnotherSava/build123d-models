@@ -70,6 +70,7 @@ f3d models/current_model.3mf --watch --opacity=0.6
 - Vector/rotation math utilities including `rotate_orientation` for fixed-axis rotations (vs build123d's object-attached rotations)
 - **create_wire_tangent_plane()**: Creates a plane tangent to a wire at a specified position (0.0-1.0 parameter)
 - **solidify_wire()**: Converts a wire to a 3D solid by sweeping a small circle along it (useful for visualization)
+- **are_points_too_close()**: Use this function when comparing points/vectors/vertices for equality instead of direct comparison or manual distance checks
 
 ### Project Structure
 

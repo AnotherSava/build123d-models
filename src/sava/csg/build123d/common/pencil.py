@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, revolve, VectorLike, Edge
 
 from sava.common.advanced_math import advanced_mod
-from sava.csg.build123d.common.geometry import shift_vector, get_angle, to_vector, validate_points_unique, snap_to
+from sava.csg.build123d.common.geometry import shift_vector, get_angle, to_vector, validate_points_unique, snap_to, get_angle_between
 
 # TYPE_CHECKING import for type hints only; runtime import is lazy to avoid circular dependency
 if TYPE_CHECKING:
@@ -43,6 +43,7 @@ def _reconstruct_edge(edge: Edge) -> Edge:
 class Pencil:
     def __init__(self, plane: Plane = Plane.XY, start: VectorLike = (0, 0)):
         self.curves = []
+        self._pending_fillet_radius: float | None = None
         self.location = Vector(0, 0, 0)
         # Shift plane origin by start vector (in plane's local coordinates)
         start = to_vector(start)
@@ -53,6 +54,58 @@ class Pencil:
         vector = Vector(snap_to(vector.X, 0), snap_to(vector.Y, 0), snap_to(vector.Z, 0))
         assert vector.Z == 0
         return vector
+
+    def fillet(self, radius: float) -> 'Pencil':
+        """Mark the current corner for filleting when the next curve is added.
+
+        The fillet will be applied to the corner at the current location (the end
+        of the last curve). Must be called after at least one drawing operation.
+
+        Args:
+            radius: The fillet radius
+
+        Returns:
+            self for method chaining
+
+        Example:
+            Pencil().right(1).fillet(0.1).up(1).create_wire()
+            # Creates a wire with a fillet at (1, 0)
+        """
+        if not self.curves:
+            raise ValueError("Cannot fillet at start - no previous curve exists")
+        self._pending_fillet_radius = radius
+        return self
+
+    def _add_curve(self, curve: Edge) -> None:
+        """Add a curve, applying any pending fillet at the junction."""
+        if self._pending_fillet_radius:
+            prev_curve = self.curves[-1]
+            dir1 = prev_curve.tangent_at(1)
+            dir2 = curve.tangent_at(0)
+
+            angle = get_angle_between(dir1, dir2)
+            if 0.01 < angle < 179.99:  # not parallel
+                half_angle = radians(angle) / 2
+                trim_distance = self._pending_fillet_radius * tan(half_angle)
+                p1 = self.location - dir1 * trim_distance
+                p2 = self.location + dir2 * trim_distance
+
+                # Calculate arc center and midpoint
+                bisector = (dir1.normalized() * -1 + dir2.normalized()).normalized()
+                arc_center = self.location + bisector * (self._pending_fillet_radius / cos(half_angle))
+                mid_dir = ((p1 - arc_center).normalized() + (p2 - arc_center).normalized()).normalized()
+                arc_mid = arc_center + mid_dir * self._pending_fillet_radius
+
+                # Trim previous curve, add fillet arc, trim new curve
+                self.curves[-1] = Line(prev_curve.position_at(0), p1)
+                self.curves.append(ThreePointArc(p1, arc_mid, p2))
+                self.curves.append(Line(p2, curve.position_at(1)))
+                self._pending_fillet_radius = None
+                return
+
+            self._pending_fillet_radius = None
+
+        self.curves.append(curve)
 
     def double_arc(self, destination: VectorLike, shift_coefficient: float = 0.5, angle: float = None):
         """Draw two symmetric arcs to reach the destination.
@@ -132,7 +185,7 @@ class Pencil:
         validate_points_unique(points, tolerance=1e-6, labels=labels)
 
         edge = Edge.make_spline(points, [current_tangent, destination_tangent])
-        self.curves.append(edge)
+        self._add_curve(edge)
         self.location = destination_abs
         return self
 
@@ -147,7 +200,7 @@ class Pencil:
     def arc_abs(self, midpoint_abs: VectorLike, destination_abs: VectorLike):
         midpoint_abs = self.process_vector_input(midpoint_abs)
         destination_abs = self.process_vector_input(destination_abs)
-        self.curves.append(ThreePointArc(self.location, midpoint_abs, destination_abs))
+        self._add_curve(ThreePointArc(self.location, midpoint_abs, destination_abs))
         self.location = destination_abs
         return self
 
@@ -200,7 +253,7 @@ class Pencil:
 
     def jump_to(self, destination_abs: VectorLike):
         destination_abs = self.process_vector_input(destination_abs)
-        self.curves.append(Line(self.location, destination_abs))
+        self._add_curve(Line(self.location, destination_abs))
         self.location = destination_abs
         return self
 
@@ -260,10 +313,8 @@ class Pencil:
         if enclose and self.location != Vector(0, 0, 0):
             curves.append(Line(self.location, Vector(0, 0, 0)))
 
-        # Create wire in local 2D coordinates
-        local_wire = Wire(curves)
-        # Transform from local to global using the plane's location
-        return local_wire.locate(Location(self.plane))
+        # Create wire in local 2D coordinates and transform to global
+        return Wire(curves).locate(Location(self.plane))
 
     def extrude_mirrored_x(self, height: float, center: float = 0, label: str = None) -> SmartSolid:
         """Extrude a face mirrored around the local X axis at the specified Y coordinate."""
@@ -320,8 +371,10 @@ class Pencil:
             if self.location.X != center:
                 self.x_to(center)
 
-        # Create wire and locate it to the plane
+        # Create wire in local coordinates (fillets already applied inline)
         wire_with_start = Wire(self.curves)
+
+        # Locate to the plane
         original_wire = wire_with_start.locate(Location(self.plane))
 
         # Create mirror plane: offset from plane origin along the appropriate axis
@@ -358,7 +411,9 @@ class Pencil:
         # OCCT's extrusion algorithm to freeze indefinitely
         reconstructed_edges = [_reconstruct_edge(e) for e in all_edges]
 
-        return Wire(reconstructed_edges)
+        combined_wire = Wire(reconstructed_edges)
+
+        return combined_wire
 
     def revolve(self, angle: float = 360, axis: Axis = Axis.Y, enclose: bool = True, label: str = None) -> SmartSolid:
         from sava.csg.build123d.common.smartsolid import SmartSolid

@@ -247,6 +247,25 @@ def are_points_too_close(pt1: VectorLike, pt2: VectorLike, tolerance: float = 1e
     pt2 = to_vector(pt2)
     return (pt1 - pt2).length < tolerance
 
+def get_angle_between(dir1: VectorLike, dir2: VectorLike) -> float:
+    """Returns the angle between two 2D direction vectors in degrees.
+
+    Args:
+        dir1: First direction vector
+        dir2: Second direction vector
+
+    Returns:
+        Angle between the vectors in degrees (0 to 180)
+    """
+    from math import acos, degrees
+    dir1 = to_vector(dir1)
+    dir2 = to_vector(dir2)
+    dot = dir1.X * dir2.X + dir1.Y * dir2.Y
+    len1 = (dir1.X ** 2 + dir1.Y ** 2) ** 0.5
+    len2 = (dir2.X ** 2 + dir2.Y ** 2) ** 0.5
+    cos_angle = max(-1, min(1, dot / (len1 * len2)))
+    return degrees(acos(cos_angle))
+
 def validate_points_unique(points: list[VectorLike], tolerance: float = 1e-6, labels: list[str] | None = None) -> None:
     """Validates that no two points in the list are too close together.
 
