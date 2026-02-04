@@ -1,11 +1,12 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from math import radians, tan, cos
+from math import radians, tan
 from typing import Callable, Tuple
 
 from build123d import Axis, Plane
 
+from sava.common.advanced_math import COS_45
 from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl, show_red, show_blue
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
@@ -139,7 +140,7 @@ class CableStorage:
         pencil.fillet(self.dim.railing_fillet_radius)
         pencil.up_to(dim.height - dim.railing_ceiling_thickness - dim.railing_width / 2)
         pencil.arc_with_radius(dim.railing_width / 2 - dim.railing_gap, -90, -180)
-        pencil.down_to(dim.railing_offset-dim.railing_offset * cos(radians(45)))
+        pencil.down_to(dim.railing_offset - dim.railing_offset * COS_45)
         pencil.fillet(self.dim.railing_fillet_radius)
         pencil.jump((-dim.railing_offset, -dim.railing_offset))
         pencil.fillet(self.dim.railing_fillet_radius)

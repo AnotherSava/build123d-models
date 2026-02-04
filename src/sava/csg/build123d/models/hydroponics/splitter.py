@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from math import cos, radians
 
 from bd_warehouse.thread import IsoThread
 from build123d import Solid
 
+from sava.common.advanced_math import COS_45
 from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.smartbox import SmartBox
@@ -105,7 +105,7 @@ class HydroponicsSplitterFactory:
         thread_screw_solid = SmartSolid(thread_screw)
         core_screw = SmartSolid(Solid.make_cylinder(thread_screw.min_radius, screw_length))
 
-        width = thread_screw.major_diameter * cos(radians(45))
+        width = thread_screw.major_diameter * COS_45
 
         handle = SmartBox(self.dim.handle_length, width, self.dim.handle_height)
         handle.fillet_z(width / 2 - 0.01)

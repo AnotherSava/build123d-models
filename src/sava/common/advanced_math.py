@@ -1,3 +1,10 @@
+from math import sqrt
+
+# Trigonometric constants for 45 degrees
+SQRT2 = sqrt(2)
+COS_45 = sqrt(2) / 2  # cos(radians(45)) = sin(radians(45))
+SIN_45 = COS_45
+
 
 # round to the nearest int number n in [min_value, max_value] range, which is n % div == mod % div
 def advanced_round(x: float, div: int, mod: int = 0, min_value: int = None, max_value: int = None) -> int:
