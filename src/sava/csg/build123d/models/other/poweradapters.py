@@ -171,7 +171,7 @@ class PowerAdapterLid(PowerAdapterBase):
 
         snaps = SmartSolid(self.orient(snap, lid), label="snaps").align_z(lid, Alignment.LR, self.dim.lid_cutout_height -self.dim.lock.tip_distance - self.dim.lock.tip_height)
 
-        text = create_text(self.dim.text, self.dim.label, "text")
+        text = create_text(self.dim.text, self.dim.label, label="text")
         text.align_zxy(lid, Alignment.RL)
 
         # return lid.cut(snaps), snaps, text.connected()
