@@ -178,9 +178,7 @@ class SmarterCone(SmartSolid):
     def copy(self, label: str = None) -> 'SmarterCone':
         """Override copy to return a SmarterCone instead of SmartSolid"""
         result = SmarterCone.__new__(SmarterCone)
-
-        result.solid = copy(self.solid)
-        result.label = label or self.label
+        self._copy_base_fields(result, label)
         result.base_radius = self.base_radius
         result.top_radius = self.top_radius
         result.height = self.height
@@ -190,7 +188,6 @@ class SmarterCone(SmartSolid):
         result.thickness_base = self.thickness_base
         result.thickness_top = self.thickness_top
         result.inner_cone = None if self.inner_cone is None else self.inner_cone.copy()
-
         return result
 
     def create_shell(self, thickness_radius: float = None, thickness_base: float = 0, thickness_top: float = 0, thickness_side: float = None) -> 'SmarterCone':

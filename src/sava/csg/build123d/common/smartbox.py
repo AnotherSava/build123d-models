@@ -216,15 +216,12 @@ class SmartBox(SmartSolid):
     def copy(self, label: str = None) -> 'SmartBox':
         """Deep copy returning SmartBox"""
         result = SmartBox.__new__(SmartBox)
-
-        result.solid = copy(self.solid)
-        result.label = label or self.label
+        self._copy_base_fields(result, label)
         result.length = self.length
         result.width = self.width
         result.tapered_length = self.tapered_length
         result.tapered_width = self.tapered_width
         result.height = self.height
-
         return result
 
     def add_cutout(self, direction: Direction, length: float, radius_bottom: float = 0, radius_top: float | None = None, width: float | None = None, height: float | None = None, shift: float = 0) -> 'SmartBox':

@@ -2,11 +2,11 @@ from copy import copy
 from dataclasses import dataclass
 from typing import Iterable, TYPE_CHECKING
 
-from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean
+from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean, Rotation
 
 from sava.common.common import flatten
 from sava.common.logging import logger
-from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, filter_edges_by_position, filter_edges_by_axis
+from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, filter_edges_by_position, filter_edges_by_axis, multi_rotate_vector, convert_orientation_to_rotations
 
 if TYPE_CHECKING:
     from sava.csg.build123d.common.smartbox import SmartBox
@@ -104,6 +104,8 @@ class SmartSolid:
         """
         self.label = label
         self.solid = fuse(*args) if len(args) > 0 else None
+        self.origin = Vector(0, 0, 0)
+        self._orientation = Vector(0, 0, 0)
         self.assert_valid()
 
     @property
@@ -206,7 +208,7 @@ class SmartSolid:
     def move(self, x: float, y: float = 0, z: float = 0) -> 'SmartSolid':
         # Move each shape separately if it's a ShapeList, otherwise move the single shape
         location = Location(Vector(x, y, z))
-        
+
         if isinstance(self.solid, ShapeList):
             # Move each shape in the list separately
             moved_shapes = []
@@ -216,7 +218,8 @@ class SmartSolid:
         else:
             # Move single shape
             self.solid = self.solid.move(location)
-        
+
+        self.origin += Vector(x, y, z)
         return self
 
     def moved(self, x: float, y: float = 0, z: float = 0) -> 'SmartSolid':
@@ -239,7 +242,26 @@ class SmartSolid:
 
     def orient(self, rotations: VectorLike) -> 'SmartSolid':
         self.solid = self.wrap_solid()
+        rotations = to_vector(rotations)
+        current_orient = self._orientation
+
+        # Undo current orientation's effect on origin, then apply new orientation
+        if current_orient != Vector(0, 0, 0):
+            old_fixed = convert_orientation_to_rotations(tuple(current_orient))
+            # Apply inverse: negate and reverse order
+            self.origin = multi_rotate_vector(self.origin, Plane.XY, (0, 0, -old_fixed.Z))
+            self.origin = multi_rotate_vector(self.origin, Plane.XY, (0, -old_fixed.Y, 0))
+            self.origin = multi_rotate_vector(self.origin, Plane.XY, (-old_fixed.X, 0, 0))
+
+        if rotations != Vector(0, 0, 0):
+            new_fixed = convert_orientation_to_rotations(tuple(rotations))
+            # Apply forward
+            self.origin = multi_rotate_vector(self.origin, Plane.XY, (new_fixed.X, 0, 0))
+            self.origin = multi_rotate_vector(self.origin, Plane.XY, (0, new_fixed.Y, 0))
+            self.origin = multi_rotate_vector(self.origin, Plane.XY, (0, 0, new_fixed.Z))
+
         self.solid.orientation = rotations
+        self._orientation = rotations
         return self
 
     def oriented(self, rotations: VectorLike, label: str = None) -> 'SmartSolid':
@@ -247,7 +269,26 @@ class SmartSolid:
 
     def rotate(self, axis: Axis, angle: float) -> 'SmartSolid':
         self.solid = self.wrap_solid()
-        self.solid = self.solid.rotate(axis, angle)
+        # Use moved() with Rotation instead of rotate() to avoid meshing bugs at exact 90° angles
+        if axis == Axis.X:
+            rotation = Rotation(angle, 0, 0)
+            rotations = (angle, 0, 0)
+        elif axis == Axis.Y:
+            rotation = Rotation(0, angle, 0)
+            rotations = (0, angle, 0)
+        elif axis == Axis.Z:
+            rotation = Rotation(0, 0, angle)
+            rotations = (0, 0, angle)
+        else:
+            # For custom axes, fall back to the original rotate method
+            self.solid = self.solid.rotate(axis, angle)
+            self.origin = self.origin.rotate(axis, angle)
+            return self
+        self.solid = self.solid.moved(Location(rotation))
+        self.origin = self.origin.rotate(axis, angle)
+        # Update stored orientation to track the cumulative effect
+        new_orient = rotate_orientation(self._orientation, rotations, Plane.XY)
+        self._orientation = new_orient
         return self
 
     def rotated(self, axis: Axis, angle: float) -> 'SmartSolid':
@@ -342,6 +383,10 @@ class SmartSolid:
         self.solid = self.wrap_solid()
         self.solid.location = solid.solid.location
 
+        # Copy origin and orientation from the reference solid
+        self.origin = Vector(solid.origin)
+        self._orientation = Vector(solid._orientation)
+
         return self
 
     def align_axis(self, solid: 'SmartSolid | None', axis: Axis, alignment: Alignment = Alignment.C, shift: float = 0) -> 'SmartSolid':
@@ -397,6 +442,9 @@ class SmartSolid:
         """
         self.align_old(solid, plane=plane)
         return AlignmentBuilder(self, solid, plane)
+
+    def aligned(self, solid: 'SmartSolid' = None, plane: Plane = Plane.XY) -> AlignmentBuilder:
+        return self.copy().align(solid, plane)
 
     def _fillet(self, axis_orientational: Axis, radius: float, axis_positional: Axis = None, minimum: float = None, maximum: float = None, inclusive: tuple[bool, bool] | None = None, angle_tolerance: float = 1e-5) -> 'SmartSolid':
         edges = filter_edges_by_axis(self.solid.edges(), axis_orientational, angle_tolerance)
@@ -460,7 +508,7 @@ class SmartSolid:
         return self
 
     def intersect(self, *args) -> 'SmartSolid':
-        original = self.solid
+        original = self.wrap_solid()
         other = fuse(args)
         self.solid = original & other
         # Workaround for build123d bug: retry without cleaning if invalid
@@ -489,10 +537,23 @@ class SmartSolid:
         # self.fuse(notch.intersect(extended_shape))
 
     def copy(self, label: str = None):
-        return SmartSolid(copy(self.solid), label=label or self.label)
+        result = SmartSolid(copy(self.solid), label=label or self.label)
+        result.origin = Vector(self.origin)
+        result._orientation = Vector(self._orientation)
+        return result
+
+    def _copy_base_fields(self, target: 'SmartSolid', label: str = None) -> None:
+        """Copy base class fields to target. Called by subclass copy() methods."""
+        target.solid = copy(self.solid)
+        target.label = label or self.label
+        target.origin = Vector(self.origin)
+        target._orientation = Vector(self._orientation)
 
     def _scale_solid(self, factor_x: float, factor_y: float, factor_z: float):
-        return scale(self.solid, (factor_x, factor_y or factor_x, factor_z or factor_y or factor_x))
+        factor_y = factor_y or factor_x
+        factor_z = factor_z or factor_y or factor_x
+        self.origin = Vector(self.origin.X * factor_x, self.origin.Y * factor_y, self.origin.Z * factor_z)
+        return scale(self.solid, (factor_x, factor_y, factor_z))
 
     def pad(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None):
         pad_y = pad_x if pad_y is None else pad_y
@@ -513,6 +574,12 @@ class SmartSolid:
 
     def mirror(self, about: Plane = Plane.XZ) -> 'SmartSolid':
         self.solid = mirror(self.solid, about)
+        # Mirror the origin point about the same plane
+        # Reflect origin across the plane: p' = p - 2 * (p - o).dot(n) * n
+        # where o is plane origin, n is plane normal
+        relative = self.origin - about.origin
+        distance = relative.dot(about.z_dir)
+        self.origin = self.origin - about.z_dir * (2 * distance)
         return self
 
     def mirrored(self, about: Plane = Plane.XZ, label: str = None) -> 'SmartSolid':
@@ -529,3 +596,15 @@ class SmartSolid:
     def clone(self, count: int, shift: VectorLike, label: str = None) -> 'SmartSolid':
         shift = to_vector(shift)
         return SmartSolid((self.moved_vector(shift * i) for i in range(count)), label=label)
+
+    def cut_off(self, x: float = 0, y: float = 0, z: float = 0) -> 'SmartSolid':
+        return self.intersect(self.create_bound_box().move(x, y, z))
+
+    def cut_x(self, offset: float) -> 'SmartSolid':
+        return self.cut_off(x=offset)
+
+    def cut_y(self, offset: float) -> 'SmartSolid':
+        return self.cut_off(y=offset)
+
+    def cut_z(self, offset: float) -> 'SmartSolid':
+        return self.cut_off(z=offset)

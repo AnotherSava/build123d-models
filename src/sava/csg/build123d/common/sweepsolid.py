@@ -14,12 +14,13 @@ class SweepSolid(SmartSolid):
 
         super().__init__(sweep(sketch, path), label=label)
 
-    def copy(self) -> 'SweepSolid':
-        sweep_solid = SweepSolid(self.sketch, self.path, self.plane_path)
-        sweep_solid.solid = copy(self.solid)
-        sweep_solid.path = copy(self.path)
-        sweep_solid.plane_path = copy(self.plane_path)
-        return sweep_solid
+    def copy(self, label: str = None) -> 'SweepSolid':
+        result = SweepSolid.__new__(SweepSolid)
+        self._copy_base_fields(result, label)
+        result.sketch = self.sketch
+        result.path = copy(self.path)
+        result.plane_path = copy(self.plane_path)
+        return result
 
     def move(self, x: float, y: float = 0, z: float = 0) -> 'SweepSolid':
         super().move(x, y, z)
