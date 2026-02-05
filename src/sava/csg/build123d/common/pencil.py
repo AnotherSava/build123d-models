@@ -8,6 +8,22 @@ from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, L
 from sava.common.advanced_math import advanced_mod
 from sava.csg.build123d.common.geometry import shift_vector, get_angle, to_vector, validate_points_unique, snap_to, get_angle_between
 
+
+def _param_at_arc_length(edge: Edge, target_length: float, from_end: bool = False) -> float:
+    """Find the normalized parameter where arc length from start (or end) equals target_length."""
+    if from_end:
+        target_length = edge.length - target_length
+
+    low, high = 0.0, 1.0
+    for _ in range(50):
+        mid = (low + high) / 2
+        trimmed = edge.trim(0, mid)
+        if trimmed.length < target_length:
+            low = mid
+        else:
+            high = mid
+    return (low + high) / 2
+
 # TYPE_CHECKING import for type hints only; runtime import is lazy to avoid circular dependency
 if TYPE_CHECKING:
     from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -43,7 +59,8 @@ def _reconstruct_edge(edge: Edge) -> Edge:
 class Pencil:
     def __init__(self, plane: Plane = Plane.XY, start: VectorLike = (0, 0)):
         self.curves = []
-        self._pending_fillet_radius: float | None = None
+        self._fillet_pending: bool = False
+        self._last_fillet_radius: float | None = None
         self.location = Vector(0, 0, 0)
         # Shift plane origin by start vector (in plane's local coordinates)
         start = to_vector(start)
@@ -55,14 +72,14 @@ class Pencil:
         assert vector.Z == 0
         return vector
 
-    def fillet(self, radius: float) -> 'Pencil':
+    def fillet(self, radius: float = None) -> 'Pencil':
         """Mark the current corner for filleting when the next curve is added.
 
         The fillet will be applied to the corner at the current location (the end
         of the last curve). Must be called after at least one drawing operation.
 
         Args:
-            radius: The fillet radius
+            radius: The fillet radius. If None, uses the last fillet radius.
 
         Returns:
             self for method chaining
@@ -70,15 +87,26 @@ class Pencil:
         Example:
             Pencil().right(1).fillet(0.1).up(1).create_wire()
             # Creates a wire with a fillet at (1, 0)
+
+            # Reusing the last radius:
+            Pencil().right(1).fillet(0.1).up(1).fillet().left(1).create_wire()
+            # Creates a wire with fillets at (1, 0) and (1, 1), both with radius 0.1
         """
         if not self.curves:
             raise ValueError("Cannot fillet at start - no previous curve exists")
-        self._pending_fillet_radius = radius
+
+        if radius:
+            self._last_fillet_radius = radius
+
+        if self._last_fillet_radius is None:
+            raise ValueError("No fillet radius specified and no previous radius to reuse")
+
+        self._fillet_pending = True
         return self
 
     def _add_curve(self, curve: Edge) -> None:
         """Add a curve, applying any pending fillet at the junction."""
-        if self._pending_fillet_radius:
+        if self._fillet_pending:
             prev_curve = self.curves[-1]
             dir1 = prev_curve.tangent_at(1)
             dir2 = curve.tangent_at(0)
@@ -86,24 +114,28 @@ class Pencil:
             angle = get_angle_between(dir1, dir2)
             if 0.01 < angle < 179.99:  # not parallel
                 half_angle = radians(angle) / 2
-                trim_distance = self._pending_fillet_radius * tan(half_angle)
-                p1 = self.location - dir1 * trim_distance
-                p2 = self.location + dir2 * trim_distance
+                trim_distance = self._last_fillet_radius * tan(half_angle)
+
+                # Find trim points on the actual curves (not just along tangent)
+                param1 = _param_at_arc_length(prev_curve, trim_distance, from_end=True)
+                param2 = _param_at_arc_length(curve, trim_distance, from_end=False)
+                p1 = prev_curve.position_at(param1)
+                p2 = curve.position_at(param2)
 
                 # Calculate arc center and midpoint
                 bisector = (dir1.normalized() * -1 + dir2.normalized()).normalized()
-                arc_center = self.location + bisector * (self._pending_fillet_radius / cos(half_angle))
+                arc_center = self.location + bisector * (self._last_fillet_radius / cos(half_angle))
                 mid_dir = ((p1 - arc_center).normalized() + (p2 - arc_center).normalized()).normalized()
-                arc_mid = arc_center + mid_dir * self._pending_fillet_radius
+                arc_mid = arc_center + mid_dir * self._last_fillet_radius
 
                 # Trim previous curve, add fillet arc, trim new curve
-                self.curves[-1] = Line(prev_curve.position_at(0), p1)
+                self.curves[-1] = prev_curve.trim(0, param1)
                 self.curves.append(ThreePointArc(p1, arc_mid, p2))
-                self.curves.append(Line(p2, curve.position_at(1)))
-                self._pending_fillet_radius = None
+                self.curves.append(curve.trim(param2, 1))
+                self._fillet_pending = False
                 return
 
-            self._pending_fillet_radius = None
+            self._fillet_pending = False
 
         self.curves.append(curve)
 
@@ -128,6 +160,49 @@ class Pencil:
         angle_actual = 180 - degrees(2 * atan(destination.Y / destination.X)) if angle is None else angle
         angle_actual = advanced_mod(angle_actual, 360, -180)
         return self.arc_with_destination(destination * (1 - shift_coefficient), -angle_actual).arc_with_destination(destination * shift_coefficient, angle_actual)
+
+    def spline_abs(self, destination_abs: VectorLike, destination_tangent: VectorLike, intermediate_points_abs: list[VectorLike] | None = None, start_tangent: VectorLike | None = None) -> 'Pencil':
+        """Draw a smooth spline curve to reach the destination using absolute coordinates.
+
+        Creates a cubic spline that smoothly transitions from the current location to the
+        destination point. The curve is tangent to the previous path at the current location
+        and arrives at the destination with the specified tangent direction.
+
+        Args:
+            destination_abs: Target point in absolute coordinates
+            destination_tangent: Tangent direction vector at the destination point (only direction matters,
+                    magnitude is normalized by build123d's default behavior)
+            intermediate_points_abs: Optional list of points to pass through between current location
+                               and destination. Each point is in absolute coordinates.
+                               Points are interpolated in order. Default is None (direct spline).
+            start_tangent: Optional tangent direction vector at the start point. If None, the tangent
+                         is calculated from the previous curve (or from destination if no previous curves).
+                         Default is None (auto-calculated).
+
+        Returns:
+            self for method chaining
+        """
+        destination_abs = self.process_vector_input(destination_abs)
+        destination_tangent = to_vector(destination_tangent)
+
+        # Calculate or use provided tangent at current location
+        if start_tangent is not None:
+            current_tangent = to_vector(start_tangent)
+        else:
+            current_tangent = destination_abs - self.location if not self.curves else self.curves[-1].tangent_at(1.0)
+
+        # Process intermediate points
+        intermediate_abs = [self.process_vector_input(pt) for pt in intermediate_points_abs or []]
+        points = [self.location] + intermediate_abs + [destination_abs]
+
+        # Validate that all points are unique
+        labels = ["start"] + [f"intermediate point {i}" for i in range(len(intermediate_abs))] + ["destination"]
+        validate_points_unique(points, tolerance=1e-6, labels=labels)
+
+        edge = Edge.make_spline(points, [current_tangent, destination_tangent])
+        self._add_curve(edge)
+        self.location = destination_abs
+        return self
 
     def spline(self, destination: VectorLike, destination_tangent: VectorLike, intermediate_points: list[VectorLike] | None = None, start_tangent: VectorLike | None = None) -> 'Pencil':
         """Draw a smooth spline curve to reach the destination, optionally passing through intermediate points.
@@ -164,30 +239,8 @@ class Pencil:
             # Spline with both intermediate points and custom start tangent
             pencil.spline((50, 50), (1, 0), intermediate_points=[(25, 25)], start_tangent=(0, 1))
         """
-        destination = to_vector(destination)
-        destination_tangent = to_vector(destination_tangent)
-
-        # Convert relative destination to absolute
-        destination_abs = self.process_vector_input(self.location + destination)
-
-        # Calculate or use provided tangent at current location
-        if start_tangent is not None:
-            current_tangent = to_vector(start_tangent)
-        else:
-            current_tangent = destination if not self.curves else self.curves[-1].tangent_at(1.0)
-
-        # Convert intermediate points (relative) to absolute coordinates
-        intermediate_abs = [self.process_vector_input(self.location + to_vector(pt)) for pt in intermediate_points or []]
-        points = [self.location] + intermediate_abs + [destination_abs]
-
-        # Validate that all points are unique
-        labels = ["start"] + [f"intermediate point {i}" for i in range(len(intermediate_abs))] + ["destination"]
-        validate_points_unique(points, tolerance=1e-6, labels=labels)
-
-        edge = Edge.make_spline(points, [current_tangent, destination_tangent])
-        self._add_curve(edge)
-        self.location = destination_abs
-        return self
+        intermediate_abs = [self.location + to_vector(pt) for pt in intermediate_points or []]
+        return self.spline_abs(self.location + to_vector(destination), destination_tangent, intermediate_abs, start_tangent)
 
     def arc_with_radius(self, radius: float, centre_angle: float, arc_degrees: float):
         centre = shift_vector(self.location, radius, centre_angle)

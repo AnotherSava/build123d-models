@@ -28,6 +28,38 @@ class TestPencilFillet(unittest.TestCase):
             pencil.fillet(1)
         self.assertIn("no previous curve", str(context.exception))
 
+    def test_fillet_error_no_radius_without_previous(self):
+        """Test that fillet() without radius raises error when no previous radius exists."""
+        pencil = Pencil()
+        pencil.right(10)
+        with self.assertRaises(ValueError) as context:
+            pencil.fillet()
+        self.assertIn("No fillet radius specified", str(context.exception))
+
+    def test_fillet_reuse_last_radius(self):
+        """Test that fillet() without radius reuses the last radius."""
+        pencil = Pencil()
+        wire = pencil.right(10).fillet(2).up(10).fillet().left(10).create_wire()
+
+        # Should create a valid wire with two fillets
+        self.assertTrue(wire.is_valid)
+
+        # Should have same number of edges as using explicit radius twice
+        wire_explicit = Pencil().right(10).fillet(2).up(10).fillet(2).left(10).create_wire()
+        self.assertEqual(len(wire.edges()), len(wire_explicit.edges()))
+
+    def test_fillet_reuse_overwrites_with_new_radius(self):
+        """Test that specifying a new radius updates the last radius for future reuse."""
+        pencil = Pencil()
+        # First fillet with radius 2, second with radius 3, third reuses 3
+        wire = pencil.right(10).fillet(2).up(10).fillet(3).left(10).fillet().down(10).create_wire()
+
+        self.assertTrue(wire.is_valid)
+
+        # Should have same number of edges as using explicit radius 3 for the third fillet
+        wire_explicit = Pencil().right(10).fillet(2).up(10).fillet(3).left(10).fillet(3).down(10).create_wire()
+        self.assertEqual(len(wire.edges()), len(wire_explicit.edges()))
+
     def test_fillet_multiple_corners(self):
         """Test filleting multiple corners with different radii."""
         pencil = Pencil()
