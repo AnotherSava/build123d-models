@@ -8,6 +8,7 @@ from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
+from sava.csg.build123d.common.edgefilters import PositionalFilter, SurfaceFilter, FilletDebug
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.smartsphere import SmartSphere
 from sava.csg.build123d.common.text import create_text, TextDimensions
@@ -19,7 +20,7 @@ class CableHolderDimensions:
     attachment_height: float = 20.0
     attachment_thickness: float = 3.0
     attachment_fillet_radius: float = 0.5
-    holder_distance: float = 13.0
+    ball_distance: float = 3.0
     holder_length_straight: float = 10.0
     holder_length_angled: float = 4.0
     holder_radius: float = 3.0
@@ -45,38 +46,19 @@ class CableHolderDimensions:
     ball_opener_depth: float = 2.4
 
     ball_holder_thickness: float = 2
-    ball_holder_cannel_width: float = 5
+    ball_holder_cannel_width: float = 7
+    ball_holder_fillet_radius: float = 0.61
+    ball_holder_sphere_radius_gap: float = 0.2
+    ball_holder_sphere_lock_fraction: float = 0.06
+
+    @property
+    def ball_holder_radius_inner(self) -> float:
+        return self.ball_radius + self.ball_holder_sphere_radius_gap
 
 
 class CableHolder:
     def __init__(self, dim: CableHolderDimensions):
         self.dim = dim
-
-    def create_holder(self, length: float) -> SmartSolid:
-        dim = self.dim
-
-        pencil = Pencil(Plane.XZ)
-        pencil.up(dim.attachment_height)
-        pencil.right(dim.holder_length_straight + dim.attachment_thickness)
-        pencil.arc_with_radius(dim.holder_radius, 0, dim.holder_angle)
-        pencil.arc_with_radius(dim.holder_thickness / 2, dim.holder_angle - 180, -180)
-        pencil.arc_with_radius(dim.holder_radius + dim.holder_thickness, dim.holder_angle, -dim.holder_angle)
-        pencil.left(dim.holder_length_straight)
-        pencil.down()
-
-        return pencil.extrude(length, "holder").fillet_y(dim.attachment_fillet_radius, Axis.X, inclusive=(True, False))
-
-    def create_cut(self, width: float, attachment_length: float) -> SmartSolid:
-        dim = self.dim
-        pencil = Pencil()
-        pencil.arc_with_radius(width / 2, -90, -90)
-        pencil.draw(dim.holder_length_straight - dim.cut_offset, dim.cut_angle - 90)
-        distance = attachment_length - dim.attachment_thickness - dim.cut_offset - pencil.location.X
-        delta = 0.01
-        pencil.spline((distance - delta, distance), (0, 1))
-        pencil.right(delta)
-        pencil.down()
-        return pencil.extrude_mirrored_x(dim.holder_thickness + dim.holder_length_angled)
 
     def create_cable_ball_connector(self, radius: float) -> SmartSolid:
         dim = self.dim
@@ -140,34 +122,52 @@ class CableHolder:
         return sphere.fuse(segment_out).cut(cable_canal, connector_in, segment_in, text).fuse(teeth, connector_out).rotate_x(-90)
 
 
-    def create(self) -> SmartSolid:
+    def create_holder(self, holder_count: int = 3) -> SmartSolid:
         dim = self.dim
-        length = dim.holder_distance * len(dim.holder_width)
-        holder = self.create_holder(length)
-        for i, width in enumerate(dim.holder_width):
-            cut = self.create_cut(width, holder.x_size)
-            cut.align(holder).x(Alignment.LR, dim.attachment_thickness + dim.cut_offset).y(Alignment.L, dim.holder_distance * (i + 0.5)).z(Alignment.RL)
-            holder = holder.cut(cut)
 
-        return holder
+        sphere = SmartSphere(dim.ball_holder_radius_inner, label="ball_holder").create_shell(dim.ball_holder_thickness)
+        ball_holder = sphere.cut_z(-dim.ball_radius * (1 - dim.ball_holder_sphere_lock_fraction))
+        cable_canal = SmartBox(dim.ball_holder_cannel_width, ball_holder.y_size, ball_holder.z_size)
+        cable_canal.align(ball_holder).y(Alignment.CR, -dim.ball_holder_cannel_width / 2)
+        cable_canal.fillet_z(dim.ball_holder_cannel_width * 0.49)
+        ball_holder.cut(cable_canal)
+
+        pencil = Pencil(Plane.YZ)
+        pencil.right(dim.ball_holder_radius_inner + dim.ball_holder_thickness - dim.ball_holder_cannel_width / 2)
+        pencil.down(ball_holder.z_size)
+        pencil.fillet(dim.attachment_fillet_radius)
+        pencil.spline_abs((dim.attachment_thickness, -dim.attachment_height), (0, -1), start_tangent=(-1, 0))
+        pencil.left()
+        attachment = pencil.extrude(dim.ball_distance * (holder_count - 1) + ball_holder.x_size * holder_count, "cable_holder")
+
+        for i in range(holder_count):
+            ball_holder.align(attachment).x(Alignment.LR, (dim.ball_distance + ball_holder.x_size) * i).y(Alignment.LR).z(Alignment.RL)
+            sphere.colocate(ball_holder)
+            inner_sphere = sphere.create_inner_sphere()
+            attachment.fuse(ball_holder).cut(inner_sphere)
+
+        attachment.fillet_by(dim.ball_holder_fillet_radius, PositionalFilter(Axis.Z, attachment.z_max), PositionalFilter(Axis.Y), PositionalFilter(Axis.X))
+        attachment.fillet_by(dim.ball_holder_fillet_radius, PositionalFilter(Axis.X, attachment.x_min), PositionalFilter(Axis.Y))
+        attachment.fillet_by(dim.ball_holder_fillet_radius, PositionalFilter(Axis.X, attachment.x_max), PositionalFilter(Axis.Y))
+
+        return attachment
 
     def create_ball_holder(self) -> SmartSolid:
         dim = self.dim
-        ball_holder = SmartSphere(dim.ball_radius).create_shell(dim.ball_holder_thickness)
-        ball_holder.cut_z(-dim.ball_radius * 0.9)
-        cable_canal = SmartBox(dim.ball_holder_cannel_width, ball_holder.y_size / 2, ball_holder.z_size)
-        cable_canal.align(ball_holder).y(Alignment.CR)
+        sphere = SmartSphere(dim.ball_holder_radius_inner, label="ball_holder").create_shell(dim.ball_holder_thickness)
+        ball_holder = sphere.cut_z(-dim.ball_radius * (1 - dim.ball_holder_sphere_lock_fraction))
+        cable_canal = SmartBox(dim.ball_holder_cannel_width, ball_holder.y_size, ball_holder.z_size)
+        cable_canal.align(ball_holder).y(Alignment.CR, -dim.ball_holder_cannel_width / 2)
+        cable_canal.fillet_z(dim.ball_holder_cannel_width * 0.49)
         ball_holder.cut(cable_canal)
+        ball_holder.fillet_by(dim.ball_holder_fillet_radius, PositionalFilter(Axis.Z, ball_holder.z_max))
         return ball_holder
-
 
 
 if __name__ == "__main__":
     dimensions = CableHolderDimensions()
     cable_holder = CableHolder(dimensions)
-    # model = cable_holder.create()
-    # models = [cable_holder.create_cable_ball(diameter / 10) for diameter in range(30, 43)]
-    models = [cable_holder.create_ball_holder()]
+    models = [cable_holder.create_holder()]
 
     export_3mf("models/other/cable_holder/export.3mf", models[0])
     export_stl("models/other/cable_holder/stl", *models)
