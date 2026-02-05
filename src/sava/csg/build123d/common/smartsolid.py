@@ -1,72 +1,24 @@
 from copy import copy
-from dataclasses import dataclass
 from typing import Iterable, TYPE_CHECKING
 
-from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean, Rotation
+from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean, Rotation, Face
 
 from sava.common.common import flatten
 from sava.common.logging import logger
-from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, filter_edges_by_position, filter_edges_by_axis, multi_rotate_vector, convert_orientation_to_rotations
+from sava.csg.build123d.common.alignmentbuilder import AlignmentBuilder
+
+
+from sava.csg.build123d.common.edgefilters import PositionalFilter, SurfaceFilter, AxisFilter, EdgeFilter, FilletDebug, AXIS_X, AXIS_Y, AXIS_Z, filter_edges_by_position, filter_edges_by_axis, filter_edges_by_surface
+from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, multi_rotate_vector, convert_orientation_to_rotations
+
+
+def get_solid(element):
+    if isinstance(element, AlignmentBuilder):
+        element = element.done()
+    return element.solid if isinstance(element, SmartSolid) else element
 
 if TYPE_CHECKING:
     from sava.csg.build123d.common.smartbox import SmartBox
-
-
-@dataclass
-class PositionalFilter:
-    axis: Axis
-    minimum: float = None
-    maximum: float = None
-    inclusive: tuple[bool, bool] = None
-
-
-class AlignmentBuilder:
-    """Fluent builder for chaining alignment operations on a SmartSolid."""
-
-    def __init__(self, target: 'SmartSolid', reference: 'SmartSolid | None', plane: Plane = Plane.XY):
-        self.target = target
-        self.reference = reference
-        self.plane = plane
-
-    def _parse_args(self, alignment_or_shift: 'Alignment | float', shift: float) -> tuple['Alignment', float]:
-        if isinstance(alignment_or_shift, Alignment):
-            return alignment_or_shift, shift  # .z(LL, 5) -> (LL, 5)
-        return Alignment.C, alignment_or_shift  # .z(15) -> (C, 15)
-
-    def x(self, alignment_or_shift: 'Alignment | float' = Alignment.C, shift: float = 0) -> 'AlignmentBuilder':
-        alignment, shift = self._parse_args(alignment_or_shift, shift)
-        self.target.align_x(self.reference, alignment, shift, self.plane)
-        return self
-
-    def y(self, alignment_or_shift: 'Alignment | float' = Alignment.C, shift: float = 0) -> 'AlignmentBuilder':
-        alignment, shift = self._parse_args(alignment_or_shift, shift)
-        self.target.align_y(self.reference, alignment, shift, self.plane)
-        return self
-
-    def z(self, alignment_or_shift: 'Alignment | float' = Alignment.C, shift: float = 0) -> 'AlignmentBuilder':
-        alignment, shift = self._parse_args(alignment_or_shift, shift)
-        self.target.align_z(self.reference, alignment, shift, self.plane)
-        return self
-
-    def xy(self, alignment: 'Alignment' = Alignment.C, shift_x: float = 0, shift_y: float = 0) -> 'AlignmentBuilder':
-        return self.x(alignment, shift_x).y(alignment, shift_y)
-
-    def xz(self, alignment: 'Alignment' = Alignment.C, shift_x: float = 0, shift_z: float = 0) -> 'AlignmentBuilder':
-        return self.x(alignment, shift_x).z(alignment, shift_z)
-
-    def yz(self, alignment: 'Alignment' = Alignment.C, shift_y: float = 0, shift_z: float = 0) -> 'AlignmentBuilder':
-        return self.y(alignment, shift_y).z(alignment, shift_z)
-
-    def done(self) -> 'SmartSolid':
-        """Return the SmartSolid for further chaining with other methods."""
-        return self.target
-
-    def then(self) -> 'SmartSolid':
-        """Return the SmartSolid for further chaining with other methods."""
-        return self.target
-
-def get_solid(element):
-    return element.solid if isinstance(element, SmartSolid) else element
 
 def fuse_two(shape1: Shape | None, shape2: Shape | None):
     if shape1 is None:
@@ -453,13 +405,44 @@ class SmartSolid:
         self.solid = fillet(edges, radius)
         return self
 
-    def fillet_positional(self, radius: float, axis_orientational: Axis | None, *position_filters: PositionalFilter, angle_tolerance: float = 1e-5) -> 'SmartSolid':
+    def fillet_by(self, radius: float, *filters: EdgeFilter, debug: FilletDebug = None) -> 'SmartSolid':
+        """Fillet edges matching the given filters.
+
+        Args:
+            radius: Fillet radius
+            *filters: PositionalFilter, SurfaceFilter, or AxisFilter objects
+            debug: Debug mode - ALL shows all edges in red, PARTIAL tests each edge individually
+
+        Returns:
+            self for chaining
+        """
         edges = self.solid.edges()
-        if axis_orientational is not None:
-            edges = filter_edges_by_axis(edges, axis_orientational, angle_tolerance)
-        for position_filter in position_filters:
-            edges = self._filter_positional(edges, position_filter)
-        self.solid = fillet(edges, radius)
+        for f in filters:
+            if isinstance(f, AxisFilter):
+                edges = filter_edges_by_axis(edges, f.axis, f.angle_tolerance)
+            elif isinstance(f, PositionalFilter):
+                edges = self._filter_positional(edges, f)
+            elif isinstance(f, SurfaceFilter):
+                edges = filter_edges_by_surface(edges, f)
+
+        if not edges:
+            logger.warning("fillet_by: no edges matched the filters")
+            return self
+
+        if debug == FilletDebug.ALL:
+            from sava.csg.build123d.common.exporter import show_red  # inline to avoid circular import
+            show_red(*edges)
+        elif debug == FilletDebug.PARTIAL:
+            from sava.csg.build123d.common.exporter import show_red, show_green  # inline to avoid circular import
+            for edge in edges:
+                try:
+                    fillet([edge], radius)
+                    show_green(edge)
+                except Exception:
+                    show_red(edge)
+        else:
+            self.solid = fillet(edges, radius)
+
         return self
 
     def _filter_positional(self, edges: ShapeList[Edge], positional_filter: PositionalFilter) -> ShapeList[Edge]:

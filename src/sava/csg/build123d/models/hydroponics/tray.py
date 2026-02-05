@@ -14,7 +14,8 @@ from sava.csg.build123d.common.primitives import create_handle_wire
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartloft import SmartLoft
-from sava.csg.build123d.common.smartsolid import SmartSolid, fuse, PositionalFilter
+from sava.csg.build123d.common.edgefilters import PositionalFilter
+from sava.csg.build123d.common.smartsolid import SmartSolid, fuse
 from sava.csg.build123d.models.hydroponics.basket import BasketDimensions
 
 
@@ -289,7 +290,7 @@ class TrayFactory:
         thread = self.create_peg_thread()
 
         peg = SmarterCone.cylinder(thread.min_radius, thread.length + self.dim.peg_height, label="peg")
-        peg.fillet_positional(self.dim.peg_fillet_radius, None, PositionalFilter(Axis.Z, peg.z_max))
+        peg.fillet_by(self.dim.peg_fillet_radius, PositionalFilter(Axis.Z, peg.z_max))
 
         thread_screw_solid = SmartSolid(thread)
         thread_screw_solid.align_zxy(peg, Alignment.LR)
@@ -323,7 +324,7 @@ class TrayFactory:
 
         peg_radius = self.create_peg_thread(True).min_radius
         cap_base = SmarterCone.cylinder(peg_radius, self.dim.peg_cap_handle_height)
-        cap_base.fillet_positional(self.dim.peg_cap_fillet_radius, None, PositionalFilter(Axis.Z, cap_base.z_max))
+        cap_base.fillet_by(self.dim.peg_cap_fillet_radius, PositionalFilter(Axis.Z, cap_base.z_max))
         cap_base.align_zxy(peg_cap, Alignment.RL)
 
         hex_socket_face = hex_recess(self.dim.peg_cap_hex_socket_size)

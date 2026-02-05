@@ -12,7 +12,8 @@ from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
-from sava.csg.build123d.common.smartsolid import SmartSolid, PositionalFilter
+from sava.csg.build123d.common.edgefilters import PositionalFilter, AXIS_Z, AxisFilter
+from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 class ConnectorRecesses:
@@ -125,9 +126,9 @@ class CableStorage:
         cable_cut.align(connector_cut).y(Alignment.CR).z(Alignment.RL)
 
         result = SmartSolid(box, connector_fuse, label=f"holder {connector.name.lower()}").cut(connector_cut, cable_cut)
-        result.fillet_positional(self.dim.cable_hole_fillet_radius, Axis.Z, PositionalFilter(Axis.Y, box.y_max), PositionalFilter(Axis.X))
+        result.fillet_by(self.dim.cable_hole_fillet_radius, AXIS_Z, PositionalFilter(Axis.Y, box.y_max), PositionalFilter(Axis.X))
         connector_fuse_filters = [PositionalFilter(Axis.Y, connector_fuse.y_min, connector_fuse.y_max), PositionalFilter(Axis.X, connector_fuse.x_min, connector_fuse.x_max)]
-        result.fillet_positional(self.dim.cable_hole_fillet_radius, Axis.Z, *connector_fuse_filters, angle_tolerance=(90 - self.dim.cable_holder_angle))
+        result.fillet_by(self.dim.cable_hole_fillet_radius, AxisFilter(Axis.Z, 90 - self.dim.cable_holder_angle), *connector_fuse_filters)
 
         return result
 
@@ -141,9 +142,9 @@ class CableStorage:
         pencil.up_to(dim.height - dim.railing_ceiling_thickness - dim.railing_width / 2)
         pencil.arc_with_radius(dim.railing_width / 2 - dim.railing_gap, -90, -180)
         pencil.down_to(dim.railing_offset - dim.railing_offset * COS_45)
-        pencil.fillet(self.dim.railing_fillet_radius)
+        pencil.fillet()
         pencil.jump((-dim.railing_offset, -dim.railing_offset))
-        pencil.fillet(self.dim.railing_fillet_radius)
+        pencil.fillet()
         pencil.down(dim.railing_handle_height)
         pencil.left()
         return pencil.extrude_mirrored_y(length)

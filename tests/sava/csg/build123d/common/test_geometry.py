@@ -4,7 +4,8 @@ from math import sqrt, sin, cos, radians
 from build123d import Vector, Axis, Plane, Box, Edge, ShapeList
 from parameterized import parameterized
 
-from sava.csg.build123d.common.geometry import rotate_vector, multi_rotate_vector, convert_orientation_to_rotations, orient_axis, calculate_orientation, filter_edges_by_axis, filter_edges_by_position
+from sava.csg.build123d.common.geometry import rotate_vector, multi_rotate_vector, convert_orientation_to_rotations, orient_axis, calculate_orientation
+from sava.csg.build123d.common.edgefilters import filter_edges_by_axis, filter_edges_by_position
 from tests.sava.csg.build123d.test_utils import assertVectorAlmostEqual
 
 

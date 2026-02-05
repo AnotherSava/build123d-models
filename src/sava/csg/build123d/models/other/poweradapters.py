@@ -9,6 +9,7 @@ from sava.csg.build123d.common.geometry import create_vector, Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_tapered_box, create_tapered_box_delta
 from sava.csg.build123d.common.smartbox import SmartBox
+from sava.csg.build123d.common.edgefilters import AXIS_X
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.sweepsolid import SweepSolid
 from sava.csg.build123d.common.text import TextDimensions, create_text
@@ -164,7 +165,7 @@ class PowerAdapterLid(PowerAdapterBase):
         box_protrusions.align_old(lid).align_z(lid, Alignment.LR)
         lid.cut(box_protrusions)
 
-        lid.fillet_positional(self.dim.lid_fillet_radius, Axis.X, *box_protrusions.create_positional_filters_plane(Plane.YZ))
+        lid.fillet_by(self.dim.lid_fillet_radius, AXIS_X, *box_protrusions.create_positional_filters_plane(Plane.YZ))
 
         thinning = self.create_snap_thinning()
         snap = self.create_snap().align_zxy(thinning, Alignment.LR).intersect(thinning)

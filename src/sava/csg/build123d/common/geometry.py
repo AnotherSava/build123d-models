@@ -184,54 +184,6 @@ def is_within_interval(value: float, minimum: float, maximum: float, inclusive: 
         return inclusive[1]
     return minimum < value < maximum
 
-def filter_edges_by_position(edges: ShapeList[Edge], axis: Axis, minimum: float, maximum: float, inclusive: tuple[bool, bool]) -> ShapeList[Edge]:
-    """Filter edges by position along an axis with tolerance-aware boundary comparisons.
-
-    Args:
-        edges: List of edges to filter
-        axis: Axis to measure position along
-        minimum: Lower bound of the interval
-        maximum: Upper bound of the interval
-        inclusive: Tuple of (include_min, include_max) for boundary inclusion
-
-    Returns:
-        Filtered list of edges within the interval
-    """
-    axis_dir = axis.direction.normalized()
-    filtered = [edge for edge in edges if is_within_interval(edge.center().dot(axis_dir), minimum, maximum, inclusive)]
-    return ShapeList(filtered)
-
-def filter_edges_by_axis(edges: ShapeList[Edge], axis: Axis, angle_tolerance: float = 1e-5, num_samples: int = 10) -> ShapeList[Edge]:
-    """Filter edges by alignment to an axis, checking tangents at multiple points.
-
-    For an edge to pass, the tangent at every sampled point must be within the
-    angle tolerance of the axis. This correctly handles arcs and curved edges.
-
-    Args:
-        edges: List of edges to filter
-        axis: Axis to filter by (edges parallel to this axis are selected)
-        angle_tolerance: Maximum angle deviation from axis in degrees. Default is 1e-5.
-        num_samples: Number of points along the edge to check tangent. Default is 10.
-
-    Returns:
-        Filtered list of edges aligned with the axis
-    """
-    axis_dir = axis.direction.normalized()
-    filtered = []
-    for edge in edges:
-        max_angle = 0.0
-        for i in range(num_samples):
-            t = i / (num_samples - 1) if num_samples > 1 else 0.5
-            tangent = edge.tangent_at(t).normalized()
-            dot = abs(tangent.dot(axis_dir))
-            angle = degrees(acos(min(1.0, dot)))
-            max_angle = max(max_angle, angle)
-            if angle > angle_tolerance:
-                break  # No need to check more points
-        if max_angle <= angle_tolerance:
-            filtered.append(edge)
-    return ShapeList(filtered)
-
 def are_points_too_close(pt1: VectorLike, pt2: VectorLike, tolerance: float = 1e-6) -> bool:
     """Checks if two points are too close together.
 
