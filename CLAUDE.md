@@ -173,12 +173,14 @@ def create_boxes(count: int, size: float = 1.0) -> list[Box]:
 
 ### Import Organization
 
-All imports at top of file. Order (with blank lines between groups):
+Always place imports at the top of the file unless there is a specific reason not to (such as circular dependencies). Order (with blank lines between groups):
 1. Standard library (`import os`, `from typing import List`)
 2. Third-party (`from build123d import Vector, Plane, Box`)
 3. Local (`from sava.common.common import flatten`)
 
-Inline imports only allowed for: circular import resolution, conditional imports, performance-critical lazy loading, type checking only.
+Inline imports are only allowed for:
+- Circular import resolution (add comment: `# inline to avoid circular import`)
+- Type checking only (`if TYPE_CHECKING:` block)
 
 ### Testing
 
