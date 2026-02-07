@@ -27,6 +27,7 @@ def _param_at_arc_length(edge: Edge, target_length: float, from_end: bool = Fals
 # TYPE_CHECKING import for type hints only; runtime import is lazy to avoid circular dependency
 if TYPE_CHECKING:
     from sava.csg.build123d.common.smartsolid import SmartSolid
+    from sava.csg.build123d.common.smartrevolve import SmartRevolve
 
 
 def _reconstruct_edge(edge: Edge) -> Edge:
@@ -468,6 +469,7 @@ class Pencil:
 
         return combined_wire
 
-    def revolve(self, angle: float = 360, axis: Axis = Axis.Y, enclose: bool = True, label: str = None) -> SmartSolid:
-        from sava.csg.build123d.common.smartsolid import SmartSolid
-        return SmartSolid(revolve(self.create_face(enclose), axis, angle), label=label)
+    def revolve(self, angle: float = 360, axis: Axis = Axis.Y, enclose: bool = True, label: str = None) -> 'SmartRevolve':
+        from sava.csg.build123d.common.smartrevolve import SmartRevolve
+        face = self.create_face(enclose)
+        return SmartRevolve(face, axis, angle, self.plane, label=label)
