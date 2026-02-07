@@ -1,6 +1,6 @@
 from copy import copy
 
-from build123d import Axis, Face, Location, Vector, VectorLike, Wire, extrude, loft
+from build123d import Axis, Face, Location, Plane, Vector, VectorLike, Wire, extrude, loft
 
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -68,9 +68,14 @@ class SmartLoft(SmartSolid):
         result.target_profile = copy(face).move(Location(tuple(d * amount for d in direction)))
         return result
 
-    def move(self, x: float, y: float = 0, z: float = 0) -> 'SmartLoft':
-        super().move(x, y, z)
-        location = Location(Vector(x, y, z))
+    def move(self, x: float, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartLoft':
+        super().move(x, y, z, plane=plane)
+        # Convert plane-local offsets to global coordinates if plane is specified
+        if plane is not None:
+            global_offset = plane.x_dir * x + plane.y_dir * y + plane.z_dir * z
+        else:
+            global_offset = Vector(x, y, z)
+        location = Location(global_offset)
         self.base_profile = self.base_profile.move(location)
         self.target_profile = self.target_profile.move(location)
         return self

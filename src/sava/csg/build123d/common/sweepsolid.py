@@ -22,11 +22,16 @@ class SweepSolid(SmartSolid):
         result.plane_path = copy(self.plane_path)
         return result
 
-    def move(self, x: float, y: float = 0, z: float = 0) -> 'SweepSolid':
-        super().move(x, y, z)
-        location = Location(Vector(x, y, z))
+    def move(self, x: float, y: float = 0, z: float = 0, plane: Plane = None) -> 'SweepSolid':
+        super().move(x, y, z, plane=plane)
+        # Convert plane-local offsets to global coordinates if plane is specified
+        if plane is not None:
+            global_offset = plane.x_dir * x + plane.y_dir * y + plane.z_dir * z
+        else:
+            global_offset = Vector(x, y, z)
+        location = Location(global_offset)
         self.path = self.path.move(location)
-        self.plane_path.origin += Vector(x, y, z)
+        self.plane_path.origin += global_offset
         return self
 
     def rotate(self, axis: Axis, angle: float) -> 'SweepSolid':

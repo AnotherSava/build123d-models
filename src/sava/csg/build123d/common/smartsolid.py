@@ -151,15 +151,33 @@ class SmartSolid:
         self.solid.label = color
         return self
 
-    def move_vector(self, vector: Vector):
-        return self.move(vector.X, vector.Y, vector.Z)
+    def move_vector(self, vector: Vector, plane: Plane = None) -> 'SmartSolid':
+        return self.move(vector.X, vector.Y, vector.Z, plane=plane)
 
-    def moved_vector(self, vector: Vector):
-        return self.copy().move_vector(vector)
+    def moved_vector(self, vector: Vector, plane: Plane = None) -> 'SmartSolid':
+        return self.copy().move_vector(vector, plane=plane)
 
-    def move(self, x: float, y: float = 0, z: float = 0) -> 'SmartSolid':
+    def move(self, x: float, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartSolid':
+        """Move the solid by the specified offsets.
+
+        Args:
+            x: Offset along x-axis (or plane's x_dir if plane is specified)
+            y: Offset along y-axis (or plane's y_dir if plane is specified)
+            z: Offset along z-axis (or plane's z_dir if plane is specified)
+            plane: Optional plane defining the coordinate system for the offsets.
+                   If None, uses global XYZ coordinates.
+
+        Returns:
+            self for chaining
+        """
+        # Convert plane-local offsets to global coordinates if plane is specified
+        if plane is not None:
+            global_offset = plane.x_dir * x + plane.y_dir * y + plane.z_dir * z
+        else:
+            global_offset = Vector(x, y, z)
+
         # Move each shape separately if it's a ShapeList, otherwise move the single shape
-        location = Location(Vector(x, y, z))
+        location = Location(global_offset)
 
         if isinstance(self.solid, ShapeList):
             # Move each shape in the list separately
@@ -171,20 +189,20 @@ class SmartSolid:
             # Move single shape
             self.solid = self.solid.move(location)
 
-        self.origin += Vector(x, y, z)
+        self.origin += global_offset
         return self
 
-    def moved(self, x: float, y: float = 0, z: float = 0) -> 'SmartSolid':
-        return self.copy().move(x, y, z)
+    def moved(self, x: float, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartSolid':
+        return self.copy().move(x, y, z, plane=plane)
 
-    def move_x(self, x: float) -> 'SmartSolid':
-        return self.move(x, 0, 0)
+    def move_x(self, x: float, plane: Plane = None) -> 'SmartSolid':
+        return self.move(x, 0, 0, plane=plane)
 
-    def move_y(self, y: float) -> 'SmartSolid':
-        return self.move(0, y, 0)
+    def move_y(self, y: float, plane: Plane = None) -> 'SmartSolid':
+        return self.move(0, y, 0, plane=plane)
 
-    def move_z(self, z: float) -> 'SmartSolid':
-        return self.move(0, 0, z)
+    def move_z(self, z: float, plane: Plane = None) -> 'SmartSolid':
+        return self.move(0, 0, z, plane=plane)
 
     def get_from(self, axis: Axis) -> float:
         return self.get_bounds_along_axis(axis)[0]

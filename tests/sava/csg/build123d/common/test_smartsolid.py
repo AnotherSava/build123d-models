@@ -353,5 +353,106 @@ class TestSmartSolidOriginTracking(unittest.TestCase):
         assertVectorAlmostEqual(self, box.origin, (0, 10, 0))
 
 
+class TestSmartSolidMoveWithPlane(unittest.TestCase):
+    """Tests for move operations with plane parameter."""
+
+    def test_move_without_plane_uses_global_coordinates(self):
+        """Test that move() without plane uses global XYZ coordinates."""
+        box = SmartSolid(Box(10, 10, 10))
+        box.move(5, 10, 15)
+
+        assertVectorAlmostEqual(self, box.origin, (5, 10, 15))
+        # Box is centered at origin, so after move center is at (5, 10, 15)
+        assertVectorAlmostEqual(self, box.solid.center(), (5, 10, 15))
+
+    def test_move_with_xy_plane_same_as_global(self):
+        """Test that move() with Plane.XY is same as global coordinates."""
+        box1 = SmartSolid(Box(10, 10, 10))
+        box2 = SmartSolid(Box(10, 10, 10))
+
+        box1.move(5, 10, 15)
+        box2.move(5, 10, 15, plane=Plane.XY)
+
+        assertVectorAlmostEqual(self, box1.origin, box2.origin)
+
+    def test_move_with_xz_plane(self):
+        """Test that move() with Plane.XZ uses XZ plane coordinates."""
+        box = SmartSolid(Box(10, 10, 10))
+        # In Plane.XZ: x_dir=(1,0,0), y_dir=(0,0,1), z_dir=(0,-1,0)
+        # So move(5, 10, 15) in XZ plane = 5*x_dir + 10*y_dir + 15*z_dir
+        # = 5*(1,0,0) + 10*(0,0,1) + 15*(0,-1,0) = (5, -15, 10)
+        box.move(5, 10, 15, plane=Plane.XZ)
+
+        assertVectorAlmostEqual(self, box.origin, (5, -15, 10))
+
+    def test_move_with_yz_plane(self):
+        """Test that move() with Plane.YZ uses YZ plane coordinates."""
+        box = SmartSolid(Box(10, 10, 10))
+        # In Plane.YZ: x_dir=(0,1,0), y_dir=(0,0,1), z_dir=(1,0,0)
+        # So move(5, 10, 15) in YZ plane = 5*x_dir + 10*y_dir + 15*z_dir
+        # = 5*(0,1,0) + 10*(0,0,1) + 15*(1,0,0) = (15, 5, 10)
+        box.move(5, 10, 15, plane=Plane.YZ)
+
+        assertVectorAlmostEqual(self, box.origin, (15, 5, 10))
+
+    def test_move_x_with_plane(self):
+        """Test that move_x() with plane uses plane's x direction."""
+        box = SmartSolid(Box(10, 10, 10))
+        box.move_x(10, plane=Plane.YZ)
+
+        # In Plane.YZ: x_dir=(0,1,0), so move_x(10) = (0, 10, 0)
+        assertVectorAlmostEqual(self, box.origin, (0, 10, 0))
+
+    def test_move_y_with_plane(self):
+        """Test that move_y() with plane uses plane's y direction."""
+        box = SmartSolid(Box(10, 10, 10))
+        box.move_y(10, plane=Plane.XZ)
+
+        # In Plane.XZ: y_dir=(0,0,1), so move_y(10) = (0, 0, 10)
+        assertVectorAlmostEqual(self, box.origin, (0, 0, 10))
+
+    def test_move_z_with_plane(self):
+        """Test that move_z() with plane uses plane's z direction."""
+        box = SmartSolid(Box(10, 10, 10))
+        box.move_z(10, plane=Plane.XZ)
+
+        # In Plane.XZ: z_dir=(0,-1,0), so move_z(10) = (0, -10, 0)
+        assertVectorAlmostEqual(self, box.origin, (0, -10, 0))
+
+    def test_moved_with_plane_returns_copy(self):
+        """Test that moved() with plane returns a moved copy."""
+        box = SmartSolid(Box(10, 10, 10))
+        moved_box = box.moved(5, 10, 15, plane=Plane.XZ)
+
+        # Original should be unchanged
+        assertVectorAlmostEqual(self, box.origin, (0, 0, 0))
+        # Copy should be moved: (5, -15, 10) in XZ plane
+        assertVectorAlmostEqual(self, moved_box.origin, (5, -15, 10))
+
+    def test_move_with_custom_plane(self):
+        """Test move() with a custom rotated plane."""
+        box = SmartSolid(Box(10, 10, 10))
+        # Create a plane rotated 90 degrees around Z
+        rotated_plane = Plane.XY.rotated((0, 0, 90))
+        # After 90° Z rotation: x_dir=(0,1,0), y_dir=(-1,0,0), z_dir=(0,0,1)
+        # So move(10, 0, 0) in rotated plane = 10*(0,1,0) = (0, 10, 0)
+        box.move(10, 0, 0, plane=rotated_plane)
+
+        assertVectorAlmostEqual(self, box.origin, (0, 10, 0))
+
+    @parameterized.expand([
+        (Plane.XY,),
+        (Plane.XZ,),
+        (Plane.YZ,),
+    ])
+    def test_move_with_plane_origin_tracked(self, plane):
+        """Test that origin is properly tracked with plane-relative moves."""
+        box = SmartSolid(Box(10, 10, 10))
+        box.move(5, 10, 15, plane=plane)
+
+        # The solid's center should match origin (since Box starts centered at origin)
+        assertVectorAlmostEqual(self, box.solid.center(), box.origin)
+
+
 if __name__ == '__main__':
     unittest.main()
