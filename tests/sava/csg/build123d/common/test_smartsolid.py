@@ -454,5 +454,73 @@ class TestSmartSolidMoveWithPlane(unittest.TestCase):
         assertVectorAlmostEqual(self, box.solid.center(), box.origin)
 
 
+class TestSmartSolidCutMethods(unittest.TestCase):
+    """Tests for cut_x, cut_y, cut_z methods with offset and fraction parameters."""
+
+    def test_cut_x_with_offset(self):
+        """Test cut_x with explicit offset."""
+        box = SmartSolid(Box(20, 10, 10))
+        box.cut_x(offset=5)
+        self.assertAlmostEqual(box.x_size, 15, places=5)
+
+    def test_cut_x_with_fraction(self):
+        """Test cut_x with fraction parameter."""
+        box = SmartSolid(Box(20, 10, 10))
+        box.cut_x(fraction=0.25)  # Cut 25% = 5 units
+        self.assertAlmostEqual(box.x_size, 15, places=5)
+
+    def test_cut_y_with_fraction(self):
+        """Test cut_y with fraction parameter."""
+        box = SmartSolid(Box(10, 20, 10))
+        box.cut_y(fraction=0.5)  # Cut 50% = 10 units
+        self.assertAlmostEqual(box.y_size, 10, places=5)
+
+    def test_cut_z_with_fraction(self):
+        """Test cut_z with fraction parameter."""
+        box = SmartSolid(Box(10, 10, 30))
+        box.cut_z(fraction=0.333333)  # Cut ~1/3 = 10 units
+        self.assertAlmostEqual(box.z_size, 20, places=4)
+
+    def test_cut_requires_offset_or_fraction(self):
+        """Test that cut methods require either offset or fraction."""
+        box = SmartSolid(Box(10, 10, 10))
+        with self.assertRaises(ValueError) as context:
+            box.cut_x()
+        self.assertIn("Either offset or fraction must be provided", str(context.exception))
+
+    def test_cut_rejects_both_offset_and_fraction(self):
+        """Test that cut methods reject both offset and fraction."""
+        box = SmartSolid(Box(10, 10, 10))
+        with self.assertRaises(ValueError) as context:
+            box.cut_x(offset=5, fraction=0.5)
+        self.assertIn("Only one of offset or fraction can be provided", str(context.exception))
+
+    @parameterized.expand([
+        (0.0,),
+        (1.0,),
+        (-1.0,),
+        (1.5,),
+        (-1.5,),
+    ])
+    def test_cut_validates_fraction_range(self, invalid_fraction):
+        """Test that fraction must satisfy -1 < f < 0 or 0 < f < 1."""
+        box = SmartSolid(Box(10, 10, 10))
+        with self.assertRaises(ValueError) as context:
+            box.cut_x(fraction=invalid_fraction)
+        self.assertIn("fraction must satisfy", str(context.exception))
+
+    def test_cut_x_with_negative_fraction(self):
+        """Test cut_x with negative fraction cuts from the other side."""
+        box = SmartSolid(Box(20, 10, 10))
+        box.cut_x(fraction=-0.25)  # Cut 25% from the other side
+        self.assertAlmostEqual(box.x_size, 15, places=5)
+
+    def test_cut_x_negative_offset(self):
+        """Test cut_x with negative offset cuts from the other side."""
+        box = SmartSolid(Box(20, 10, 10))
+        box.cut_x(offset=-5)
+        self.assertAlmostEqual(box.x_size, 15, places=5)
+
+
 if __name__ == '__main__':
     unittest.main()

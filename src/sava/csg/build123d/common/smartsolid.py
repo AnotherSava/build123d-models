@@ -601,11 +601,23 @@ class SmartSolid:
     def cut_off(self, x: float = 0, y: float = 0, z: float = 0) -> 'SmartSolid':
         return self.intersect(self.create_bound_box().move(x, y, z))
 
-    def cut_x(self, offset: float) -> 'SmartSolid':
-        return self.cut_off(x=offset)
+    def _resolve_cut_offset(self, offset: float | None, fraction: float | None, size: float) -> float:
+        """Validate params and return the calculated offset."""
+        if offset is None and fraction is None:
+            raise ValueError("Either offset or fraction must be provided")
+        if offset is not None and fraction is not None:
+            raise ValueError("Only one of offset or fraction can be provided, not both")
+        if fraction is not None:
+            if not (-1 < fraction < 0 or 0 < fraction < 1):
+                raise ValueError(f"fraction must satisfy -1 < f < 0 or 0 < f < 1, got {fraction}")
+            return size * fraction
+        return offset
 
-    def cut_y(self, offset: float) -> 'SmartSolid':
-        return self.cut_off(y=offset)
+    def cut_x(self, offset: float = None, fraction: float = None) -> 'SmartSolid':
+        return self.cut_off(x=self._resolve_cut_offset(offset, fraction, self.x_size))
 
-    def cut_z(self, offset: float) -> 'SmartSolid':
-        return self.cut_off(z=offset)
+    def cut_y(self, offset: float = None, fraction: float = None) -> 'SmartSolid':
+        return self.cut_off(y=self._resolve_cut_offset(offset, fraction, self.y_size))
+
+    def cut_z(self, offset: float = None, fraction: float = None) -> 'SmartSolid':
+        return self.cut_off(z=self._resolve_cut_offset(offset, fraction, self.z_size))
