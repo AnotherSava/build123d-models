@@ -118,6 +118,19 @@ class SmartSphere(SmartSolid):
         radius = self.radius if external else self.internal_radius
         return SmartSphere.create_hollow(radius, radius + offset, self.angle, self.plane, label or self.label).colocate(self)
 
+    def create_sphere(self, radius: float, angle: float = None, label: str = None) -> 'SmartSphere':
+        """Creates a solid sphere with the given radius, colocated with this sphere.
+
+        Args:
+            radius: Radius of the new sphere
+            angle: Longitude sweep angle in degrees (defaults to this sphere's angle)
+            label: Optional label for the new sphere (defaults to original label)
+
+        Returns:
+            New solid SmartSphere colocated with this sphere
+        """
+        return SmartSphere(radius, angle=angle or self.angle, plane=self.plane, label=label or self.label).colocate(self)
+
     def create_inner_sphere(self, label: str = None) -> 'SmartSphere':
         """
         Creates a solid sphere with the internal radius.
@@ -133,7 +146,7 @@ class SmartSphere(SmartSolid):
         """
         if self.internal_radius is None:
             raise ValueError("Cannot create inner sphere from solid sphere (no internal radius)")
-        return SmartSphere(self.internal_radius, angle=self.angle, plane=self.plane, label=label or self.label).colocate(self)
+        return self.create_sphere(self.internal_radius, label=label)
 
     def create_outer_sphere(self, label: str = None) -> 'SmartSphere':
         """
@@ -145,7 +158,7 @@ class SmartSphere(SmartSolid):
         Returns:
             New solid SmartSphere with radius equal to this sphere's external radius
         """
-        return SmartSphere(self.radius, angle=self.angle, plane=self.plane, label=label or self.label).colocate(self)
+        return self.create_sphere(self.radius, label=label)
 
     def copy(self, label: str = None) -> 'SmartSphere':
         """Deep copy returning SmartSphere."""
