@@ -145,6 +145,15 @@ class TestPrepareShape(unittest.TestCase):
         self.assertEqual(len(prepared), 1)
         self.assertEqual(prepared[0].label, "test_label")
 
+    def test_prepare_shape_without_assign_color_skips_color(self):
+        """Test that assign_color=False skips color assignment but still assigns label"""
+        box = Box(10, 10, 10)
+        prepared = _prepare_shape(box, "test_label", assign_color=False)
+
+        self.assertEqual(len(prepared), 1)
+        self.assertEqual(prepared[0].label, "test_label")
+        self.assertIsNone(prepared[0].color)
+
     def test_prepare_shape_assigns_color_for_color_label(self):
         """Test that color labels get their color assigned"""
         box = Box(10, 10, 10)
