@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass, field
 from math import asin, degrees
 
@@ -25,6 +26,7 @@ class CableHolderDimensions:
 
     # Cable ball
     ball_radius: float = 8
+    ball_floor_diameter: float = 0
     ball_shell_thickness: float = 0.8
     ball_connector_height: float = 5
     ball_connector_padding_y: float = 0.1
@@ -124,6 +126,10 @@ class CableHolder:
         opener.align(sphere).x(Alignment.RL).y(Alignment.LL)
         segment_out.cut(opener)
 
+        if dim.ball_floor_diameter:
+            cut_offset = dim.ball_radius - math.sqrt(dim.ball_radius ** 2 - dim.ball_floor_diameter ** 2 / 4)
+            sphere.cut_y(-cut_offset)
+
         return sphere.fuse(segment_out).cut(cable_canal, connector_in, segment_in, text).fuse(teeth, connector_out).rotate_x(-90)
 
 
@@ -131,7 +137,7 @@ class CableHolder:
         dim = self.dim
 
         ball_holder = self.create_ball_holder()
-        attachment = SmartBox(dim.ball_distance * (holder_count - 1) + ball_holder.x_size * holder_count, dim.attachment_thickness, dim.attachment_height, label="cable_holder")
+        attachment = SmartBox(dim.ball_distance * (holder_count - 1) + ball_holder.x_size * holder_count, dim.attachment_thickness, dim.attachment_height, label=f"cable_holder_{holder_count}")
         attachment.fillet_by(dim.attachment_fillet_radius, PositionalFilter(Axis.Y, inclusive=(False, True)))
 
         for i in range(holder_count):
@@ -139,7 +145,7 @@ class CableHolder:
             ball_holder.align(attachment).x(Alignment.LR, (dim.ball_distance + ball_holder.x_size) * i).y(Alignment.LR, dim.attachment_thickness).z(Alignment.LR, z)
             attachment.fuse(ball_holder)
 
-        return attachment
+        return attachment.rotate_x(90)
 
     def create_bottom_connector(self, ball_holder: SmartSolid, sphere: SmartSphere) -> SmartSolid:
         dim = self.dim
@@ -224,7 +230,7 @@ if __name__ == "__main__":
     dimensions = CableHolderDimensions()
     cable_holder = CableHolder(dimensions)
     cable_ball_solids = [cable_holder.create_cable_ball(diameter / 10) for diameter in range(30, 43)]
-    holder_solid = cable_holder.create_holder()
+    holder_solids = [cable_holder.create_holder(length) for length in range(1, 7)]
 
-    export_3mf("models/other/cable_holder/export.3mf", holder_solid)
-    export_stl("models/other/cable_holder/stl", holder_solid, *cable_ball_solids)
+    export_3mf("models/other/cable_holder/export.3mf", holder_solids[3])
+    export_stl("models/other/cable_holder/stl", *holder_solids, *cable_ball_solids)
