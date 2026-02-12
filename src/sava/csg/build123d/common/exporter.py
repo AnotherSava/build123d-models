@@ -49,13 +49,12 @@ def _get_color_for_label(label: str) -> str:
     raise RuntimeError(f"All {len(BASIC_COLORS)} colors exhausted. Cannot assign color to label '{label}'.")
 
 
-def _prepare_shape(shape, label: str, edge_max_length: float = None, assign_color: bool = True) -> Iterable[Shape]:
+def _prepare_shape(shape, label: str, edge_max_length: float = None, prepare_for_stl: bool = False) -> Iterable[Shape]:
     """Convert shape to exportable shape(s) and assign color based on label.
 
     Args:
-        assign_color: When True, assign a color based on label. The set of colors is limited, which is enough
-            for all parts present in a 3MF model, but STL models may contain more variants (one file per label)
-            which would deplete the set of colors.
+        prepare_for_stl: When True, skip color assignment (STL doesn't support colors, and the limited color set
+            could be depleted by many STL labels) and apply bed_orientation to SmartSolid shapes.
     """
     from build123d import Box, Location
     result = []
@@ -73,14 +72,14 @@ def _prepare_shape(shape, label: str, edge_max_length: float = None, assign_colo
         box.locate(Location(shape.center()))
         extracted = box
     else:
-        extracted = get_solid(shape)
+        extracted = get_solid(shape, apply_bed_orientation=prepare_for_stl)
 
     if isinstance(extracted, Iterable):
         for item in extracted:
-            result += _prepare_shape(item, label, edge_max_length, assign_color)
+            result += _prepare_shape(item, label, edge_max_length, prepare_for_stl)
     else:
         shape_copy = copy(extracted)
-        if assign_color:
+        if not prepare_for_stl:
             shape_copy.color = Color(_get_color_for_label(label))
         shape_copy.label = label
         result.append(shape_copy.clean())
@@ -298,7 +297,7 @@ def save_stl(directory: str = None) -> None:
     for label, shapes in _shapes.items():
         mesher = Mesher()
         for shape in shapes:
-            for prepared in _prepare_shape(shape, label, edge_max_length, assign_color=False):
+            for prepared in _prepare_shape(shape, label, edge_max_length, prepare_for_stl=True):
                 mesher.add_shape(prepared)
 
         file_path = create_file_path(actual_directory, f"{label}.stl")

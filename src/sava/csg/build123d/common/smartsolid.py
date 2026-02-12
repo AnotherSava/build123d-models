@@ -12,10 +12,14 @@ from sava.csg.build123d.common.edgefilters import PositionalFilter, SurfaceFilte
 from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, multi_rotate_vector, convert_orientation_to_rotations
 
 
-def get_solid(element):
+def get_solid(element, apply_bed_orientation: bool = False):
     if isinstance(element, AlignmentBuilder):
         element = element.done()
-    return element.solid if isinstance(element, SmartSolid) else element
+    if isinstance(element, SmartSolid):
+        if apply_bed_orientation and element.bed_orientation is not None:
+            element = element.copy().orient(element.bed_orientation)
+        return element.solid
+    return element
 
 if TYPE_CHECKING:
     from sava.csg.build123d.common.smartbox import SmartBox
@@ -58,6 +62,7 @@ class SmartSolid:
         self.solid = fuse(*args) if len(args) > 0 else None
         self.origin = Vector(0, 0, 0)
         self._orientation = Vector(0, 0, 0)
+        self.bed_orientation: VectorLike | None = None
         self.assert_valid()
 
     @property
@@ -452,12 +457,17 @@ class SmartSolid:
             show_red(*edges)
         elif debug == FilletDebug.PARTIAL:
             from sava.csg.build123d.common.exporter import show_red, show_green  # inline to avoid circular import
+            succeeded = 0
+            failed = 0
             for edge in edges:
                 try:
                     fillet([edge], radius)
                     show_green(edge)
+                    succeeded += 1
                 except Exception:
                     show_red(edge)
+                    failed += 1
+            logger.debug(f"fillet_by PARTIAL: {succeeded} succeeded, {failed} failed out of {len(edges)} edges")
         else:
             self.solid = fillet(edges, radius)
 
@@ -538,9 +548,8 @@ class SmartSolid:
         # self.fuse(notch.intersect(extended_shape))
 
     def copy(self, label: str = None):
-        result = SmartSolid(copy(self.solid), label=label or self.label)
-        result.origin = Vector(self.origin)
-        result._orientation = Vector(self._orientation)
+        result = SmartSolid()
+        self._copy_base_fields(result, label)
         return result
 
     def _copy_base_fields(self, target: 'SmartSolid', label: str = None) -> None:
@@ -549,6 +558,7 @@ class SmartSolid:
         target.label = label or self.label
         target.origin = Vector(self.origin)
         target._orientation = Vector(self._orientation)
+        target.bed_orientation = self.bed_orientation
 
     def _scale_solid(self, factor_x: float, factor_y: float, factor_z: float):
         factor_y = factor_y or factor_x

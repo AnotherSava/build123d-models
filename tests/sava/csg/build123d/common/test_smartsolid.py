@@ -327,6 +327,20 @@ class TestSmartSolidOriginTracking(unittest.TestCase):
         assertVectorAlmostEqual(self, box_copy.origin, box.origin)
         assertVectorAlmostEqual(self, box_copy._orientation, box._orientation)
 
+    def test_bed_orientation_default_none(self):
+        """Test that bed_orientation is None by default."""
+        box = SmartSolid(Box(10, 10, 10))
+        self.assertIsNone(box.bed_orientation)
+
+    def test_copy_preserves_bed_orientation(self):
+        """Test that copy() preserves bed_orientation field."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.bed_orientation = (90, 0, 0)
+
+        box_copy = box.copy()
+
+        self.assertEqual(box_copy.bed_orientation, (90, 0, 0))
+
     def test_combined_transformations(self):
         """Test origin tracking through multiple transformations."""
         box = SmartSolid(Box(100, 50, 30))

@@ -9,6 +9,7 @@ from sava.csg.build123d.common.exporter import (
     export, clear, show_red, show_blue, show_green, save_3mf, save_stl,
     _shapes, _label_colors, _get_color_for_label, _prepare_shape, _is_valid_color, BASIC_COLORS
 )
+from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 class TestExport(unittest.TestCase):
@@ -145,14 +146,27 @@ class TestPrepareShape(unittest.TestCase):
         self.assertEqual(len(prepared), 1)
         self.assertEqual(prepared[0].label, "test_label")
 
-    def test_prepare_shape_without_assign_color_skips_color(self):
-        """Test that assign_color=False skips color assignment but still assigns label"""
+    def test_prepare_shape_with_prepare_for_stl_skips_color(self):
+        """Test that prepare_for_stl=True skips color assignment but still assigns label"""
         box = Box(10, 10, 10)
-        prepared = _prepare_shape(box, "test_label", assign_color=False)
+        prepared = _prepare_shape(box, "test_label", prepare_for_stl=True)
 
         self.assertEqual(len(prepared), 1)
         self.assertEqual(prepared[0].label, "test_label")
         self.assertIsNone(prepared[0].color)
+
+    def test_prepare_shape_with_prepare_for_stl_applies_bed_orientation(self):
+        """Test that prepare_for_stl=True applies bed_orientation when set on a SmartSolid"""
+        solid = SmartSolid(Box(10, 20, 30))
+        solid.bed_orientation = (90, 0, 0)
+        prepared = _prepare_shape(solid, "test_label", prepare_for_stl=True)
+
+        self.assertEqual(len(prepared), 1)
+        # After 90° X rotation, Y and Z dimensions should swap: 10x30x20
+        bbox = prepared[0].bounding_box()
+        self.assertAlmostEqual(bbox.size.X, 10, places=1)
+        self.assertAlmostEqual(bbox.size.Y, 30, places=1)
+        self.assertAlmostEqual(bbox.size.Z, 20, places=1)
 
     def test_prepare_shape_assigns_color_for_color_label(self):
         """Test that color labels get their color assigned"""
