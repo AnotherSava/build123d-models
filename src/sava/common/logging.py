@@ -19,3 +19,7 @@ handler = logging.StreamHandler()
 handler.setFormatter(ColorFormatter())
 logging.basicConfig(level=logging.WARNING, handlers=[handler])
 logger = logging.getLogger("sava")
+
+# To enable debug logging in a model script, add to its __main__ block:
+#     from sava.common.logging import logger
+#     logger.setLevel("DEBUG")
