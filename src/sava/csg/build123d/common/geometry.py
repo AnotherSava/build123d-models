@@ -11,6 +11,12 @@ from build123d.topology import Mixin1D
 if TYPE_CHECKING:
     from sava.csg.build123d.common.smartsolid import SmartSolid
 
+TOLERANCE = 1e-6
+DELTA = 1e-8
+# Minimum radius/height for OCCT geometric operations (loft, cylinder, cone).
+# Below ~1e-4 OCCT produces invalid solids that fail validity checks.
+MIN_SIZE_OCCT = 1e-4
+
 
 class Alignment(IntEnum):
     """
@@ -118,9 +124,9 @@ def to_vector(vector: VectorLike) -> Vector:
     Returns:
         A Vector object
     """
-    return vector if isinstance(vector, Vector) else Vector(vector)
+    return vector if vector is None or isinstance(vector, Vector) else Vector(vector)
 
-def snap_to(original_number: float, *round_numbers: float, tolerance: float = 1e-6) -> float:
+def snap_to(original_number: float, *round_numbers: float, tolerance: float = TOLERANCE) -> float:
     """Snaps a number to one of multiple target values if within tolerance.
 
     Useful for cleaning up floating-point arithmetic by snapping values that are
@@ -152,7 +158,7 @@ def snap_to(original_number: float, *round_numbers: float, tolerance: float = 1e
             return round_number
     return original_number
 
-def are_numbers_too_close(num1: float, num2: float, tolerance: float = 1e-6) -> bool:
+def are_numbers_too_close(num1: float, num2: float, tolerance: float = TOLERANCE) -> bool:
     """Checks if two numbers are too close together.
 
     Args:
@@ -165,7 +171,7 @@ def are_numbers_too_close(num1: float, num2: float, tolerance: float = 1e-6) -> 
     """
     return abs(num1 - num2) < tolerance
 
-def is_within_interval(value: float, minimum: float, maximum: float, inclusive: tuple[bool, bool], tolerance: float = 1e-6) -> bool:
+def is_within_interval(value: float, minimum: float, maximum: float, inclusive: tuple[bool, bool], tolerance: float = TOLERANCE) -> bool:
     """Check if a value is within an interval using tolerance-aware boundary comparisons.
 
     Args:
@@ -184,7 +190,7 @@ def is_within_interval(value: float, minimum: float, maximum: float, inclusive: 
         return inclusive[1]
     return minimum < value < maximum
 
-def are_points_too_close(pt1: VectorLike, pt2: VectorLike, tolerance: float = 1e-6) -> bool:
+def are_points_too_close(pt1: VectorLike, pt2: VectorLike, tolerance: float = TOLERANCE) -> bool:
     """Checks if two points are too close together.
 
     Args:
@@ -218,7 +224,7 @@ def get_angle_between(dir1: VectorLike, dir2: VectorLike) -> float:
     cos_angle = max(-1, min(1, dot / (len1 * len2)))
     return degrees(acos(cos_angle))
 
-def validate_points_unique(points: list[VectorLike], tolerance: float = 1e-6, labels: list[str] | None = None) -> None:
+def validate_points_unique(points: list[VectorLike], tolerance: float = TOLERANCE, labels: list[str] | None = None) -> None:
     """Validates that no two points in the list are too close together.
 
     Args:
