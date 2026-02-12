@@ -98,7 +98,7 @@ class CableHolder:
         cable_canal = SmarterCone.cylinder(cable_diameter / 2, dim.ball_radius * 2)
         cable_canal.align(sphere).y(Alignment.L)
 
-        text_canal = cable_canal.create_offset(thickness_side=dim.ball_text_depth)
+        text_canal = cable_canal.create_offset(dim.ball_text_depth)
 
         quarter_box_in = SmartBox(dim.ball_radius - cable_diameter / 2 - dim.ball_shell_thickness, dim.ball_large_connector_height, dim.ball_radius * 2)
         quarter_box_in.align(sphere).y(Alignment.LR).x(Alignment.LR)
@@ -187,7 +187,7 @@ class CableHolder:
         pencil.down()
         connector = pencil.extrude(dim.top_ring_tube_radius * 2)
 
-        side = SmarterCone.cylinder(dim.top_ring_tube_radius, length, Plane.XZ, 180).rotate_y(90)
+        side = SmarterCone.cylinder(dim.top_ring_tube_radius, length, plane=Plane.XZ, angle=180).rotate_y(90)
         side.align(connector).x(Alignment.RR)
         connector.fuse(side)
         side.rotate_y(180).align(connector).x(Alignment.LL)

@@ -59,7 +59,7 @@ class HoseConnectorFactory:
             radius = diameter_max / 2
             top_radius = min(pipe_diameter_outer, diameter_min) / 2
             angle = -45
-            cap = SmarterCone.with_base_angle(radius, angle, top_radius)
+            cap = SmarterCone.base(top_radius).extend(angle=angle, radius=radius)
 
             if result is None:
                 result = segment.copy()  # segment shouldn't be modified (reused as last_segment)

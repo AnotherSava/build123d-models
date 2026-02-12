@@ -146,11 +146,11 @@ class BasketFactory:
         self.dim = dim
 
     def _create_basket(self) -> Tuple[SmartSolid, SmarterCone]:
-        outer = SmarterCone(self.dim.outer_radius_bottom, self.dim.outer_radius_top, self.dim.height)
+        outer = SmarterCone.base(self.dim.outer_radius_bottom).extend(radius=self.dim.outer_radius_top, height=self.dim.height)
         inner = outer.create_offset(-self.dim.thickness)
 
-        point_end = SmarterCone(0, self.dim.outer_radius_bottom, self.dim.outer_radius_bottom).align_zxy(outer, Alignment.LL)
-        point_end.create_shell(thickness_side=-self.dim.thickness)
+        point_end = SmarterCone.base(0).extend(radius=self.dim.outer_radius_bottom, height=self.dim.outer_radius_bottom).align_zxy(outer, Alignment.LL)
+        point_end = point_end.create_shell(-self.dim.thickness)
 
         # Create all window cutouts
         windows = SmartSolid(self._create_all_windows()).align_z(outer, Alignment.RL)
@@ -198,7 +198,7 @@ class BasketFactory:
     def create_basket(self) -> SmartSolid:
         basket_outer, basket_inner = self._create_basket()
 
-        rim_outer = SmarterCone.with_base_angle_and_height(self.dim.rim_diameter_outer_wide / 2, self.dim.rim_depth, -self.dim.rim_angle)
+        rim_outer = SmarterCone.base(self.dim.outer_radius_top).extend(angle=-self.dim.rim_angle, height=self.dim.rim_depth)
         rim_outer.align(basket_outer).z(Alignment.RR)
 
         rim_inner = rim_outer.create_offset(-self.dim.thickness)
@@ -253,10 +253,10 @@ class BasketFactory:
 
     def create_lid(self, basket: SmartSolid, hole_diameter: float) -> SmartSolid:
         lid_label = f"lid_{hole_diameter}mm"
-        lid = SmarterCone(self.dim.lid_radius_narrow, self.dim.lid_radius_wide, self.dim.lid_thickness, angle=180, label=lid_label)
+        lid = SmarterCone.base(self.dim.lid_radius_narrow, angle=180, label=lid_label).extend(radius=self.dim.lid_radius_wide, height=self.dim.lid_thickness)
         lid.align(basket).y(Alignment.CR).z(Alignment.RL, self.dim.lid_thickness - self.dim.rim_depth)
 
-        hole = SmarterCone.with_base_angle_and_height(hole_diameter / 2, self.dim.lid_thickness, 135)
+        hole = SmarterCone.base(hole_diameter / 2).extend(angle=135, height=self.dim.lid_thickness)
         hole.align(lid).y(Alignment.L)
 
         for angle in [0, 180]:
@@ -285,12 +285,14 @@ class BasketFactory:
     def _create_lid_foundation(self, lid: SmartSolid) -> list[SmartSolid]:
         dim = self.dim
 
-        foundation_inner = SmarterCone.with_base_angle_and_height(dim.foundation_hook_inner_radius, dim.lid_foundation_hook_depth, dim.lid_foundation_angle, angle=dim.foundation_hook_arc_angle)
+        foundation_base_radius = dim.foundation_hook_inner_radius - dim.lid_foundation_hook_depth / tan(radians(abs(dim.lid_foundation_angle)))
+        foundation_inner = SmarterCone.base(foundation_base_radius, angle=dim.foundation_hook_arc_angle).extend(radius=dim.foundation_hook_inner_radius, height=dim.lid_foundation_hook_depth)
         foundation_inner.align_z(lid, Alignment.LL, dim.lid_foundation_offset)
 
-        foundation = foundation_inner.create_shell(dim.foundation_thickness).rotate_z(-dim.foundation_hook_arc_angle / 2)
+        foundation = foundation_inner.create_shell(dim.foundation_thickness)
+        foundation.rotate_z(-dim.foundation_hook_arc_angle / 2)
 
-        foundation_support = self._create_foundation_support(foundation_inner)
+        foundation_support = self._create_foundation_support(foundation)
         foundation_support.align(foundation).x(Alignment.RL, -dim.foundation_thickness)
 
         return [SmartSolid(foundation, foundation_support).rotate_z(360 / dim.window_count * (index + 0.5)) for index in [1, 2]]

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from math import sin, radians, atan, sqrt, degrees
+from math import sin, radians, tan, atan, sqrt, degrees
 from typing import Tuple, Iterable
 
 from bd_warehouse.fastener import hex_recess
@@ -233,7 +233,7 @@ class TrayFactory:
 
     def create_basket_hole(self) -> SmartSolid:
         dim = self.dim.basket_dimensions
-        rim_outer = SmarterCone.with_base_angle(dim.rim_diameter_outer_middle / 2 + self.dim.basket_gap, 180 - dim.rim_angle, self.dim.basket_hole_width / 2)
+        rim_outer = SmarterCone.base(dim.rim_diameter_outer_middle / 2 + self.dim.basket_gap).extend(angle=180 - dim.rim_angle, radius=self.dim.basket_hole_width / 2)
 
         leg_holder_boundary = SmarterCone.cylinder(dim.rim_diameter_outer_middle / 2 + self.dim.basket_gap, self.dim.tray_height)
         leg_holder_boundary.align_zxy(rim_outer, Alignment.RL)
@@ -257,8 +257,10 @@ class TrayFactory:
 
     def create_watering_hole(self, radius_delta: float = 0) -> SmartSolid:
         radius_wide = self.dim.watering_hole_radius_wide - radius_delta
-        central_cone = SmarterCone.with_base_angle_and_height(radius_wide, self.dim.tray_height, self.dim.watering_hole_angle)
-        top_cone = SmarterCone.with_base_angle_and_height(radius_wide + self.dim.watering_hole_bevel, self.dim.tray_height, -45)
+        central_bottom_r = radius_wide - self.dim.tray_height / tan(radians(abs(self.dim.watering_hole_angle)))
+        central_cone = SmarterCone.base(central_bottom_r).extend(radius=radius_wide, height=self.dim.tray_height)
+        top_cone_top_r = radius_wide + self.dim.watering_hole_bevel
+        top_cone = SmarterCone.base(top_cone_top_r - self.dim.tray_height).extend(radius=top_cone_top_r, height=self.dim.tray_height)
         top_cone.align_zxy(central_cone, Alignment.RL)
         return central_cone.fuse(top_cone)
 
@@ -295,14 +297,14 @@ class TrayFactory:
         thread_screw_solid = SmartSolid(thread)
         thread_screw_solid.align_zxy(peg, Alignment.LR)
 
-        peg_base = SmarterCone.with_base_angle_and_height(thread.min_radius, -self.dim.peg_base_width_delta, 45)
+        peg_base = SmarterCone.base(thread.min_radius).extend(angle=-45, height=self.dim.peg_base_width_delta).rotate_x(180)
         peg_base.align_zxy(peg, Alignment.LR, thread.length)
 
         cap_hole, cap_thread = self.create_hole_parts(self.dim.peg_cap_hole_diameter, self.dim.peg_cap_hole_height, self.dim.peg_cap_hole_pitch)
         cap_hole.align_zxy(peg, Alignment.RL)
         cap_thread.colocate(cap_hole)
 
-        cap_hole_cone = SmarterCone.with_base_angle(self.dim.peg_cap_hole_diameter / 2, -45)
+        cap_hole_cone = SmarterCone.base(self.dim.peg_cap_hole_diameter / 2).extend(angle=-45, radius=0)
         cap_hole_cone.align_zxy(cap_hole, Alignment.LL)
 
         return peg.cut(cap_hole, cap_hole_cone).fuse(thread_screw_solid, cap_thread, peg_base)
