@@ -30,7 +30,8 @@ The project includes a set of high-level wrapper classes that simplify common 3D
 
 ### Other
 
-- **Cable Holder** - Wall-mounted holder with split ball cable organizers *(work in progress)*.
+- **Cable Holder** - Wall-mounted holder with split ball cable organizers ([Thingiverse](https://www.thingiverse.com/thing:7290467), [MakerWorld](https://makerworld.com/en/models/2367034)).
+- **Marker Holder** - Wall-mounted marker holder ([Thingiverse](https://www.thingiverse.com/thing:7294115), [MakerWorld](https://makerworld.com/en/models/2390507)).
 - **Cable Storage** - Wall-mounted cable organizer with railings *(work in progress)*.
 - **Power Adapters** - Modular power adapter storage system *(work in progress)*.
 
