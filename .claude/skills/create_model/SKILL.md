@@ -1,5 +1,5 @@
 ---
-name: new_model
+name: create_model
 description: Create new model based on build123d framework
 disable-model-invocation: true
 allowed-tools: Read, Write, Bash, Edit
