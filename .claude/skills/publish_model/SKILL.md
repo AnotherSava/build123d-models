@@ -107,11 +107,11 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
 
 10. **Update project README and description files**
     - Add or update the model entry in `README.md` under the appropriate section
-    - Use the Thingiverse URL from step 8 and MakerWorld URL from step 9:
+    - Use only the Thingiverse URL from step 8 (MakerWorld URLs change after publishing, so leave a placeholder):
       ```
-      - **Model Name** - Short description ([Thingiverse](https://www.thingiverse.com/thing:XXXXX), [MakerWorld](https://makerworld.com/en/models/XXXXX)).
+      - **Model Name** - Short description ([Thingiverse](https://www.thingiverse.com/thing:XXXXX), [MakerWorld](TBD)).
       ```
     - If the model already exists in the README with *(work in progress)*, replace that entry
     - Add the uploaded URL to each description file as a `URL:` line after `Tags:`:
       - In `thingiverse.md`: `URL: https://www.thingiverse.com/thing:XXXXX`
-      - In `makerworld.md`: `URL: https://makerworld.com/en/models/XXXXX`
+      - In `makerworld.md`: `URL:` (leave empty — the final URL is only known after the model is fully published)

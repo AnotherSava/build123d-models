@@ -22,18 +22,18 @@ The project includes a set of high-level wrapper classes that simplify common 3D
 
 ### Hydroponics
 
-- **Basket** - Hydroponic basket with cap ([Thingiverse](https://www.thingiverse.com/thing:7266974), [Maker world](https://makerworld.com/en/models/2162074-hydroponic-basket-with-cap-variety-of-options#profileId-2344140)).
+- **Basket** - Hydroponic basket with cap ([Thingiverse](https://www.thingiverse.com/thing:7266974), [Maker world](https://makerworld.com/en/models/2162074)).
 - **Connector** - Pipe connector. 
-- **Splitter** - Water pump flow control connector ([Thingiverse](https://www.thingiverse.com/thing:7266985), [Maker world](https://makerworld.com/en/models/2084438-water-pump-flow-control-connector#profileId-2252743)).
+- **Splitter** - Water pump flow control connector ([Thingiverse](https://www.thingiverse.com/thing:7266985), [Maker world](https://makerworld.com/en/models/2084438)).
 - **Stand** - Hydroponic setup stand with side piping.
-- **Tray** - Germination tray for Ahopegarden hydroponic system ([Thingiverse](https://www.thingiverse.com/thing:7266976), [Maker world](https://makerworld.com/en/models/2095406-germination-tray-for-ahopegarden-hydroponic-system#profileId-2380658)).
+- **Tray** - Germination tray for Ahopegarden hydroponic system ([Thingiverse](https://www.thingiverse.com/thing:7266976), [Maker world](https://makerworld.com/en/models/2095406)).
 
 ### Other
 
 - **Cable Holder** - Wall-mounted holder with split ball cable organizers ([Thingiverse](https://www.thingiverse.com/thing:7290467), [MakerWorld](https://makerworld.com/en/models/2367034)).
 - **Marker Holder** - Wall-mounted marker holder ([Thingiverse](https://www.thingiverse.com/thing:7294115), [MakerWorld](https://makerworld.com/en/models/2390507)).
 - **Cable Storage** - Wall-mounted cable organizer with railings *(work in progress)*.
-- **Power Adapters** - Modular power adapter storage system *(work in progress)*.
+- **Power Adapters** - Travel power adapter storage box for 12 international socket types ([Thingiverse](https://www.thingiverse.com/thing:7297385), [MakerWorld](https://makerworld.com/en/models/2409726)).
 
 ## Claude Code Skills
 
