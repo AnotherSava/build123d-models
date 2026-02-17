@@ -35,6 +35,12 @@ The project includes a set of high-level wrapper classes that simplify common 3D
 - **Cable Storage** - Wall-mounted cable organizer with railings *(work in progress)*.
 - **Power Adapters** - Modular power adapter storage system *(work in progress)*.
 
+## Claude Code Skills
+
+- `/commit` — Analyzes changes and generates Conventional Commit messages
+- `/create_model` — Create new model based on build123d framework
+- `/publish_model` — Create model description and publish to Thingiverse and MakerWorld
+
 ## Installation
 
 Install the required dependencies:

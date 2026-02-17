@@ -2,7 +2,7 @@
 name: commit
 description: Analyzes changes and generates Conventional Commit messages
 disable-model-invocation: true
-allowed-tools: Read, Bash(git diff:*), Bash(git add:*), Bash(git commit:*), Bash(git status:*), Bash(git log:*), Bash(python3 .claude/skills/commit/scripts/format_files.py)
+allowed-tools: Read, Bash(git diff:*), Bash(git add:*), Bash(git commit:*), Bash(git status:*), Bash(git log:*)
 ---
 
 # Commit Changes
@@ -39,10 +39,7 @@ You are tasked with creating git commits for the changes made during this sessio
    - For each commit show:
      1. **Commit N**
      2. Commit message with only the type prefix in **bold** (e.g. **refactor**: description), no code block
-     3. Number of files and lines changed, then file list with brief descriptions (use `format_files.py` — see below)
-   - To format the file list:
-     - Write JSON array of `[file, changes]` pairs to `.claude/skills/commit/scripts/input/input.json`
-     - Run `python3 .claude/skills/commit/scripts/format_files.py` and paste the output as-is
+     3. Number of files and lines changed, then file list: each file as `inline code` followed by brief description. Pad each file entry with spaces so all entries match the length of the longest one, aligning descriptions into a column.
    - End with: "I plan to create **N** commit(s) with these changes. Shall I proceed?"
 
 6. **Execute upon confirmation:**
