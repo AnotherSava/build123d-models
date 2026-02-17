@@ -9,7 +9,6 @@ from traitlets import HasTraits, Float, Int, TraitError, validate
 from sava.common.advanced_math import advanced_round
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.hexagon import Hexagon, HexagonConfiguration, HexTileVertices, get_distance_y
-from sava.csg.build123d.common.primitives import create_tapered_box
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -140,7 +139,7 @@ class MeshLid(SmartBox):
             half_hexes_covered_y = 1
 
         slope_width = hexes_covered_y * self.distance_y + half_hexes_covered_y * self.internal_mesh_hex.get_side()
-        taper_box = create_tapered_box(length, width, height, length - slopeLength * 2, width - slope_width * 2)
+        taper_box = SmartBox(length, width, height, length - slopeLength * 2, width - slope_width * 2)
 
         return taper_box.move_vector(Vector(self.dimensions.length / 2, self.dimensions.width / 2, self.dimensions.height - self.dimensions.wall_height))
 

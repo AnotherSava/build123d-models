@@ -122,6 +122,10 @@ class SmartBox(SmartSolid):
         else:
             return SmartBox(opposite_length, opposite_width, height, length, width, plane, label)
 
+    @classmethod
+    def with_delta(cls, length: float, width: float, height: float, delta: float, plane: Plane = Plane.XY, label: str = None) -> 'SmartBox':
+        return cls(length, width, height, length + 2 * delta, width + 2 * delta, plane, label)
+
     @property
     def tapered(self) -> bool:
         return self.tapered_length != self.length or self.tapered_width != self.width

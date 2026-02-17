@@ -7,25 +7,6 @@ from sava.csg.build123d.common.smartloft import SmartLoft
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
-def create_tapered_box(base_length: float, base_width: float, height: float, top_length: float, top_width: float, radius = None) -> SmartSolid:
-    base = create_filleted_rect(base_length, base_width, radius)
-    top = create_filleted_rect(top_length, top_width, radius)
-
-    return SmartLoft.create(base, top, height=height)
-
-def create_tapered_box_delta(base_length: float, base_width: float, height: float, delta: float, radius = None) -> SmartSolid:
-    return create_tapered_box(base_length, base_width, height, base_length + delta * 2, base_width + delta * 2, radius)
-
-def create_filleted_rect(length: float, width: float, radius: float) -> Face:
-    wire = Wire.make_rect(length, width)
-    if radius:
-        wire = fillet(wire.vertices(), radius)
-    return Face(wire)
-
-def create_cone_with_angle_and_height(bottom_radius: float, height: float, angle: float) -> SmartSolid:
-    top_radius = height * tan(radians(angle)) + bottom_radius
-    return SmartSolid(Solid.make_cone(bottom_radius, top_radius, height))
-
 def create_handle_wire(radius: float, arc_angle: float, width: float, centre: VectorLike = (0, 0, 0)) -> Wire:
     """Create a curved handle wire as a spline arc.
 
