@@ -4,12 +4,11 @@ from typing import Tuple
 
 from build123d import Vector, Plane, Axis, Location, Face, Polyline, extrude
 
-from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl, show_red, show_blue
+from sava.csg.build123d.common.edgefilters import AXIS_X, AxisFilter, PositionalFilter
+from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
 from sava.csg.build123d.common.geometry import create_vector, Alignment
 from sava.csg.build123d.common.pencil import Pencil
-from sava.csg.build123d.common.primitives import create_tapered_box, create_tapered_box_delta
 from sava.csg.build123d.common.smartbox import SmartBox
-from sava.csg.build123d.common.edgefilters import AXIS_X
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.sweepsolid import SweepSolid
 from sava.csg.build123d.common.text import TextDimensions, create_text
@@ -77,7 +76,7 @@ class PowerAdapterBoxDimensions:
     box_taper_diff: float = 0.6
 
     lid_internal_height: float = 63.0
-    lid_ceiling_thickness: float = 1.012
+    lid_ceiling_thickness: float = 2
 
     lid_wall_thickness: float = 2
 
@@ -134,17 +133,22 @@ class PowerAdapterBase:
     # Creates tapered box protrusion that connects box and lid
     def create_protrusions(self, filleted: bool):
         protrusion_base_length = self.dim.lock.length + self.dim.lock.length_padding * 2 + self.dim.protrusion_side_delta
-        radius = self.dim.protrusion_fillet_radius if filleted else 0
-        protrusion = create_tapered_box(protrusion_base_length, self.dim.box_width, self.dim.lid_cutout_height, protrusion_base_length - self.dim.box_taper_diff * 2, self.dim.box_width, radius)
+        width = self.dim.lid_wall_thickness + self.dim.box_taper_diff
+
+        result = SmartBox(width, protrusion_base_length, self.dim.lid_cutout_height, tapered_width=protrusion_base_length - self.dim.box_taper_diff * 2)
+        if filleted:
+            radius = self.dim.protrusion_fillet_radius if filleted else 0
+            result.fillet_by(radius, AxisFilter(Axis.Z, 30), PositionalFilter(Axis.X, result.x_mid, result.x_max))
+
+        return result
         return protrusion.clone(2, (self.dim.lock_shift_from_centre * 2, 0))
 
-    def orient(self, solid: SmartSolid, base: SmartSolid):
+    def orient(self, solid: SmartSolid, base: SmartSolid, shift_z: float = 0):
         result = []
-        solid.align_z(base, Alignment.LR)
-        for orientation, alignment in [[270, Alignment.LR], [90, Alignment.RL]]:
-            for direction in [-1, 1]:
-                copy = solid.oriented((0, 0, orientation)).align_x(base, Alignment.C, self.dim.lock_shift_from_centre * direction).align_y(base, alignment)
-                result.append(copy)
+        solid.align_z(base, Alignment.LR, shift_z)
+        for orientation, alignment in [[0, Alignment.RL], [180, Alignment.LR]]:
+            copy = solid.oriented((0, 0, orientation)).align_x(base, alignment).align_y(base)
+            result.append(copy)
         return SmartSolid(result)
 
 
@@ -161,8 +165,7 @@ class PowerAdapterLid(PowerAdapterBase):
         lock_bottom = SmartBox(self.dim.lid_wall_thickness, self.dim.lock.length + self.dim.lock.length_padding * 2, self.dim.lock.height + self.dim.lid_cutout_height)
         lid.cut(self.orient(lock_bottom, lid))
 
-        box_protrusions = self.create_protrusions(False)
-        box_protrusions.align_old(lid).align_z(lid, Alignment.LR)
+        box_protrusions = self.orient(self.create_protrusions(False), lid)
         lid.cut(box_protrusions)
 
         lid.fillet_by(self.dim.lid_fillet_radius, AXIS_X, *box_protrusions.create_positional_filters_plane(Plane.YZ))
@@ -280,13 +283,13 @@ class PowerAdapterLid(PowerAdapterBase):
 class PowerAdapterBox(PowerAdapterBase):
     # Assembles complete box with socket recesses and lock slots
     def create_box(self) -> tuple[SmartSolid, SmartSolid]:
-        box_top = create_tapered_box_delta(self.dim.lid_length_internal, self.dim.lid_width_internal, self.dim.lid_cutout_height, -self.dim.box_taper_diff, self.dim.box_fillet_radius)
+        box_top = SmartBox.with_delta(self.dim.lid_length_internal, self.dim.lid_width_internal, self.dim.lid_cutout_height, -self.dim.box_taper_diff)
+        box_top.fillet_z(self.dim.box_fillet_radius, angle_tolerance=30)
 
-        box_protrusions = self.create_protrusions(True)
-        box_protrusions.align_old(box_top)
+        box_bottom = SmartBox(self.dim.box_length, self.dim.box_width, self.dim.box_wider_height)
+        box_bottom.fillet_z(self.dim.box_fillet_radius).align_zxy(box_top, Alignment.LL)
 
-        box_bottom = SmartBox(self.dim.box_length, self.dim.box_width, self.dim.box_wider_height).fillet_z(self.dim.box_fillet_radius)
-        box_bottom.align_zxy(box_top, Alignment.LL)
+        box_protrusions = self.orient(self.create_protrusions(True), box_bottom, box_bottom.z_size)
 
         box = SmartSolid(box_top, box_bottom, box_protrusions, label="box")
 
@@ -339,7 +342,6 @@ class PowerAdapterBox(PowerAdapterBase):
 
         # Create socket type text centred on the recess floor (engraved)
         text.align_zxy(recess, Alignment.LL)
-        # show_red(text.connected().orient((0, 0, 180)))
 
         return recess, text
 
