@@ -68,17 +68,14 @@ class TestTextSolidRotation(unittest.TestCase):
         mesher = Mesher()
         mesher.add_shape(combined.wrap_solid())
 
-    def test_multichar_text_rotate_fails(self):
-        """Test that multi-char text (ShapeList) fails with rotate() - known limitation.
-
-        Multi-character text creates a ShapeList which doesn't have .orientation attribute.
-        Use rotate_with_axis() for multi-char text, or ensure multi-char text isn't rotated.
-        """
+    def test_multichar_text_rotate_works(self):
+        """Test that multi-char text (ShapeList) works with rotate_multi() after orientation replacement."""
         dim = TextDimensions(font_size=12, font="Liberation Sans", height=0.8)
         text = create_text(dim, "E/F")
 
-        with self.assertRaises(AttributeError):
-            text.rotate_multi((0, 0, 180))
+        text.rotate_multi((0, 0, 180))
+
+        self.assertTrue(text.wrap_solid().is_valid)
 
 
 if __name__ == '__main__':

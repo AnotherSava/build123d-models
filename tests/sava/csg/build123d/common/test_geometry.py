@@ -4,7 +4,7 @@ from math import sqrt, sin, cos, radians
 from build123d import Vector, Axis, Plane, Box, Edge, ShapeList
 from parameterized import parameterized
 
-from sava.csg.build123d.common.geometry import rotate_vector, multi_rotate_vector, convert_orientation_to_rotations, orient_axis, calculate_orientation
+from sava.csg.build123d.common.geometry import rotate_vector, multi_rotate_vector, convert_orientation_to_rotations, orient_axis, calculate_orientation, rotate_plane, orient_plane, Direction
 from sava.csg.build123d.common.edgefilters import filter_edges_by_axis, filter_edges_by_position
 from tests.sava.csg.build123d.test_utils import assertVectorAlmostEqual
 
@@ -116,12 +116,62 @@ class TestRotateVector(unittest.TestCase):
     def test_rotate_vector_axis_normalization(self):
         """Test that Axis automatically normalizes direction vectors"""
         vector = Vector(1, 0, 0)
-        
+
         # Using unnormalized direction should give same result as normalized (Axis handles this)
         result1 = rotate_vector(vector, Axis((0, 0, 0), (2, 0, 0)), 90)  # 2x X-axis direction
         result2 = rotate_vector(vector, Axis((0, 0, 0), (1, 0, 0)), 90)  # 1x X-axis direction
-        
+
         assertVectorAlmostEqual(self, result1, result2)
+
+    @parameterized.expand([
+        # 180° around XY diagonal: (1,0,0) reflected through (1,1,0) plane
+        (Vector(1, 0, 0), Axis((0, 0, 0), (1, 1, 0)), 180, Vector(0, 1, 0)),
+        # 180° around XZ diagonal
+        (Vector(0, 1, 0), Axis((0, 0, 0), (1, 0, 1)), 180, Vector(0, -1, 0)),
+        # 360° around arbitrary axis returns to original
+        (Vector(1, 2, 3), Axis((0, 0, 0), (1, 1, 1)), 360, Vector(1, 2, 3)),
+        # 240° around (1,1,1) should cycle X->Z->Y->X (two steps of the 120° cycle)
+        (Vector(1, 0, 0), Axis((0, 0, 0), (1, 1, 1)), 240, Vector(0, 0, 1)),
+    ])
+    def test_rotate_vector_arbitrary_axis_extended(self, vector, axis, angle, expected):
+        """Test rotate_vector with additional arbitrary axis cases"""
+        result = rotate_vector(vector, axis, angle)
+        assertVectorAlmostEqual(self, result, expected)
+
+    def test_rotate_vector_small_angle_arbitrary_axis(self):
+        """Test rotate_vector with small angles around arbitrary axis preserves magnitude and is non-trivial"""
+        vector = Vector(1, 0, 0)
+        axis = Axis((0, 0, 0), (1, 1, 1))
+        result = rotate_vector(vector, axis, 5)
+        # Magnitude should be preserved
+        self.assertAlmostEqual(result.length, vector.length, places=5)
+        # Result should differ from input (5° is not zero)
+        self.assertFalse(abs(result.X - vector.X) < 1e-10 and abs(result.Y - vector.Y) < 1e-10 and abs(result.Z - vector.Z) < 1e-10)
+
+    @parameterized.expand([
+        # Point on axis stays fixed
+        (Vector(5, 0, 0), Axis((5, 0, 0), (0, 0, 1)), 90, Vector(5, 0, 0)),
+        # Point offset from axis rotates around it
+        (Vector(6, 0, 0), Axis((5, 0, 0), (0, 0, 1)), 90, Vector(5, 1, 0)),
+        (Vector(6, 0, 0), Axis((5, 0, 0), (0, 0, 1)), 180, Vector(4, 0, 0)),
+        (Vector(6, 0, 0), Axis((5, 0, 0), (0, 0, 1)), 360, Vector(6, 0, 0)),
+        # Axis at (10, 10, 0) pointing up Z
+        (Vector(11, 10, 0), Axis((10, 10, 0), (0, 0, 1)), 90, Vector(10, 11, 0)),
+    ])
+    def test_rotate_vector_non_origin_axis(self, vector, axis, angle, expected):
+        """Test rotate_vector with axes not passing through the origin."""
+        result = rotate_vector(vector, axis, angle)
+        assertVectorAlmostEqual(self, result, expected)
+
+    def test_rotate_vector_non_origin_axis_preserves_distance(self):
+        """Distance from axis position should be preserved after rotation."""
+        axis = Axis((5, 3, 7), (1, 1, 1))
+        vector = Vector(8, 1, 4)
+        # Distance from vector to axis line should be preserved
+        offset = vector - axis.position
+        result = rotate_vector(vector, axis, 73)
+        result_offset = result - axis.position
+        self.assertAlmostEqual(offset.length, result_offset.length, places=5)
 
 
 class TestMultiRotateVector(unittest.TestCase):
@@ -295,6 +345,132 @@ class TestCalculateOrientation(unittest.TestCase):
         self.assertAlmostEqual(normalize_angle(result.X), normalize_angle(expected.X), places=1)
         self.assertAlmostEqual(normalize_angle(result.Y), normalize_angle(expected.Y), places=1)
         self.assertAlmostEqual(normalize_angle(result.Z), normalize_angle(expected.Z), places=1)
+
+
+class TestRotatePlane(unittest.TestCase):
+
+    @parameterized.expand([
+        # 90° around Z: x_dir (1,0,0) -> (0,1,0), z_dir unchanged, origin unchanged
+        (Plane.XY, Axis.Z, 90, Vector(0, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)),
+        # 90° around X: z_dir (0,0,1) -> (0,-1,0), x_dir unchanged
+        (Plane.XY, Axis.X, 90, Vector(0, 0, 0), Vector(1, 0, 0), Vector(0, -1, 0)),
+        # 90° around Y: x_dir (1,0,0) -> (0,0,-1), z_dir (0,0,1) -> (1,0,0)
+        (Plane.XY, Axis.Y, 90, Vector(0, 0, 0), Vector(0, 0, -1), Vector(1, 0, 0)),
+        # Zero rotation: no change
+        (Plane.XY, Axis.Z, 0, Vector(0, 0, 0), Vector(1, 0, 0), Vector(0, 0, 1)),
+    ])
+    def test_rotate_plane_basic(self, plane, axis, angle, expected_origin, expected_x_dir, expected_z_dir):
+        result = rotate_plane(plane, axis, angle)
+        assertVectorAlmostEqual(self, result.origin, expected_origin)
+        assertVectorAlmostEqual(self, result.x_dir, expected_x_dir)
+        assertVectorAlmostEqual(self, result.z_dir, expected_z_dir)
+
+    def test_rotate_plane_with_offset_origin(self):
+        """Plane origin should rotate around the axis."""
+        plane = Plane(origin=(10, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        result = rotate_plane(plane, Axis.Z, 90)
+        assertVectorAlmostEqual(self, result.origin, (0, 10, 0))
+        assertVectorAlmostEqual(self, result.x_dir, (0, 1, 0))
+
+    def test_rotate_plane_arbitrary_axis(self):
+        """Rotation around arbitrary diagonal axis."""
+        plane = Plane(origin=(10, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        diagonal = Axis((0, 0, 0), (1, 1, 0))
+        result = rotate_plane(plane, diagonal, 180)
+        # 180° around (1,1,0): (10,0,0) -> (0,10,0)
+        assertVectorAlmostEqual(self, result.origin, (0, 10, 0))
+
+    def test_rotate_plane_preserves_orthonormality(self):
+        """Rotated plane directions should remain orthonormal."""
+        plane = Plane(origin=(5, 5, 5), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        result = rotate_plane(plane, Axis((0, 0, 0), (1, 1, 1)), 73)
+        self.assertAlmostEqual(result.x_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(result.z_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(result.x_dir.dot(result.z_dir), 0.0, places=5)
+
+    def test_rotate_plane_360_returns_to_original(self):
+        """360° rotation returns plane to original state."""
+        plane = Plane(origin=(3, 7, 11), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        result = rotate_plane(plane, Axis.Z, 360)
+        assertVectorAlmostEqual(self, result.origin, plane.origin)
+        assertVectorAlmostEqual(self, result.x_dir, plane.x_dir)
+        assertVectorAlmostEqual(self, result.z_dir, plane.z_dir)
+
+
+class TestOrientPlane(unittest.TestCase):
+
+    @parameterized.expand([
+        # 90° Z orientation: same as 90° Z rotation for single-axis
+        ((0, 0, 90), Vector(0, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)),
+        # 90° X orientation
+        ((90, 0, 0), Vector(0, 0, 0), Vector(1, 0, 0), Vector(0, -1, 0)),
+        # 90° Y orientation
+        ((0, 90, 0), Vector(0, 0, 0), Vector(0, 0, -1), Vector(1, 0, 0)),
+        # Zero orientation: no change
+        ((0, 0, 0), Vector(0, 0, 0), Vector(1, 0, 0), Vector(0, 0, 1)),
+    ])
+    def test_orient_plane_basic(self, orientation, expected_origin, expected_x_dir, expected_z_dir):
+        result = orient_plane(Plane.XY, orientation)
+        assertVectorAlmostEqual(self, result.origin, expected_origin)
+        assertVectorAlmostEqual(self, result.x_dir, expected_x_dir)
+        assertVectorAlmostEqual(self, result.z_dir, expected_z_dir)
+
+    def test_orient_plane_with_offset_origin(self):
+        """Plane origin should be rotated by the orientation."""
+        plane = Plane(origin=(10, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        result = orient_plane(plane, (0, 0, 90))
+        assertVectorAlmostEqual(self, result.origin, (0, 10, 0))
+
+    def test_orient_plane_matches_build123d_rotated(self):
+        """orient_plane should produce same result as Plane.rotated() for various orientations."""
+        plane = Plane(origin=(5, 3, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        orientations = [(0, 0, 90), (90, 0, 0), (0, 90, 0), (45, 30, 60)]
+        for orientation in orientations:
+            with self.subTest(orientation=orientation):
+                ours = orient_plane(plane, orientation)
+                theirs = plane.rotated(orientation)
+                assertVectorAlmostEqual(self, ours.x_dir, theirs.x_dir)
+                assertVectorAlmostEqual(self, ours.z_dir, theirs.z_dir)
+                # Note: origin handling may differ because Plane.rotated() doesn't rotate origin
+                # Our orient_plane does rotate origin, which is the behavior we need
+
+    def test_orient_plane_preserves_orthonormality(self):
+        """Oriented plane directions should remain orthonormal."""
+        plane = Plane(origin=(5, 5, 5), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        result = orient_plane(plane, (37, 53, 71))
+        self.assertAlmostEqual(result.x_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(result.z_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(result.x_dir.dot(result.z_dir), 0.0, places=5)
+
+    def test_orient_plane_multi_axis(self):
+        """Test that multi-axis orientation (90,90,0) produces expected fixed-axis result."""
+        # (90,90,0) in object-attached = (90,0,-90) equivalent in some representations
+        # With fixed axes: rotate 90 around X, then 90 around Y
+        result = orient_plane(Plane.XY, (90, 90, 0))
+        # After object-attached 90°X then 90°Y:
+        # X stays X after X rotation, then 90° Y rotation: X -> -Z direction
+        # Actually let's verify the x_dir via orient_axis
+        from sava.csg.build123d.common.geometry import orient_axis
+        x_axis, y_axis, z_axis = orient_axis((90, 90, 0))
+        assertVectorAlmostEqual(self, result.x_dir, x_axis.direction)
+        assertVectorAlmostEqual(self, result.z_dir, z_axis.direction)
+
+
+class TestDirectionRotate(unittest.TestCase):
+    """Tests for Direction.rotate() using our own math."""
+
+    @parameterized.expand([
+        (Direction.N, 90, Axis.Z, Direction.W),   # N rotated 90° Z → W
+        (Direction.E, 90, Axis.Z, Direction.N),   # E rotated 90° Z → N
+        (Direction.N, 180, Axis.Z, Direction.S),  # N rotated 180° Z → S
+        (Direction.U, 90, Axis.X, Direction.S),   # U rotated 90° X → S: (0,0,1)→(0,-1,0)
+    ])
+    def test_direction_rotate(self, direction: Direction, angle: int, axis: Axis, expected: Direction):
+        result = direction.rotate(angle, axis)
+        self.assertEqual(result, expected)
+
+    def test_direction_rotate_360_returns_same(self):
+        self.assertEqual(Direction.N.rotate(360, Axis.Z), Direction.N)
 
 
 class TestFilterEdgesByAxis(unittest.TestCase):

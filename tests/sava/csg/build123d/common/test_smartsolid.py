@@ -1,6 +1,6 @@
 import unittest
 
-from build123d import Box, Sphere, Plane, Axis
+from build123d import Box, Sphere, Plane, Axis, Vector
 from parameterized import parameterized
 
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -199,12 +199,17 @@ class TestSmartSolidShapeList(unittest.TestCase):
         self.assertAlmostEqual(solid.x_size, 10, places=1)
         self.assertAlmostEqual(solid.y_size, 30, places=1)
 
-    def test_rotate_shapelist_fails(self):
-        """Test that rotate() fails on ShapeList - reads .orientation before wrapping."""
+    def test_rotate_multi_shapelist_works(self):
+        """Test that rotate_multi() works on ShapeList - reads _orientation, not solid.orientation."""
         solid = self._create_shape_list_solid()
 
-        with self.assertRaises(AttributeError):
-            solid.rotate_multi((0, 0, 90))
+        solid.rotate_multi((0, 0, 90))
+
+        # After 90 degree rotation around Z, the shape should have different bounds
+        # Original: two boxes at x=0 and x=20, total x_size ~30
+        # After rotation: should be ~10 in X (the width becomes the length)
+        self.assertAlmostEqual(solid.x_size, 10, places=1)
+        self.assertAlmostEqual(solid.y_size, 30, places=1)
 
     def test_rotate_with_axis_shapelist_works(self):
         """Test that rotate_with_axis() works on ShapeList by wrapping first."""
@@ -238,35 +243,35 @@ class TestSmartSolidOriginTracking(unittest.TestCase):
 
         assertVectorAlmostEqual(self, b2.origin, (10, 20, 30))
 
-    def test_orient_tracks_origin(self):
-        """Test that orient() updates origin correctly - 90° Z rotation."""
+    def test_orient_does_not_move_origin(self):
+        """Test that orient() does not change origin — rotation only, no position change."""
         box = SmartSolid(Box(100, 50, 30))
         box.move(10, 0, 0)  # origin at (10, 0, 0)
 
         box.orient((0, 0, 90))  # Rotate 90° around Z
 
-        # After 90° Z rotation, (10, 0, 0) -> (0, 10, 0)
-        assertVectorAlmostEqual(self, box.origin, (0, 10, 0))
+        # orient() is rotation-only — origin stays at (10, 0, 0)
+        assertVectorAlmostEqual(self, box.origin, (10, 0, 0))
 
-    def test_orient_tracks_origin_x_rotation(self):
-        """Test that orient() updates origin correctly - 90° X rotation."""
+    def test_orient_does_not_move_origin_x_rotation(self):
+        """Test that orient() does not change origin — X rotation."""
         box = SmartSolid(Box(100, 50, 30))
         box.move(0, 10, 0)  # origin at (0, 10, 0)
 
         box.orient((90, 0, 0))  # Rotate 90° around X
 
-        # After 90° X rotation, (0, 10, 0) -> (0, 0, 10)
-        assertVectorAlmostEqual(self, box.origin, (0, 0, 10))
+        # orient() is rotation-only — origin stays at (0, 10, 0)
+        assertVectorAlmostEqual(self, box.origin, (0, 10, 0))
 
-    def test_orient_tracks_origin_y_rotation(self):
-        """Test that orient() updates origin correctly - 90° Y rotation."""
+    def test_orient_does_not_move_origin_y_rotation(self):
+        """Test that orient() does not change origin — Y rotation."""
         box = SmartSolid(Box(100, 50, 30))
         box.move(10, 0, 0)  # origin at (10, 0, 0)
 
         box.orient((0, 90, 0))  # Rotate 90° around Y
 
-        # After 90° Y rotation, (10, 0, 0) -> (0, 0, -10)
-        assertVectorAlmostEqual(self, box.origin, (0, 0, -10))
+        # orient() is rotation-only — origin stays at (10, 0, 0)
+        assertVectorAlmostEqual(self, box.origin, (10, 0, 0))
 
     def test_mirror_xz_tracks_origin(self):
         """Test that mirror(Plane.XZ) updates origin correctly."""
@@ -534,6 +539,273 @@ class TestSmartSolidCutMethods(unittest.TestCase):
         box = SmartSolid(Box(20, 10, 10))
         box.cut_x(offset=-5)
         self.assertAlmostEqual(box.x_size, 15, places=5)
+
+
+class TestSmartSolidRotateConvenience(unittest.TestCase):
+    """Tests for rotate_x(), rotate_y(), rotate_z() convenience methods."""
+
+    @parameterized.expand([
+        (Axis.X, "rotate_x", 45),
+        (Axis.X, "rotate_x", 90),
+        (Axis.Y, "rotate_y", 45),
+        (Axis.Y, "rotate_y", 90),
+        (Axis.Z, "rotate_z", 45),
+        (Axis.Z, "rotate_z", 90),
+    ])
+    def test_convenience_matches_rotate(self, axis, method_name, angle):
+        """Test that rotate_x/y/z() produce same result as rotate(Axis, angle)."""
+        box1 = SmartSolid(Box(10, 20, 30))
+        box1.move(5, 10, 15)
+        box2 = SmartSolid(Box(10, 20, 30))
+        box2.move(5, 10, 15)
+
+        box1.rotate(axis, angle)
+        getattr(box2, method_name)(angle)
+
+        assertVectorAlmostEqual(self, box1.origin, box2.origin)
+        assertVectorAlmostEqual(self, box1._orientation, box2._orientation)
+        assertVectorAlmostEqual(self, box1.bound_box.size, box2.bound_box.size)
+
+
+class TestSmartSolidRotatedCopy(unittest.TestCase):
+    """Tests for rotated() returning a copy without modifying original."""
+
+    def test_rotated_returns_copy(self):
+        """Test that rotated() returns a new SmartSolid and leaves original unchanged."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(5, 0, 0)
+        original_origin = Vector(box.origin.X, box.origin.Y, box.origin.Z)
+        original_orientation = Vector(box._orientation.X, box._orientation.Y, box._orientation.Z)
+
+        copy = box.rotated(Axis.Z, 90)
+
+        # Original unchanged
+        assertVectorAlmostEqual(self, box.origin, original_origin)
+        assertVectorAlmostEqual(self, box._orientation, original_orientation)
+        # Copy is rotated
+        assertVectorAlmostEqual(self, copy.origin, (0, 5, 0))
+        self.assertNotAlmostEqual(copy._orientation.Z, 0, places=1)
+
+    def test_oriented_returns_copy(self):
+        """Test that oriented() returns a new SmartSolid and leaves original unchanged."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(10, 0, 0)
+        original_origin = Vector(box.origin.X, box.origin.Y, box.origin.Z)
+
+        copy = box.oriented((0, 0, 90))
+
+        # Original unchanged
+        assertVectorAlmostEqual(self, box.origin, original_origin)
+        assertVectorAlmostEqual(self, box._orientation, (0, 0, 0))
+        # Copy is oriented — orient doesn't move position
+        assertVectorAlmostEqual(self, copy.origin, (10, 0, 0))
+        assertVectorAlmostEqual(self, copy._orientation, (0, 0, 90))
+
+
+class TestSmartSolidConsecutiveRotations(unittest.TestCase):
+    """Tests for consecutive rotate() calls verifying cumulative behavior."""
+
+    def test_two_rotations_equal_single(self):
+        """Test that rotate(Z, 45) + rotate(Z, 45) equals rotate(Z, 90)."""
+        box1 = SmartSolid(Box(10, 20, 30))
+        box1.move(10, 0, 0)
+        box1.rotate(Axis.Z, 45)
+        box1.rotate(Axis.Z, 45)
+
+        box2 = SmartSolid(Box(10, 20, 30))
+        box2.move(10, 0, 0)
+        box2.rotate(Axis.Z, 90)
+
+        assertVectorAlmostEqual(self, box1.origin, box2.origin)
+        assertVectorAlmostEqual(self, box1.bound_box.size, box2.bound_box.size)
+
+    def test_three_rotations_different_axes(self):
+        """Test consecutive rotations around different axes."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(10, 0, 0)
+
+        box.rotate(Axis.Z, 90)
+        # origin: (10,0,0) -> (0,10,0)
+        assertVectorAlmostEqual(self, box.origin, (0, 10, 0))
+
+        box.rotate(Axis.X, 90)
+        # origin: (0,10,0) -> (0,0,10)
+        assertVectorAlmostEqual(self, box.origin, (0, 0, 10))
+
+    def test_four_90_degree_rotations_return_to_original(self):
+        """Test that 4x rotate(Z, 90) returns origin to original position."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(7, 3, 5)
+        original_origin = Vector(box.origin.X, box.origin.Y, box.origin.Z)
+
+        for _ in range(4):
+            box.rotate(Axis.Z, 90)
+
+        assertVectorAlmostEqual(self, box.origin, original_origin)
+
+    def test_360_rotation_returns_to_original(self):
+        """Test that a single 360° rotation returns to original state."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(7, 3, 5)
+        original_origin = Vector(box.origin.X, box.origin.Y, box.origin.Z)
+        original_size = Vector(box.bound_box.size.X, box.bound_box.size.Y, box.bound_box.size.Z)
+
+        box.rotate(Axis.Z, 360)
+
+        assertVectorAlmostEqual(self, box.origin, original_origin)
+        assertVectorAlmostEqual(self, box.bound_box.size, original_size)
+
+
+class TestSmartSolidMixedOperations(unittest.TestCase):
+    """Tests for combining rotate(), orient(), and move() in various orders."""
+
+    def test_rotate_move_rotate(self):
+        """Test rotate() + move() + rotate() sequence."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(10, 0, 0)  # origin: (10, 0, 0)
+
+        box.rotate(Axis.Z, 90)  # origin: (0, 10, 0)
+        assertVectorAlmostEqual(self, box.origin, (0, 10, 0))
+
+        box.move(5, 0, 0)  # origin: (5, 10, 0)
+        assertVectorAlmostEqual(self, box.origin, (5, 10, 0))
+
+        box.rotate(Axis.Z, 90)  # origin: (5,10,0) -> (-10, 5, 0)
+        assertVectorAlmostEqual(self, box.origin, (-10, 5, 0))
+
+    def test_orient_move_orient(self):
+        """Test orient() + move() + orient() — orient never changes position."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(10, 0, 0)
+
+        box.orient((0, 0, 90))  # origin stays at (10, 0, 0)
+        assertVectorAlmostEqual(self, box.origin, (10, 0, 0))
+
+        box.move(5, 0, 0)  # origin: (15, 0, 0)
+        assertVectorAlmostEqual(self, box.origin, (15, 0, 0))
+
+        # orient is absolute — replaces rotation, but never changes position
+        box.orient((0, 0, 180))  # origin stays at (15, 0, 0)
+        assertVectorAlmostEqual(self, box.origin, (15, 0, 0))
+
+    def test_rotate_then_orient_replaces(self):
+        """Test that orient() after rotate() replaces rotation but doesn't change position."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(10, 0, 0)
+
+        box.rotate(Axis.Z, 45)
+        # rotate() moves position: (10,0,0) rotated 45° around Z
+        import math
+        expected_x = 10 * math.cos(math.radians(45))
+        expected_y = 10 * math.sin(math.radians(45))
+        assertVectorAlmostEqual(self, box.origin, (expected_x, expected_y, 0))
+
+        box.orient((0, 0, 90))
+        # orient() replaces rotation but does NOT change position
+        assertVectorAlmostEqual(self, box.origin, (expected_x, expected_y, 0))
+
+    def test_orient_then_rotate_adds(self):
+        """Test that rotate() after orient() adds incrementally."""
+        box1 = SmartSolid(Box(10, 20, 30))
+        box1.move(10, 0, 0)
+        box1.orient((0, 0, 45))  # origin stays at (10, 0, 0) — orient doesn't move
+        box1.rotate(Axis.Z, 45)  # rotate moves position: (10,0,0) rotated 45° around Z
+
+        box2 = SmartSolid(Box(10, 20, 30))
+        box2.move(10, 0, 0)
+        box2.rotate(Axis.Z, 45)  # same position effect
+
+        assertVectorAlmostEqual(self, box1.origin, box2.origin)
+
+
+class TestSmartSolidArbitraryAxis(unittest.TestCase):
+    """Tests for rotate() with non-standard axes."""
+
+    def test_arbitrary_axis_rotation_bounds(self):
+        """Test that rotation around an arbitrary axis changes bounds correctly."""
+        box = SmartSolid(Box(10, 20, 30))
+
+        # Rotate 90° around XY diagonal (1,1,0)
+        diagonal_axis = Axis((0, 0, 0), (1, 1, 0))
+        box.rotate(diagonal_axis, 180)
+
+        # 180° around (1,1,0) swaps X↔Y and flips Z
+        # Box(10,20,30) -> Box(20,10,30)
+        bbox = box.bound_box
+        self.assertAlmostEqual(bbox.size.X, 20, places=1)
+        self.assertAlmostEqual(bbox.size.Y, 10, places=1)
+        self.assertAlmostEqual(bbox.size.Z, 30, places=1)
+
+    def test_arbitrary_axis_rotation_origin(self):
+        """Test that origin tracks correctly through arbitrary axis rotation."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(10, 0, 0)
+
+        # Rotate 90° around Z axis using standard Axis
+        box1 = box.copy()
+        box1.rotate(Axis.Z, 90)
+
+        # Same rotation using custom Axis equivalent
+        box2 = box.copy()
+        box2.rotate(Axis((0, 0, 0), (0, 0, 1)), 90)
+
+        assertVectorAlmostEqual(self, box1.origin, box2.origin)
+
+    def test_arbitrary_axis_360_returns_to_original(self):
+        """Test 360° rotation around arbitrary axis returns to original."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.move(7, 3, 5)
+        original_origin = Vector(box.origin.X, box.origin.Y, box.origin.Z)
+
+        diagonal_axis = Axis((0, 0, 0), (1, 1, 1))
+        box.rotate(diagonal_axis, 360)
+
+        assertVectorAlmostEqual(self, box.origin, original_origin)
+
+
+class TestSmartSolidOrientationTracking(unittest.TestCase):
+    """Tests verifying _orientation field stays in sync with solid.orientation."""
+
+    def test_orientation_matches_after_orient(self):
+        """_orientation should match solid.orientation after orient()."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.orient((45, 30, 60))
+        assertVectorAlmostEqual(self, box._orientation, box.solid.orientation)
+
+    def test_orientation_matches_after_rotate(self):
+        """_orientation should match solid.orientation after rotate()."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.rotate(Axis.Z, 90)
+        assertVectorAlmostEqual(self, box._orientation, box.solid.orientation)
+
+    def test_orientation_matches_after_consecutive_rotates(self):
+        """_orientation should match solid.orientation after multiple rotate() calls."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.rotate(Axis.Z, 45)
+        assertVectorAlmostEqual(self, box._orientation, box.solid.orientation)
+        box.rotate(Axis.X, 30)
+        assertVectorAlmostEqual(self, box._orientation, box.solid.orientation)
+        box.rotate(Axis.Y, 60)
+        assertVectorAlmostEqual(self, box._orientation, box.solid.orientation)
+
+    def test_orientation_matches_after_rotate_then_orient(self):
+        """_orientation should match solid.orientation when mixing rotate and orient."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.rotate(Axis.Z, 45)
+        assertVectorAlmostEqual(self, box._orientation, box.solid.orientation)
+        box.orient((90, 0, 0))
+        assertVectorAlmostEqual(self, box._orientation, box.solid.orientation)
+
+    def test_orientation_zero_initially(self):
+        """_orientation should be (0,0,0) for a fresh solid."""
+        box = SmartSolid(Box(10, 20, 30))
+        assertVectorAlmostEqual(self, box._orientation, (0, 0, 0))
+
+    def test_orientation_matches_after_rotate_multi(self):
+        """_orientation should match solid.orientation after rotate_multi()."""
+        box = SmartSolid(Box(10, 20, 30))
+        box.rotate_multi((45, 30, 60))
+        assertVectorAlmostEqual(self, box._orientation, box.solid.orientation)
 
 
 if __name__ == '__main__':

@@ -250,11 +250,6 @@ class TestPencilFillet(unittest.TestCase):
         arc_mid = arc_edge.position_at(0.5)
         arc_end = arc_edge.position_at(1)
 
-        print(f"Fillet corner (in local coords): {fillet_corner}")
-        print(f"Arc start: {arc_start}")
-        print(f"Arc mid: {arc_mid}")
-        print(f"Arc end: {arc_end}")
-
         # The diagonal goes from (5,0) to (7,2) - direction (1,1)/sqrt(2)
         # The vertical goes from (7,2+trim) upward - direction (0,1)
         # This is a LEFT turn (counter-clockwise)

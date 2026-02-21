@@ -2,6 +2,7 @@ from copy import copy
 
 from build123d import Axis, Face, Location, Plane, Vector, VectorLike, Wire, extrude, loft
 
+from sava.csg.build123d.common.geometry import multi_rotate_vector, rotate_vector
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
@@ -68,6 +69,13 @@ class SmartLoft(SmartSolid):
         result.target_profile = copy(face).move(Location(tuple(d * amount for d in direction)))
         return result
 
+    def copy(self, label: str = None) -> 'SmartLoft':
+        result = SmartLoft.__new__(SmartLoft)
+        self._copy_base_fields(result, label)
+        result.base_profile = copy(self.base_profile)
+        result.target_profile = copy(self.target_profile)
+        return result
+
     def move(self, x: float, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartLoft':
         super().move(x, y, z, plane=plane)
         # Convert plane-local offsets to global coordinates if plane is specified
@@ -81,9 +89,38 @@ class SmartLoft(SmartSolid):
         return self
 
     def rotate(self, axis: Axis, angle: float) -> 'SmartLoft':
+        # Save profile centers before rotation to compute per-profile position deltas
+        old_base_center = Vector(self.base_profile.center())
+        old_target_center = Vector(self.target_profile.center())
+
+        # super().rotate() calls self.orient() polymorphically, which sets profile orientations
         super().rotate(axis, angle)
-        self.base_profile = self.base_profile.rotate(axis, angle)
-        self.target_profile = self.target_profile.rotate(axis, angle)
+
+        # Move each profile to its rotated position
+        base_delta = rotate_vector(old_base_center, axis, angle) - old_base_center
+        if base_delta.length > 1e-10:
+            self.base_profile = self.base_profile.moved(Location(tuple(base_delta)))
+
+        target_delta = rotate_vector(old_target_center, axis, angle) - old_target_center
+        if target_delta.length > 1e-10:
+            self.target_profile = self.target_profile.moved(Location(tuple(target_delta)))
+        return self
+
+    def rotate_multi(self, rotations: VectorLike, plane: Plane = Plane.XY) -> 'SmartLoft':
+        old_base_center = Vector(self.base_profile.center())
+        old_target_center = Vector(self.target_profile.center())
+
+        # super().rotate_multi() calls self.orient() polymorphically, which sets profile orientations
+        super().rotate_multi(rotations, plane)
+
+        # Move each profile to its rotated position
+        base_delta = multi_rotate_vector(old_base_center, plane, rotations) - old_base_center
+        if base_delta.length > 1e-10:
+            self.base_profile = self.base_profile.moved(Location(tuple(base_delta)))
+
+        target_delta = multi_rotate_vector(old_target_center, plane, rotations) - old_target_center
+        if target_delta.length > 1e-10:
+            self.target_profile = self.target_profile.moved(Location(tuple(target_delta)))
         return self
 
     def orient(self, rotations: VectorLike) -> 'SmartLoft':

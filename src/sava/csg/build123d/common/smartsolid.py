@@ -1,7 +1,7 @@
 from copy import copy
 from typing import Iterable, TYPE_CHECKING
 
-from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean, Rotation, Face
+from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean, Face
 
 from sava.common.common import flatten
 from sava.common.logging import logger
@@ -9,7 +9,7 @@ from sava.csg.build123d.common.alignmentbuilder import AlignmentBuilder
 
 
 from sava.csg.build123d.common.edgefilters import PositionalFilter, SurfaceFilter, AxisFilter, EdgeFilter, FilletDebug, AXIS_X, AXIS_Y, AXIS_Z, filter_edges_by_position, filter_edges_by_axis, filter_edges_by_surface
-from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, multi_rotate_vector, convert_orientation_to_rotations
+from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, multi_rotate_vector, orient_axis, calculate_orientation, rotate_vector
 
 
 def get_solid(element, apply_bed_orientation: bool = False):
@@ -217,53 +217,36 @@ class SmartSolid:
 
     def orient(self, rotations: VectorLike) -> 'SmartSolid':
         self.solid = self.wrap_solid()
-        rotations = to_vector(rotations)
-        current_orient = self._orientation
-
-        # Undo current orientation's effect on origin, then apply new orientation
-        if current_orient != Vector(0, 0, 0):
-            old_fixed = convert_orientation_to_rotations(tuple(current_orient))
-            # Apply inverse: negate and reverse order
-            self.origin = multi_rotate_vector(self.origin, Plane.XY, (0, 0, -old_fixed.Z))
-            self.origin = multi_rotate_vector(self.origin, Plane.XY, (0, -old_fixed.Y, 0))
-            self.origin = multi_rotate_vector(self.origin, Plane.XY, (-old_fixed.X, 0, 0))
-
-        if rotations != Vector(0, 0, 0):
-            new_fixed = convert_orientation_to_rotations(tuple(rotations))
-            # Apply forward
-            self.origin = multi_rotate_vector(self.origin, Plane.XY, (new_fixed.X, 0, 0))
-            self.origin = multi_rotate_vector(self.origin, Plane.XY, (0, new_fixed.Y, 0))
-            self.origin = multi_rotate_vector(self.origin, Plane.XY, (0, 0, new_fixed.Z))
-
         self.solid.orientation = rotations
-        self._orientation = rotations
+        self._orientation = to_vector(rotations)
         return self
 
     def oriented(self, rotations: VectorLike, label: str = None) -> 'SmartSolid':
         return self.copy(label).orient(rotations)
 
     def rotate(self, axis: Axis, angle: float) -> 'SmartSolid':
-        self.solid = self.wrap_solid()
-        # Use moved() with Rotation instead of rotate() to avoid meshing bugs at exact 90° angles
+        old_origin = Vector(self.origin)
         if axis == Axis.X:
-            rotation = Rotation(angle, 0, 0)
-            rotations = (angle, 0, 0)
+            new_orient = rotate_orientation(self._orientation, (angle, 0, 0), Plane.XY)
         elif axis == Axis.Y:
-            rotation = Rotation(0, angle, 0)
-            rotations = (0, angle, 0)
+            new_orient = rotate_orientation(self._orientation, (0, angle, 0), Plane.XY)
         elif axis == Axis.Z:
-            rotation = Rotation(0, 0, angle)
-            rotations = (0, 0, angle)
+            new_orient = rotate_orientation(self._orientation, (0, 0, angle), Plane.XY)
         else:
-            # For custom axes, fall back to the original rotate method
-            self.solid = self.solid.rotate(axis, angle)
-            self.origin = self.origin.rotate(axis, angle)
-            return self
-        self.solid = self.solid.moved(Location(rotation))
-        self.origin = self.origin.rotate(axis, angle)
-        # Update stored orientation to track the cumulative effect
-        new_orient = rotate_orientation(self._orientation, rotations, Plane.XY)
-        self._orientation = new_orient
+            # Arbitrary axis: compute new orientation by rotating current axes
+            x_ax, y_ax, z_ax = orient_axis(self._orientation)
+            new_x = Axis(x_ax.position, rotate_vector(x_ax.direction, axis, angle))
+            new_y = Axis(y_ax.position, rotate_vector(y_ax.direction, axis, angle))
+            new_z = Axis(z_ax.position, rotate_vector(z_ax.direction, axis, angle))
+            new_orient = calculate_orientation(new_x, new_y, new_z)
+        # orient() is polymorphic — subclass overrides handle subsidiary objects (profiles, paths)
+        self.orient(new_orient)
+        # orient() only sets rotation; compute and apply position delta
+        new_origin = rotate_vector(old_origin, axis, angle)
+        delta = new_origin - old_origin
+        if delta.length > 1e-10:
+            self.solid = self.solid.moved(Location(tuple(delta)))
+        self.origin = new_origin
         return self
 
     def rotated(self, axis: Axis, angle: float) -> 'SmartSolid':
@@ -289,7 +272,13 @@ class SmartSolid:
     #  - while following the same order of rotations, axis are not attached to the object, but fixed to a plane specified as a parameter
     #  - rotations are incremental, and (0,0,0) param will not change orientation no matter what
     def rotate_multi(self, rotations: VectorLike, plane: Plane = Plane.XY) -> 'SmartSolid':
-        self.orient(rotate_orientation(self.solid.orientation, rotations, plane))
+        old_origin = Vector(self.origin)
+        self.orient(rotate_orientation(self._orientation, rotations, plane))
+        new_origin = multi_rotate_vector(old_origin, plane, rotations)
+        delta = new_origin - old_origin
+        if delta.length > 1e-10:
+            self.solid = self.solid.moved(Location(tuple(delta)))
+        self.origin = new_origin
         return self
 
     def rotated_multi(self, rotations: VectorLike, plane: Plane = Plane.XY, label: str = None) -> 'SmartSolid':

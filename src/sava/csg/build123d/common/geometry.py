@@ -79,7 +79,7 @@ class Direction(Enum):
         return Axis((0, 0, 0), self.value)
 
     def rotate(self, angle: int, axis: Axis = Axis.Z) -> 'Direction':
-        return Direction.from_vector(self.value.rotate(axis, angle))
+        return Direction.from_vector(rotate_vector(self.value, axis, angle))
 
     @staticmethod
     def from_vector(vector: VectorLike, threshold: float = 0.9) -> 'Direction':
@@ -313,31 +313,31 @@ def rotate_vector(vector: VectorLike, axis: Axis, angle: float) -> Vector:
     angle_rad = radians(angle)
     cos_a = cos(angle_rad)
     sin_a = sin(angle_rad)
-    
+
+    # Translate to axis origin
+    axis_pos = axis.position
+    vx = vector.X - axis_pos.X
+    vy = vector.Y - axis_pos.Y
+    vz = vector.Z - axis_pos.Z
+
     # Get the normalized axis direction vector
     axis_vector = axis.direction
     ux, uy, uz = axis_vector.X, axis_vector.Y, axis_vector.Z
-    
+
     # Rodrigues' rotation formula
     # v_rot = v*cos(θ) + (k × v)*sin(θ) + k*(k·v)*(1-cos(θ))
-    # where k is the unit axis vector, v is the input vector, θ is the angle
-    
-    # Dot product k·v
-    dot_product = ux * vector.X + uy * vector.Y + uz * vector.Z
-    
-    # Cross product k × v
-    cross_x = uy * vector.Z - uz * vector.Y
-    cross_y = uz * vector.X - ux * vector.Z
-    cross_z = ux * vector.Y - uy * vector.X
-    
-    # Apply Rodrigues' formula
+    dot_product = ux * vx + uy * vy + uz * vz
+    cross_x = uy * vz - uz * vy
+    cross_y = uz * vx - ux * vz
+    cross_z = ux * vy - uy * vx
     one_minus_cos = 1 - cos_a
 
-    vector_x = vector.X * cos_a + cross_x * sin_a + ux * dot_product * one_minus_cos
-    vector_y = vector.Y * cos_a + cross_y * sin_a + uy * dot_product * one_minus_cos
-    vector_z = vector.Z * cos_a + cross_z * sin_a + uz * dot_product * one_minus_cos
+    rx = vx * cos_a + cross_x * sin_a + ux * dot_product * one_minus_cos
+    ry = vy * cos_a + cross_y * sin_a + uy * dot_product * one_minus_cos
+    rz = vz * cos_a + cross_z * sin_a + uz * dot_product * one_minus_cos
 
-    return Vector(vector_x, vector_y, vector_z)
+    # Translate back
+    return Vector(rx + axis_pos.X, ry + axis_pos.Y, rz + axis_pos.Z)
 
 def multi_rotate_vector(vector: VectorLike, plane: Plane, rotations: VectorLike) -> Vector:
     """ Takes a vector and sequentially rotates it by rotations.X degrees around X axis of a specified plane,
@@ -369,7 +369,45 @@ def multi_rotate_vector(vector: VectorLike, plane: Plane, rotations: VectorLike)
     return result
 
 def rotate_axis(axis_to_rotate: Axis, axis_rotate_around: Axis, angle: float) -> Axis:
-    return Axis(axis_to_rotate.position, axis_to_rotate.direction.rotate(axis_rotate_around, angle))
+    return Axis(axis_to_rotate.position, rotate_vector(axis_to_rotate.direction, axis_rotate_around, angle))
+
+def rotate_plane(plane: Plane, axis: Axis, angle: float) -> Plane:
+    """Rotate a plane around an axis by a given angle using our own math (no build123d rotate).
+
+    Args:
+        plane: The plane to rotate
+        axis: The axis to rotate around
+        angle: The rotation angle in degrees
+
+    Returns:
+        A new Plane rotated around the axis
+    """
+    new_x_dir = rotate_vector(plane.x_dir, axis, angle)
+    new_z_dir = rotate_vector(plane.z_dir, axis, angle)
+    new_origin = rotate_vector(plane.origin, axis, angle) if plane.origin.length > TOLERANCE else plane.origin
+    return Plane(origin=new_origin, x_dir=new_x_dir, z_dir=new_z_dir)
+
+def orient_plane(plane: Plane, orientation: VectorLike) -> Plane:
+    """Apply an absolute orientation to a plane using our own math (no build123d rotate).
+
+    Like build123d's Plane.rotated(orientation) for directions, but also rotates the plane's origin
+    (Plane.rotated() only rotates x_dir/z_dir and leaves the origin unchanged).
+
+    Args:
+        plane: The plane to orient (typically the original/unrotated plane)
+        orientation: Orientation angles (x, y, z) in degrees — object-attached rotation semantics
+
+    Returns:
+        A new Plane with the orientation applied
+    """
+    orientation = to_vector(orientation)
+    if orientation.length < TOLERANCE:
+        return Plane(origin=plane.origin, x_dir=plane.x_dir, z_dir=plane.z_dir)
+    fixed = convert_orientation_to_rotations(tuple(orientation))
+    new_x_dir = multi_rotate_vector(plane.x_dir, Plane.XY, fixed)
+    new_z_dir = multi_rotate_vector(plane.z_dir, Plane.XY, fixed)
+    new_origin = multi_rotate_vector(plane.origin, Plane.XY, fixed) if plane.origin.length > TOLERANCE else plane.origin
+    return Plane(origin=new_origin, x_dir=new_x_dir, z_dir=new_z_dir)
 
 def convert_orientation_to_rotations(orientation: VectorLike) -> Vector:
     """ Converts an orientation vector to a rotations vector:

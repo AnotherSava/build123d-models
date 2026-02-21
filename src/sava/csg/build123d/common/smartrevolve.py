@@ -1,25 +1,9 @@
 from copy import copy
 
-from build123d import Axis, Face, Plane, revolve, Vector
+from build123d import Axis, Face, Plane, revolve
 
+from sava.csg.build123d.common.geometry import rotate_plane, orient_plane
 from sava.csg.build123d.common.smartsolid import SmartSolid
-
-
-def _rotate_plane_around_axis(plane: Plane, axis: Axis, angle: float) -> Plane:
-    """Rotate a plane around an arbitrary axis by a given angle.
-
-    Args:
-        plane: The plane to rotate
-        axis: The axis to rotate around
-        angle: The rotation angle in degrees
-
-    Returns:
-        A new plane rotated around the axis
-    """
-    new_x = plane.x_dir.rotate(axis, angle)
-    new_z = plane.z_dir.rotate(axis, angle)
-    new_origin = plane.origin.rotate(axis, angle) if plane.origin != Vector(0, 0, 0) else plane.origin
-    return Plane(origin=new_origin, x_dir=new_x, z_dir=new_z)
 
 
 class SmartRevolve(SmartSolid):
@@ -76,11 +60,11 @@ class SmartRevolve(SmartSolid):
         """
         # 1. Rotate original plane by angle * t around original axis
         rotation_angle = self.angle * t
-        plane = _rotate_plane_around_axis(self.sketch_plane, self.axis, rotation_angle)
+        plane = rotate_plane(self.sketch_plane, self.axis, rotation_angle)
 
         # 2. Apply current orientation (from SmartSolid._orientation)
         if self._orientation.length > 1e-10:
-            plane = plane.rotated(self._orientation)
+            plane = orient_plane(plane, self._orientation)
 
         # 3. Apply current position offset (from SmartSolid.origin)
         plane.origin = plane.origin + self.origin

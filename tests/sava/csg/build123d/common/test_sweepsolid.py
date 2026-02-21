@@ -1,6 +1,6 @@
 import unittest
 
-from build123d import Vector, Wire, Edge, Plane, Box, Circle, VectorLike, ShapeList
+from build123d import Vector, Wire, Edge, Plane, Box, Circle, VectorLike, ShapeList, Axis
 from parameterized import parameterized
 
 from sava.csg.build123d.common.sweepsolid import SweepSolid
@@ -184,129 +184,26 @@ class TestSweepSolid(unittest.TestCase):
 
     def test_create_plane_start_vs_end_with_rotation(self):
         """Test that create_plane_start and create_plane_end behave differently with rotation around wire start"""
-        # Create a 3D wire to see rotation effects better
-        edge = Edge.make_line((0, 0, 0), (20, 0, 10))  # Wire going from origin to (20,0,10)
+        edge = Edge.make_line((0, 0, 0), (20, 0, 10))
         wire = Wire([edge])
         sketch = Circle(0.05)
         sweep_solid = SweepSolid(sketch, wire, Plane.XY)
-        
-        # Get initial solid center to understand rotation behavior
-        initial_solid_center = sweep_solid.solid.center()
-        
-        # Get initial planes
+
         initial_plane_start = sweep_solid.create_plane_start()
         initial_plane_end = sweep_solid.create_plane_end()
-        
-        # Store initial positions where (0,0,0) maps to in world coordinates
         initial_start_world = initial_plane_start.from_local_coords((0, 0, 0))
         initial_end_world = initial_plane_end.from_local_coords((0, 0, 0))
-        
-        # Debug: print initial positions
-        print(f"Initial solid center: {initial_solid_center}")
-        print(f"Initial wire start position: {wire.position_at(0.0)}")
-        print(f"Initial wire end position: {wire.position_at(1.0)}")
-        print(f"Initial start world: {initial_start_world}")
-        print(f"Initial end world: {initial_end_world}")
-        
-        # Apply rotation around Y axis to see the effect on the 3D wire
-        sweep_solid.rotate_multi((0, 90, 0))  # 90 degree rotation around Y axis
-        
-        # Get solid center after rotation
-        rotated_solid_center = sweep_solid.solid.center()
-        print(f"Rotated solid center: {rotated_solid_center}")
-        
-        # Get planes after rotation
+
+        sweep_solid.rotate_multi((0, 90, 0))
+
         rotated_plane_start = sweep_solid.create_plane_start()
         rotated_plane_end = sweep_solid.create_plane_end()
-        
-        # Get world positions after rotation
         rotated_start_world = rotated_plane_start.from_local_coords((0, 0, 0))
         rotated_end_world = rotated_plane_end.from_local_coords((0, 0, 0))
-        
-        print(f"Rotated start world: {rotated_start_world}")
-        print(f"Rotated end world: {rotated_end_world}")
-        
-        # Calculate actual movements
-        start_movement = (rotated_start_world - initial_start_world).length
-        end_movement = (rotated_end_world - initial_end_world).length
-        
-        print(f"Start movement: {start_movement}")
-        print(f"End movement: {end_movement}")
-        
-        # Verify that coordinate mapping still works
-        final_local_coords_start = rotated_plane_start.to_local_coords(rotated_start_world)
-        final_local_coords_end = rotated_plane_end.to_local_coords(rotated_end_world)
-        
-        assertVectorAlmostEqual(self, final_local_coords_start, (0, 0, 0))
-        assertVectorAlmostEqual(self, final_local_coords_end, (0, 0, 0))
 
-    def test_rotation_center_investigation(self):
-        """Investigate where rotation happens by testing different solid positions"""
-        # Create wire not starting at origin to see rotation behavior
-        edge = Edge.make_line((10, 5, 0), (30, 5, 0))  # Wire away from origin
-        wire = Wire([edge])
-        sketch = Circle(0.05)
-        sweep_solid = SweepSolid(sketch, wire, Plane.XY)
-        
-        # Debug: Check initial orientation values
-        print(f"Initial solid orientation: {sweep_solid.solid.orientation}")
-        print(f"Initial stored orientation: Vector(0, 0, 0) (always for swept solids)")
-        
-        # Get initial positions
-        initial_solid_center = sweep_solid.solid.center()
-        initial_start_world = sweep_solid.create_plane_start().from_local_coords((0, 0, 0))
-        initial_end_world = sweep_solid.create_plane_end().from_local_coords((0, 0, 0))
-        
-        print(f"Initial solid center: {initial_solid_center}")
-        print(f"Initial start world: {initial_start_world}")
-        print(f"Initial end world: {initial_end_world}")
-        
-        # Apply rotation around Z axis
-        sweep_solid.rotate_multi((0, 0, 90))
-        
-        # Debug: Check orientation after rotation
-        print(f"Rotated solid orientation: {sweep_solid.solid.orientation}")
-        current_rotation = sweep_solid.solid.orientation  # Since initial was (0,0,0)
-        print(f"Current rotation: {current_rotation}")
-        print(f"Current rotation length: {current_rotation.length}")
-        
-        # Get rotated positions
-        rotated_solid_center = sweep_solid.solid.center()
-        rotated_start_world = sweep_solid.create_plane_start().from_local_coords((0, 0, 0))
-        rotated_end_world = sweep_solid.create_plane_end().from_local_coords((0, 0, 0))
-        
-        print(f"Rotated solid center: {rotated_solid_center}")
-        print(f"Rotated start world: {rotated_start_world}")
-        print(f"Rotated end world: {rotated_end_world}")
-        
-        # Calculate movements
-        center_movement = (rotated_solid_center - initial_solid_center).length
-        start_movement = (rotated_start_world - initial_start_world).length
-        end_movement = (rotated_end_world - initial_end_world).length
-        
-        print(f"Center movement: {center_movement}")
-        print(f"Start movement: {start_movement}")
-        print(f"End movement: {end_movement}")
-        
-        # Manual calculation: what should happen during 90° Z rotation around origin
-        # Initial start: (10, 5, 0) -> rotated should be (-5, 10, 0)
-        # Initial end: (30, 5, 0) -> rotated should be (-5, 30, 0)
-        import math
-        angle_rad = math.radians(90)
-        cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
-        
-        expected_start_x = initial_start_world.X * cos_a - initial_start_world.Y * sin_a
-        expected_start_y = initial_start_world.X * sin_a + initial_start_world.Y * cos_a
-        expected_start = Vector(expected_start_x, expected_start_y, initial_start_world.Z)
-        
-        expected_end_x = initial_end_world.X * cos_a - initial_end_world.Y * sin_a
-        expected_end_y = initial_end_world.X * sin_a + initial_end_world.Y * cos_a
-        expected_end = Vector(expected_end_x, expected_end_y, initial_end_world.Z)
-        
-        print(f"Expected start after rotation: {expected_start}")
-        print(f"Expected end after rotation: {expected_end}")
-        
-        # This test is just for investigation - no assertions needed
+        # Verify that coordinate mapping still works (round-trip)
+        assertVectorAlmostEqual(self, rotated_plane_start.to_local_coords(rotated_start_world), (0, 0, 0))
+        assertVectorAlmostEqual(self, rotated_plane_end.to_local_coords(rotated_end_world), (0, 0, 0))
 
     def test_create_plane_start_with_combined_transformations(self):
         """Test create_plane_start with combined rotation and movement"""
@@ -478,6 +375,201 @@ class TestSweepSolidPathPlane(unittest.TestCase):
         # Should form a right-handed coordinate system
         cross_product = x_dir.cross(y_dir)
         assertVectorAlmostEqual(self, cross_product, z_dir)
+
+
+class TestSweepSolidRotateMulti(unittest.TestCase):
+    """Tests for rotation operations on SweepSolid."""
+
+    def _create_sweep(self) -> SweepSolid:
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        return SweepSolid(sketch, wire, Plane.XY)
+
+    def test_rotate_multi_then_move_plane_end_consistent(self):
+        """Test rotate_multi + move: plane_end coordinate mapping stays self-consistent."""
+        sweep = self._create_sweep()
+        sweep.rotate_multi((0, 0, 90))
+        sweep.move(10, 0, 0)
+
+        plane_end = sweep.create_plane_end()
+        world = plane_end.from_local_coords((0, 0, 0))
+        local_back = plane_end.to_local_coords(world)
+        assertVectorAlmostEqual(self, local_back, (0, 0, 0))
+
+    def test_move_then_rotate_multi_plane_end_consistent(self):
+        """Test move + rotate_multi: plane_end coordinate mapping stays self-consistent."""
+        sweep = self._create_sweep()
+        sweep.move(10, 20, 0)
+        sweep.rotate_multi((0, 0, 90))
+
+        plane_end = sweep.create_plane_end()
+        world = plane_end.from_local_coords((0, 0, 0))
+        local_back = plane_end.to_local_coords(world)
+        assertVectorAlmostEqual(self, local_back, (0, 0, 0))
+
+    def test_rotate_multi_path_plane_orthonormal(self):
+        """Path plane remains orthonormal after rotation."""
+        sweep = self._create_sweep()
+        sweep.rotate_multi((45, 30, 60))
+
+        plane = sweep.create_path_plane()
+        self.assertAlmostEqual(plane.x_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(plane.z_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(plane.x_dir.dot(plane.z_dir), 0.0, places=5)
+
+    def test_rotate_multi_origin_tracking(self):
+        """SweepSolid origin tracks correctly through rotate_multi."""
+        sweep = self._create_sweep()
+        sweep.move(10, 0, 0)
+        sweep.rotate_multi((0, 0, 90))
+
+        # origin (10,0,0) rotated 90° around Z -> (0,10,0)
+        assertVectorAlmostEqual(self, sweep.origin, (0, 10, 0))
+
+
+class TestSweepSolidConsecutiveRotations(unittest.TestCase):
+    """Tests for consecutive rotation calls — previously broken by double-rotation bug."""
+
+    def _create_sweep(self) -> SweepSolid:
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        return SweepSolid(sketch, wire, Plane.XY)
+
+    def test_two_rotate_multi_equal_single(self):
+        """Two 45° Z rotations should equal one 90° rotation."""
+        s1 = self._create_sweep()
+        s1.rotate_multi((0, 0, 45))
+        s1.rotate_multi((0, 0, 45))
+
+        s2 = self._create_sweep()
+        s2.rotate_multi((0, 0, 90))
+
+        p1 = s1.create_path_plane()
+        p2 = s2.create_path_plane()
+        assertVectorAlmostEqual(self, p1.origin, p2.origin)
+        assertVectorAlmostEqual(self, p1.x_dir, p2.x_dir)
+        assertVectorAlmostEqual(self, p1.z_dir, p2.z_dir)
+
+    def test_consecutive_rotate_multi_with_move(self):
+        """Rotate + move + rotate: plane tracks correctly."""
+        sweep = self._create_sweep()
+        sweep.rotate_multi((0, 0, 90))
+        sweep.move(10, 0, 0)
+        sweep.rotate_multi((0, 0, 90))
+
+        plane = sweep.create_path_plane()
+        # Plane.XY rotated 180° Z: x_dir flips
+        assertVectorAlmostEqual(self, plane.x_dir, Vector(-1, 0, 0))
+        assertVectorAlmostEqual(self, plane.z_dir, Vector(0, 0, 1))
+
+    def test_four_rotate_multi_return_to_original(self):
+        """4x90° rotations should return plane to original state."""
+        sweep = self._create_sweep()
+        original_plane = sweep.create_path_plane()
+
+        for _ in range(4):
+            sweep.rotate_multi((0, 0, 90))
+
+        final_plane = sweep.create_path_plane()
+        assertVectorAlmostEqual(self, final_plane.origin, original_plane.origin)
+        assertVectorAlmostEqual(self, final_plane.x_dir, original_plane.x_dir)
+        assertVectorAlmostEqual(self, final_plane.z_dir, original_plane.z_dir)
+
+    def test_consecutive_orient_with_offset_plane(self):
+        """Consecutive orient() calls with offset plane don't double-rotate."""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        offset_plane = Plane(origin=(5, 5, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        sweep = SweepSolid(sketch, wire, offset_plane)
+
+        # First orient
+        sweep.orient((0, 0, 90))
+        p1 = sweep.create_path_plane()
+        assertVectorAlmostEqual(self, p1.origin, Vector(-5, 5, 0))
+
+        # Second orient to same rotation — should give same result (not double-rotate)
+        sweep.orient((0, 0, 90))
+        p2 = sweep.create_path_plane()
+        assertVectorAlmostEqual(self, p2.origin, Vector(-5, 5, 0))
+        assertVectorAlmostEqual(self, p2.x_dir, p1.x_dir)
+        assertVectorAlmostEqual(self, p2.z_dir, p1.z_dir)
+
+
+class TestSweepSolidRotateAxis(unittest.TestCase):
+    """Tests for SweepSolid.rotate(Axis, angle) — previously broken."""
+
+    def _create_sweep(self) -> SweepSolid:
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        wire = Wire([edge])
+        sketch = Circle(0.05)
+        return SweepSolid(sketch, wire, Plane.XY)
+
+    def test_rotate_z_90_plane_directions(self):
+        """rotate(Axis.Z, 90) should rotate plane directions."""
+        sweep = self._create_sweep()
+        sweep.rotate(Axis.Z, 90)
+
+        plane = sweep.create_path_plane()
+        assertVectorAlmostEqual(self, plane.x_dir, Vector(0, 1, 0))
+        assertVectorAlmostEqual(self, plane.z_dir, Vector(0, 0, 1))
+
+    def test_rotate_z_matches_rotate_multi(self):
+        """rotate(Axis.Z, 90) should match rotate_multi((0,0,90))."""
+        s1 = self._create_sweep()
+        s1.rotate(Axis.Z, 90)
+
+        s2 = self._create_sweep()
+        s2.rotate_multi((0, 0, 90))
+
+        p1 = s1.create_path_plane()
+        p2 = s2.create_path_plane()
+        assertVectorAlmostEqual(self, p1.origin, p2.origin)
+        assertVectorAlmostEqual(self, p1.x_dir, p2.x_dir)
+        assertVectorAlmostEqual(self, p1.z_dir, p2.z_dir)
+
+    def test_rotate_with_move(self):
+        """move + rotate(Axis.Z, 90) tracks plane origin."""
+        sweep = self._create_sweep()
+        sweep.move(10, 0, 0)
+        sweep.rotate(Axis.Z, 90)
+
+        assertVectorAlmostEqual(self, sweep.origin, (0, 10, 0))
+        plane = sweep.create_path_plane()
+        assertVectorAlmostEqual(self, plane.origin, (0, 10, 0))
+
+    def test_consecutive_rotate_axis(self):
+        """Two 45° Z rotations via rotate() equal single 90°."""
+        s1 = self._create_sweep()
+        s1.rotate(Axis.Z, 45)
+        s1.rotate(Axis.Z, 45)
+
+        s2 = self._create_sweep()
+        s2.rotate(Axis.Z, 90)
+
+        p1 = s1.create_path_plane()
+        p2 = s2.create_path_plane()
+        assertVectorAlmostEqual(self, p1.origin, p2.origin)
+        assertVectorAlmostEqual(self, p1.x_dir, p2.x_dir)
+        assertVectorAlmostEqual(self, p1.z_dir, p2.z_dir)
+
+    @parameterized.expand([
+        (Axis.X, 90),
+        (Axis.Y, 90),
+        (Axis.Z, 90),
+        (Axis.Z, 45),
+    ])
+    def test_rotate_axis_plane_orthonormal(self, axis: Axis, angle: float):
+        """Path plane remains orthonormal after rotate(Axis, angle)."""
+        sweep = self._create_sweep()
+        sweep.rotate(axis, angle)
+
+        plane = sweep.create_path_plane()
+        self.assertAlmostEqual(plane.x_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(plane.z_dir.length, 1.0, places=5)
+        self.assertAlmostEqual(plane.x_dir.dot(plane.z_dir), 0.0, places=5)
 
 
 if __name__ == '__main__':

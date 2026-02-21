@@ -105,27 +105,25 @@ class TestSmartConeCreateAxis(unittest.TestCase):
 
     def test_create_axis_with_combined_transformations(self):
         """Test create_axis with both movement and rotation applied"""
+        from sava.csg.build123d.common.geometry import multi_rotate_vector
+
         # Apply both transformations
         movement = Vector(3, 4, 5)
         rotation = (30, 60, 45)
-        
+
         self.cone.move_vector(movement)
         self.cone.rotate_multi(rotation)
-        
-        # Test outer cone axis
+
+        # Test outer cone axis — position follows the rotated origin
         outer_axis = self.cone.create_axis(inner=False)
-        expected_outer_position = movement
+        expected_outer_position = multi_rotate_vector(movement, Plane.XY, rotation)
         assertVectorAlmostEqual(self, outer_axis.position, expected_outer_position)
-        
-        # Test inner cone axis
+
+        # Test inner cone axis — offset from outer by height_higher_lower along Z
         inner_axis = self.cone.create_axis(inner=True)
-        
-        # Inner axis position should be outer position plus Z offset (not rotated)
-        # The implementation simply adds a Z offset to solid.position
-        expected_inner_position = movement + Vector(0, 0, -self.cone.height_higher_lower)
-        
+        expected_inner_position = expected_outer_position + Vector(0, 0, -self.cone.height_higher_lower)
         assertVectorAlmostEqual(self, inner_axis.position, expected_inner_position)
-        
+
         # Both should have same direction
         assertVectorAlmostEqual(self, outer_axis.direction, inner_axis.direction)
 

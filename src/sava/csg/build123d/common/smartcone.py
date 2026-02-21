@@ -109,12 +109,20 @@ class SmartCone(SmartSolid):
 
     def pad_outer(self, padding: float, radius: float = None):
         side_padding_x = padding / cos(self.cone_angle_rad)
-        print(f"side_padding_x: {side_padding_x}")
         new_radius_top = self.radius_top - 2 * padding * tan(self.cone_angle_rad) + 2 * side_padding_x
-        print(self.cone_angle, radius or (self.radius_outer - 2 * side_padding_x), new_radius_top)
         cone = SmartCone.create_cone(self.cone_angle, radius or (self.radius_outer - 2 * side_padding_x), new_radius_top)
         cone.colocate(self).move_vector(self.create_axis().direction * (self.height_apex_higher - cone.height_apex_higher - padding))
         return cone
+
+    def copy(self, label: str = None) -> 'SmartCone':
+        result = SmartCone.__new__(SmartCone)
+        self._copy_base_fields(result, label)
+        result.radius_outer = self.radius_outer
+        result.radius_top = self.radius_top
+        result.cone_angle = self.cone_angle
+        result.thickness = self.thickness
+        result.base_angle = self.base_angle
+        return result
 
     def create_axis(self, inner: bool = False):
         """Create an axis for an outer or inner cone, taking cone position and orientation into account
@@ -125,8 +133,8 @@ class SmartCone(SmartSolid):
         Returns:
             Axis for the specified cone
         """
-        position = Vector(0, 0, -self.height_higher_lower if inner else 0) + self.solid.position
-        orientation = multi_rotate_vector((0, 0, -1), Plane.XY, self.solid.orientation)
+        position = Vector(0, 0, -self.height_higher_lower if inner else 0) + self.origin
+        orientation = multi_rotate_vector((0, 0, -1), Plane.XY, self._orientation)
         return Axis(position, orientation)
 
     def _create_plane_with_offset(self, offset: float) -> Plane:

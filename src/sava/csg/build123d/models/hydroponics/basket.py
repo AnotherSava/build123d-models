@@ -191,7 +191,7 @@ class BasketFactory:
             angle_step = 360 / self.dim.window_count
             for i in range(self.dim.window_count):
                 # Create a copy and rotate it around Z axis at origin
-                windows.append(template_window.copy().move_z(-current_offset_from_top).solid.rotate(Axis.Z, (i + 0.5) * angle_step))
+                windows.append(template_window.copy().move_z(-current_offset_from_top).rotate(Axis.Z, (i + 0.5) * angle_step).solid)
 
         return windows
 

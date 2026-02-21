@@ -123,5 +123,59 @@ class TestSmartLoftExtrude(unittest.TestCase):
         assertVectorAlmostEqual(self, loft.target_profile.center(), Vector(5, 10, 45))
 
 
+class TestSmartLoftConsecutiveRotations(unittest.TestCase):
+    """Tests for consecutive rotate() calls on SmartLoft."""
+
+    def _create_smart_loft(self) -> SmartLoft:
+        base = Circle(10).face()
+        target = Circle(5).face()
+        return SmartLoft.create(base, target, height=20)
+
+    def test_two_z_rotations_equal_single(self):
+        """Two 45° Z rotations should equal one 90° rotation for profile tracking."""
+        loft1 = self._create_smart_loft()
+        loft1.move(10, 0, 0)
+        loft1.rotate(Axis.Z, 45)
+        loft1.rotate(Axis.Z, 45)
+
+        loft2 = self._create_smart_loft()
+        loft2.move(10, 0, 0)
+        loft2.rotate(Axis.Z, 90)
+
+        assertVectorAlmostEqual(self, loft1.base_profile.center(), loft2.base_profile.center())
+        assertVectorAlmostEqual(self, loft1.target_profile.center(), loft2.target_profile.center())
+
+    def test_rotate_move_rotate_profiles(self):
+        """Test rotate + move + rotate sequence tracks profiles correctly."""
+        loft = self._create_smart_loft()
+        loft.move(10, 0, 0)
+
+        loft.rotate(Axis.Z, 90)
+        # base: (10,0,0) -> (0,10,0), target: (10,0,20) -> (0,10,20)
+        assertVectorAlmostEqual(self, loft.base_profile.center(), (0, 10, 0))
+
+        loft.move(5, 0, 0)
+        # base: (5,10,0), target: (5,10,20)
+        assertVectorAlmostEqual(self, loft.base_profile.center(), (5, 10, 0))
+
+        loft.rotate(Axis.Z, 90)
+        # base: (5,10,0) -> (-10,5,0), target: (5,10,20) -> (-10,5,20)
+        assertVectorAlmostEqual(self, loft.base_profile.center(), (-10, 5, 0))
+        assertVectorAlmostEqual(self, loft.target_profile.center(), (-10, 5, 20))
+
+    def test_four_90_rotations_return_to_original(self):
+        """4x 90° Z rotation should return profiles to original positions."""
+        loft = self._create_smart_loft()
+        loft.move(10, 5, 0)
+        original_base = Vector(loft.base_profile.center())
+        original_target = Vector(loft.target_profile.center())
+
+        for _ in range(4):
+            loft.rotate(Axis.Z, 90)
+
+        assertVectorAlmostEqual(self, loft.base_profile.center(), original_base)
+        assertVectorAlmostEqual(self, loft.target_profile.center(), original_target)
+
+
 if __name__ == "__main__":
     unittest.main()
