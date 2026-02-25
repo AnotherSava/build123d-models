@@ -1,7 +1,6 @@
 import math
 from copy import copy
 from dataclasses import dataclass
-from typing import Tuple
 
 from build123d import Vector, Solid, Part, Plane, Compound
 from traitlets import HasTraits, Float, Int, TraitError, validate
@@ -143,7 +142,7 @@ class MeshLid(SmartBox):
 
         return taper_box.move_vector(Vector(self.dimensions.length / 2, self.dimensions.width / 2, self.dimensions.height - self.dimensions.wall_height))
 
-    def get_recess_dimensions(self) -> Tuple[float, float]:
+    def get_recess_dimensions(self) -> tuple[float, float]:
         base_recess_length = self.dimensions.length * self.dimensions.handle.recess_length_coefficient
         base_recess_width = self.dimensions.width * self.dimensions.handle.recess_width_coefficient
 
@@ -158,7 +157,7 @@ class MeshLid(SmartBox):
 
         return recess_length, recess_width
 
-    def create_handle(self) -> Tuple[SmartSolid, SmartSolid]:
+    def create_handle(self) -> tuple[SmartSolid, SmartSolid]:
         recess_length, recess_width = self.get_recess_dimensions()
 
         recess = self.create_recess(recess_length, recess_width, self.dimensions.get_mesh_height() - self.dimensions.handle.minimal_mesh_height)

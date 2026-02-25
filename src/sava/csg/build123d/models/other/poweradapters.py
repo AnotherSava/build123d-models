@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from math import tan, radians
-from typing import Tuple
 
 from build123d import Vector, Plane, Axis, Location, Face, Polyline, extrude
 
@@ -154,7 +153,7 @@ class PowerAdapterBase:
 
 class PowerAdapterLid(PowerAdapterBase):
     # Creates main lid structure with snap locks and text cutout
-    def create_lid(self) -> Tuple[SmartSolid, SmartSolid, SmartSolid]:
+    def create_lid(self) -> tuple[SmartSolid, SmartSolid, SmartSolid]:
 
         lid = SmartBox(self.dim.box_length, self.dim.box_width, self.dim.lid_height, label="lid")
         lid_internal = SmartBox(lid.x_size - self.dim.lid_wall_thickness * 2, lid.y_size - self.dim.lid_wall_thickness * 2, lid.z_size - self.dim.lid_ceiling_thickness)

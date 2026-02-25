@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Tuple
 
 from build123d import Solid
 
@@ -45,7 +44,7 @@ class HoseConnectorFactory:
         outer, inner = self.create_hose_connector_parts(pipe_diameter_outer, pipe_length)
         return outer.cut(inner)
 
-    def create_hose_connector_parts(self, pipe_diameter_outer: float, pipe_length: float = None) -> Tuple[SmartSolid, SmartSolid]:
+    def create_hose_connector_parts(self, pipe_diameter_outer: float, pipe_length: float = None) -> tuple[SmartSolid, SmartSolid]:
         result = None
 
         segment_length = self.dim.length / self.dim.segment_count

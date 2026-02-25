@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from math import sin, radians, tan, atan, sqrt, degrees
-from typing import Tuple, Iterable
+from collections.abc import Iterable
 
 from bd_warehouse.fastener import hex_recess
 from bd_warehouse.thread import IsoThread
@@ -264,10 +264,10 @@ class TrayFactory:
         top_cone.align_zxy(central_cone, Alignment.RL)
         return central_cone.fuse(top_cone)
 
-    def create_peg_hole_parts(self) -> Tuple[SmartSolid, SmartSolid]:
+    def create_peg_hole_parts(self) -> tuple[SmartSolid, SmartSolid]:
         return self.create_hole_parts(self.dim.peg_hole_diameter, self.dim.tray_height, self.dim.peg_hole_pitch)
 
-    def create_hole_parts(self, major_diameter: float, height: float, pitch: float) -> Tuple[SmartSolid, SmartSolid]:
+    def create_hole_parts(self, major_diameter: float, height: float, pitch: float) -> tuple[SmartSolid, SmartSolid]:
         hole = Solid.make_cylinder(major_diameter / 2, height)
         thread = IsoThread(
             major_diameter=major_diameter,

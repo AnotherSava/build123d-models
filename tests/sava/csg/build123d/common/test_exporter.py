@@ -1,6 +1,6 @@
-import os
 import tempfile
 import unittest
+from pathlib import Path
 
 from build123d import Box
 from parameterized import parameterized
@@ -208,10 +208,10 @@ class TestSave3mf(unittest.TestCase):
         export(Box(10, 10, 10))
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = os.path.join(tmpdir, "test_model.3mf")
+            filepath = str(Path(tmpdir) / "test_model.3mf")
             save_3mf(filepath)
 
-            self.assertTrue(os.path.exists(filepath))
+            self.assertTrue(Path(filepath).exists())
 
     def test_save_3mf_with_multiple_labels(self):
         """Test that save_3mf works with multiple labels"""
@@ -219,11 +219,11 @@ class TestSave3mf(unittest.TestCase):
         export(Box(5, 5, 5), label="screw")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = os.path.join(tmpdir, "multi_label.3mf")
+            filepath = str(Path(tmpdir) / "multi_label.3mf")
             save_3mf(filepath)
 
-            self.assertTrue(os.path.exists(filepath))
-            self.assertGreater(os.path.getsize(filepath), 0)
+            self.assertTrue(Path(filepath).exists())
+            self.assertGreater(Path(filepath).stat().st_size, 0)
 
 
 class TestSaveStl(unittest.TestCase):
@@ -239,8 +239,8 @@ class TestSaveStl(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             save_stl(tmpdir)
 
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "body.stl")))
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "screw.stl")))
+            self.assertTrue((Path(tmpdir) / "body.stl").exists())
+            self.assertTrue((Path(tmpdir) / "screw.stl").exists())
 
     def test_save_stl_single_label(self):
         """Test that save_stl works with a single label"""
@@ -249,8 +249,8 @@ class TestSaveStl(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             save_stl(tmpdir)
 
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "model.stl")))
-            self.assertGreater(os.path.getsize(os.path.join(tmpdir, "model.stl")), 0)
+            self.assertTrue((Path(tmpdir) / "model.stl").exists())
+            self.assertGreater((Path(tmpdir) / "model.stl").stat().st_size, 0)
 
 
 if __name__ == '__main__':

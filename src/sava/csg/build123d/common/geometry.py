@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum, IntEnum, auto
 from math import cos, sin, radians, atan2, degrees, acos
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 from build123d import Vector, Axis, Wire, Face, Plane, VectorLike, sweep, Solid, ShapeList, Edge, extrude
 from build123d.topology import Mixin1D
@@ -463,7 +463,7 @@ def rotate_orientation(orientation: VectorLike, rotations: VectorLike, plane: Pl
 
     return calculate_orientation(x_axis, y_axis, z_axis)
 
-def orient_axis(orientation: VectorLike) -> Tuple[Axis, Axis, Axis]:
+def orient_axis(orientation: VectorLike) -> tuple[Axis, Axis, Axis]:
     """ Converts an orientation vector to a rotations vector:
 
     Take a default XY plane, rotate it by orientation.X degree around its axis X, then rotate it by orientation.Y degree around its _new_ axis Y, and finally by orientation.Z degree around its _new_ axis Z.

@@ -1,10 +1,9 @@
-import os
 import shutil
 import tempfile
 import warnings
 from copy import copy
 from pathlib import Path
-from typing import Iterable
+from collections.abc import Iterable
 
 from build123d import Shape, Color, Mesher, Plane, Wire, Compound, Edge, BoundBox, Face
 
@@ -152,18 +151,20 @@ def get_project_root_folder() -> Path:
 
 def get_path(*path_from_project_root) -> str:
     # If first path is absolute, use it directly - mostly for temporary files in tests
-    if os.path.isabs(path_from_project_root[0]):
-        return os.path.join(*path_from_project_root)
+    first = Path(path_from_project_root[0])
+    if first.is_absolute():
+        return str(first.joinpath(*path_from_project_root[1:]))
 
     # Otherwise join to project root
-    return os.path.join(str(get_project_root_folder()), *path_from_project_root)
+    return str(get_project_root_folder().joinpath(*path_from_project_root))
 
 
 def _resolve_path(location: str) -> str:
     """Resolve path to absolute path. If relative, treat as relative to project root."""
-    if os.path.isabs(location):
-        return os.path.normpath(location)
-    return os.path.normpath(get_path(location))
+    p = Path(location)
+    if p.is_absolute():
+        return str(Path(p))
+    return str(Path(get_path(location)))
 
 
 def _report_labels(edge_max_length: float = None) -> None:
@@ -259,8 +260,9 @@ def _save_3mf(location: str) -> None:
         mesher.write(temp_path)
         shutil.copy2(temp_path, location)
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        temp = Path(temp_path)
+        if temp.exists():
+            temp.unlink()
 
 
 def create_file_path(location: str, filename: str = None) -> str:
@@ -271,10 +273,10 @@ def create_file_path(location: str, filename: str = None) -> str:
         filename: Optional filename to join with location
     """
     if filename:
-        path = _resolve_path(os.path.join(location, filename))
+        path = _resolve_path(str(Path(location) / filename))
     else:
         path = _resolve_path(location)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     return path
 
 def export_stl(directory: str, *shapes) -> None:
@@ -302,6 +304,6 @@ def save_stl(directory: str = None) -> None:
 
         file_path = create_file_path(actual_directory, f"{label}.stl")
         mesher.write(str(file_path))
-        print(f"  - {os.path.basename(file_path)}")
+        print(f"  - {Path(file_path).name}")
 
     logger.info("Done")

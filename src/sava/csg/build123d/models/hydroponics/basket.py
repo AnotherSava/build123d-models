@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from math import radians, degrees, atan, tan, cos
-from typing import Tuple
 
 from build123d import Plane, Axis, Location, Face
 
@@ -145,7 +144,7 @@ class BasketFactory:
     def __init__(self, dim: BasketDimensions):
         self.dim = dim
 
-    def _create_basket(self) -> Tuple[SmartSolid, SmarterCone]:
+    def _create_basket(self) -> tuple[SmartSolid, SmarterCone]:
         outer = SmarterCone.base(self.dim.outer_radius_bottom).extend(radius=self.dim.outer_radius_top, height=self.dim.height)
         inner = outer.create_offset(-self.dim.thickness)
 

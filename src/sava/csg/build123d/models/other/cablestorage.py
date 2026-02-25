@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from math import radians, tan
-from typing import Callable, Tuple
+from collections.abc import Callable
 
 from build123d import Axis, Plane
 
@@ -20,13 +20,13 @@ class ConnectorRecesses:
     def __init__(self, dim: 'CableStorageDimensions'):
         self.dim = dim
 
-    def generic(self, length: float, width: float, height: float) -> Tuple[SmartSolid, SmartBox]:
+    def generic(self, length: float, width: float, height: float) -> tuple[SmartSolid, SmartBox]:
         extra_width = height / tan(radians(self.dim.cable_holder_angle))
         connector_cut = SmartBox.with_base_angles_and_height(length + extra_width, width + extra_width, -height, 90, self.dim.cable_holder_angle)
         connector_offset = connector_cut.create_offset(self.dim.cable_holder_width, up=0, down=0)
         return connector_cut, connector_offset
 
-    def dvi(self, length: float, width: float, height: float) -> Tuple[SmartSolid, SmartBox]:
+    def dvi(self, length: float, width: float, height: float) -> tuple[SmartSolid, SmartBox]:
         connector_cut, connector_fuse = self.generic(length, width, height)
 
         extra_holes = []
@@ -42,7 +42,7 @@ class ConnectorRecesses:
 
 
 # Type alias for recess functions (unbound method signature)
-RecessFn = Callable[['ConnectorRecesses', float, float, float], Tuple[SmartSolid, SmartBox]]
+RecessFn = Callable[['ConnectorRecesses', float, float, float], tuple[SmartSolid, SmartBox]]
 
 
 @dataclass(frozen=True)
