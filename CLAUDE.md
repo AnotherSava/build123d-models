@@ -209,6 +209,7 @@ def test_flatten(input, expected):
 
 - **IMPORTANT**: Do not create git commits unless explicitly asked by the user
 - When the user requests commits, group related changes into logical, focused commits with clear messages
+- Put model file (.stl and .3mf) changes into the same commit as the code changes for that model
 - Never mention "Claude Code" or AI assistance in commit messages
 - Do not push to remote unless explicitly requested
 

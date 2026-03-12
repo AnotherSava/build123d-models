@@ -8,3 +8,5 @@ __pycache__/
 .chrome_mw_profile/
 /tmp/
 similar_models.txt
+# ralphex progress logs
+.ralphex/progress/
