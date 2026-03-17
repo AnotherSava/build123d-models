@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import IntEnum
 from math import acos, atan2, cos, radians, sin, tan
 
 import numpy as np
@@ -10,6 +11,11 @@ from build123d import Edge, Face, Plane, Solid, Vector, Wire, loft
 from sava.common.advanced_math import advanced_mod
 from sava.csg.build123d.common.geometry import MIN_SIZE_OCCT, are_numbers_too_close, snap_to
 from sava.csg.build123d.common.smartsolid import SmartSolid
+
+
+class InnerMode(IntEnum):
+    THICKNESS = 0  # preserve wall thickness (outer - inner) during extend
+    RADIUS = 1     # preserve inner radius and inner shifts as-is during extend
 
 
 @dataclass(frozen=True)
@@ -34,11 +40,11 @@ class ConeSection:
             assert self.shift_x == 0 and self.shift_y == 0, "Section 0: must have no shift"
         if previous is not None:
             if previous.height == 0:
-                assert self.height != 0, f"Section {index}: height must be non-zero after base"
+                pass  # any height ok: 0 for radius steps, positive/negative to establish direction
             elif previous.height > 0:
-                assert self.height > previous.height, f"Section {index}: heights must be monotonically increasing, got {previous.height} then {self.height}"
+                assert self.height >= previous.height, f"Section {index}: heights must be monotonically non-decreasing, got {previous.height} then {self.height}"
             else:
-                assert self.height < previous.height, f"Section {index}: heights must be monotonically decreasing, got {previous.height} then {self.height}"
+                assert self.height <= previous.height, f"Section {index}: heights must be monotonically non-increasing, got {previous.height} then {self.height}"
         if self.inner_radius is not None:
             assert 0 <= self.inner_radius < self.radius, f"Section {index}: inner radius must satisfy 0 <= inner_radius < radius, got inner={self.inner_radius}, outer={self.radius}"
         if self.inner_shift_x is not None or self.inner_shift_y is not None:
@@ -46,6 +52,11 @@ class ConeSection:
 
 
 class SmarterCone(SmartSolid):
+    """Builder for rotationally symmetric solids: cylinders, cones, and multi-section profiles.
+
+    See docs/code/smartercone.md for the full builder guide.
+    """
+
     def __init__(self, sections: list[ConeSection], plane: Plane = Plane.XY, angle: float = 360, label: str = None):
         # Validation
         assert len(sections) >= 1, "Must have at least 1 section"
@@ -56,20 +67,39 @@ class SmarterCone(SmartSolid):
         self.sections = list(sections)
         self.plane = plane
         self.angle = angle
+        self._inner_mode = InnerMode.THICKNESS
         solid = self._build_solid()
         super().__init__(solid, label=label)
 
-    def _build_solid(self) -> Solid:
-        if len(self.sections) == 1:
-            return Solid.make_cylinder(max(self.sections[0].radius, MIN_SIZE_OCCT), MIN_SIZE_OCCT, self.plane, self.angle)
+    def _geometry_sections(self) -> list[ConeSection]:
+        """Return sections for 3D geometry, offsetting radius-step sections by epsilon.
 
-        has_shift = any(s.shift_x != 0 or s.shift_y != 0 for s in self.sections)
-        has_inner_shift = any(s.inner_shift_x is not None or s.inner_shift_y is not None for s in self.sections)
+        A radius step (same height as previous) becomes a tiny-height segment so
+        the previous segment keeps its original end radius.
+        """
+        result = [self.sections[0]]
+        for i, s in enumerate(self.sections[1:], start=1):
+            if s.height == self.sections[i - 1].height:
+                sign = self._height_sign or 1
+                prev_geo_height = result[-1].height
+                result.append(ConeSection(s.radius, prev_geo_height + sign * MIN_SIZE_OCCT, s.inner_radius, s.shift_x, s.shift_y, s.inner_shift_x, s.inner_shift_y))
+            else:
+                result.append(s)
+        return result
+
+    def _build_solid(self) -> Solid:
+        geo = self._geometry_sections()
+
+        if len(geo) == 1:
+            return Solid.make_cylinder(max(geo[0].radius, MIN_SIZE_OCCT), MIN_SIZE_OCCT, self.plane, self.angle)
+
+        has_shift = any(s.shift_x != 0 or s.shift_y != 0 for s in geo)
+        has_inner_shift = any(s.inner_shift_x is not None or s.inner_shift_y is not None for s in geo)
 
         # Analytical path: 2 sections, no shift, no inner_radius, angle==360
-        if len(self.sections) == 2 and not has_shift and not self.has_inner and self.angle == 360:
-            base = self.sections[0]
-            top = self.sections[1]
+        if len(geo) == 2 and not has_shift and not any(s.inner_radius is not None for s in geo) and self.angle == 360:
+            base = geo[0]
+            top = geo[1]
             h = top.height
             build_plane = self.plane
             if h < 0:
@@ -81,10 +111,11 @@ class SmarterCone(SmartSolid):
                 return Solid.make_cone(base.radius, top.radius, h, build_plane, self.angle)
 
         # Loft path
+        has_inner = any(s.inner_radius is not None for s in geo)
         faces = []
-        for section in self.sections:
+        for section in geo:
             face_plane = self._section_plane(section)
-            if self.has_inner:
+            if has_inner:
                 inner_radius = section.inner_radius if section.inner_radius is not None else MIN_SIZE_OCCT
                 inner_plane = self._inner_section_plane(section) if has_inner_shift else None
                 faces.append(self._create_face(section.radius, face_plane, inner_radius, inner_plane))
@@ -159,9 +190,14 @@ class SmarterCone(SmartSolid):
         e2, _ = normalize(v2 - e1 * (v2 @ e1))
         arc_angle = atan2(v2 @ e2, v2 @ e1)
 
-        wall_thickness = junction.radius - junction.inner_radius if junction.inner_radius is not None else None
-        inner_offset_x = junction.inner_shift_x - junction.shift_x if junction.inner_shift_x is not None else None
-        inner_offset_y = junction.inner_shift_y - junction.shift_y if junction.inner_shift_y is not None else None
+        if self._inner_mode == InnerMode.THICKNESS:
+            wall_thickness = junction.radius - junction.inner_radius if junction.inner_radius is not None else None
+            inner_offset_x = junction.inner_shift_x - junction.shift_x if junction.inner_shift_x is not None else None
+            inner_offset_y = junction.inner_shift_y - junction.shift_y if junction.inner_shift_y is not None else None
+        else:
+            fixed_inner_radius = junction.inner_radius
+            fixed_inner_shift_x = junction.inner_shift_x
+            fixed_inner_shift_y = junction.inner_shift_y
 
         result = []
         for i in range(num_segments + 1):
@@ -170,9 +206,14 @@ class SmarterCone(SmartSolid):
             point = center + e1 * (fillet_radius * cos(a)) + e2 * (fillet_radius * sin(a))
             h, r, sx, sy = point
             r = max(r, 0)
-            ir = max(r - wall_thickness, MIN_SIZE_OCCT) if wall_thickness is not None else None
-            isx = sx + inner_offset_x if inner_offset_x is not None else None
-            isy = sy + inner_offset_y if inner_offset_y is not None else None
+            if self._inner_mode == InnerMode.THICKNESS:
+                ir = max(r - wall_thickness, MIN_SIZE_OCCT) if wall_thickness is not None else None
+                isx = sx + inner_offset_x if inner_offset_x is not None else None
+                isy = sy + inner_offset_y if inner_offset_y is not None else None
+            else:
+                ir = fixed_inner_radius
+                isx = fixed_inner_shift_x
+                isy = fixed_inner_shift_y
             result.append(ConeSection(r, h, inner_radius=ir, shift_x=sx, shift_y=sy, inner_shift_x=isx, inner_shift_y=isy))
         return result
 
@@ -229,9 +270,10 @@ class SmarterCone(SmartSolid):
     @property
     def _height_sign(self) -> int:
         """Return 1 if heights grow positive, -1 if negative, 0 if direction not yet established."""
-        if len(self.sections) < 2:
-            return 0
-        return 1 if self.sections[1].height > 0 else -1
+        for s in self.sections[1:]:
+            if s.height != 0:
+                return 1 if s.height > 0 else -1
+        return 0
 
     # --- Builder API ---
 
@@ -243,7 +285,13 @@ class SmarterCone(SmartSolid):
     def cylinder(cls, radius: float, height: float, *, plane: Plane = Plane.XY, angle: float = 360, label: str = None) -> 'SmarterCone':
         return cls([ConeSection(radius), ConeSection(radius, height)], plane, angle, label)
 
-    def inner(self, radius: float, *, shift_x: float = None, shift_y: float = None) -> 'SmarterCone':
+    def inner(self, radius: float = None, *, shift_x: float = None, shift_y: float = None, mode: InnerMode = None) -> 'SmarterCone':
+        assert radius is not None or mode is not None, "inner() requires at least radius or mode"
+        if mode is not None:
+            self._inner_mode = mode
+        if radius is None:
+            self._recalculate_inner()
+            return self
         last = self.sections[-1]
         if radius == 0:
             replaced = ConeSection(last.radius, last.height, inner_radius=None, shift_x=last.shift_x, shift_y=last.shift_y, inner_shift_x=None, inner_shift_y=None)
@@ -254,6 +302,38 @@ class SmarterCone(SmartSolid):
         self.solid = self._build_solid()
         self.assert_valid()
         return self
+
+    def _propagate_inner(self, prev: ConeSection, outer_radius: float, shift_x: float, shift_y: float) -> tuple[float | None, float | None, float | None]:
+        """Compute inner radius/shifts for a new section based on the previous section and current mode.
+
+        Returns (inner_radius, inner_shift_x, inner_shift_y). All None if prev has no inner.
+        """
+        if prev.inner_radius is None:
+            return None, None, None
+        if self._inner_mode == InnerMode.THICKNESS:
+            wall_thickness = prev.radius - prev.inner_radius
+            inner_radius = max(outer_radius - wall_thickness, MIN_SIZE_OCCT)
+            inner_shift_x = shift_x + (prev.inner_shift_x - prev.shift_x) if prev.inner_shift_x is not None else None
+            inner_shift_y = shift_y + (prev.inner_shift_y - prev.shift_y) if prev.inner_shift_y is not None else None
+        else:
+            inner_radius = prev.inner_radius
+            assert inner_radius < outer_radius, f"RADIUS mode: inner_radius {inner_radius} must be < outer radius {outer_radius}"
+            inner_shift_x = prev.inner_shift_x
+            inner_shift_y = prev.inner_shift_y
+        return inner_radius, inner_shift_x, inner_shift_y
+
+    def _recalculate_inner(self) -> None:
+        """Recalculate the last section's inner radius/shifts using the current mode."""
+        if len(self.sections) < 2:
+            return
+        prev = self.sections[-2]
+        last = self.sections[-1]
+        if prev.inner_radius is None or last.inner_radius is None:
+            return
+        inner_radius, inner_shift_x, inner_shift_y = self._propagate_inner(prev, last.radius, last.shift_x, last.shift_y)
+        self.sections[-1] = ConeSection(last.radius, last.height, inner_radius=inner_radius, shift_x=last.shift_x, shift_y=last.shift_y, inner_shift_x=inner_shift_x, inner_shift_y=inner_shift_y)
+        self.solid = self._build_solid()
+        self.assert_valid()
 
     def _resolve_extend_params(self, radius: float, height: float, angle: float, shift_x: float, shift_y: float) -> tuple[float, float]:
         """Resolve extend parameters into absolute (radius, height)."""
@@ -285,8 +365,7 @@ class SmarterCone(SmartSolid):
             sign = self._height_sign or 1
             height = prev.height + sign * abs(radius - prev.radius) / abs(tan(radians(angle)))
         elif has_r and not has_h and not has_a:
-            sign = self._height_sign or 1
-            height = prev.height + sign * MIN_SIZE_OCCT
+            height = prev.height  # radius step: same height, skip in geometry
         else:
             assert False, "Invalid parameter combination: specify (radius+height), (angle+height), (angle+radius), (radius only), or (height only)"
 
@@ -303,19 +382,7 @@ class SmarterCone(SmartSolid):
         prev = self.sections[-1]
         radius, height = self._resolve_extend_params(radius, height, angle, shift_x, shift_y)
 
-        # Auto-propagate inner_radius and inner shifts from previous section
-        inner_radius = None
-        inner_shift_x = None
-        inner_shift_y = None
-        if prev.inner_radius is not None:
-            wall_thickness = prev.radius - prev.inner_radius
-            inner_radius = max(radius - wall_thickness, MIN_SIZE_OCCT)
-            if prev.inner_shift_x is not None:
-                offset_x = prev.inner_shift_x - prev.shift_x
-                inner_shift_x = shift_x + offset_x
-            if prev.inner_shift_y is not None:
-                offset_y = prev.inner_shift_y - prev.shift_y
-                inner_shift_y = shift_y + offset_y
+        inner_radius, inner_shift_x, inner_shift_y = self._propagate_inner(prev, radius, shift_x, shift_y)
 
         new_section = ConeSection(radius, height, inner_radius=inner_radius, shift_x=shift_x, shift_y=shift_y, inner_shift_x=inner_shift_x, inner_shift_y=inner_shift_y)
         if fillet is not None:
@@ -384,4 +451,5 @@ class SmarterCone(SmartSolid):
         result.sections = list(self.sections)
         result.plane = self.plane
         result.angle = self.angle
+        result._inner_mode = self._inner_mode
         return result

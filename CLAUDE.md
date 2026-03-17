@@ -45,6 +45,7 @@ f3d models/current_model.3mf --watch --opacity=0.6
   - Alignment system using `Alignment` enum (LL, L, LR, CL, C, CR, RL, R, RR) for positioning relative to other solids
   - Bound box helpers (x_min, x_max, x_mid, y_size, etc.)
   - Support for both single solids and ShapeList collections
+  - Cut helpers (`cut_x`, `cut_y`, `cut_z`): trim along an axis using `cut` (absolute to remove), `cut_fraction` (fraction to remove), `keep` (absolute to keep), or `keep_fraction` (fraction to keep)
 
 - **SmartBox**: Extends SmartSolid for box primitives with cutout operations
 
@@ -53,11 +54,15 @@ f3d models/current_model.3mf --watch --opacity=0.6
 - **SmarterCone**: Cone/cylinder builder with fluent API. Provides:
   - Builder pattern: `SmarterCone.base(radius).extend(radius=, height=, angle=)` for chaining sections
   - Supports negative heights (cone extends in -Z direction)
-  - `extend()` parameter combinations: (radius+height), (angle+height), (angle+radius), (radius only), (height only)
+  - `extend()` parameter combinations: (radius+height), (angle+height), (angle+radius), (radius only — radius step at same height), (height only)
   - `angle` convention: positive = inward (radius decreases), negative = outward (radius increases)
   - Shell creation (`create_shell`), offset (`create_offset`), inner/outer extraction
   - Shift support for off-axis sections
   - Fillet at section junctions
+  - `InnerMode` enum controls how `extend()` auto-propagates inner radius:
+    - `THICKNESS` (default): preserves wall thickness (outer - inner)
+    - `RADIUS`: preserves inner radius and inner shifts as-is
+    - Set via `inner(radius, mode=InnerMode.RADIUS)`
 
 - **SweepSolid**: Creates 3D shapes by sweeping a 2D profile along a path
 
@@ -212,6 +217,7 @@ def test_flatten(input, expected):
 - When changing field/function names, check all usages (including tests) and update accordingly
 - Use search tools to find all references before making breaking changes
 - Run all tests after refactoring
+- After modifying code, update any related documentation in `docs/code/`, comments, and docstrings to stay in sync
 - **Backwards compatibility**: Don't worry too much about maintaining backwards compatibility for internal APIs. As long as you check all usages in the codebase (using Grep/search tools) and update them, breaking changes are fine. This is a personal project, not a public library.
 
 ### Git Workflow

@@ -4,7 +4,7 @@ from build123d import Plane, Vector
 from parameterized import parameterized
 
 from sava.csg.build123d.common.geometry import MIN_SIZE_OCCT, are_points_too_close
-from sava.csg.build123d.common.smartercone import SmarterCone
+from sava.csg.build123d.common.smartercone import InnerMode, SmarterCone
 
 
 class TestSmarterConeShell(unittest.TestCase):
@@ -498,18 +498,183 @@ class TestSmarterConeNegativeHeight(unittest.TestCase):
         self.assertAlmostEqual(cone.height, -60, places=3)
 
     def test_radius_only_extend(self):
-        """Test extend with only radius creates near-zero-height section"""
+        """Test extend with only radius creates radius-step section at same height"""
         cone = SmarterCone.base(50).extend(radius=40, height=50).extend(radius=30)
         self.assertEqual(len(cone.sections), 3)
         self.assertAlmostEqual(cone.sections[2].radius, 30)
-        self.assertGreater(cone.sections[2].height, cone.sections[1].height)
+        self.assertAlmostEqual(cone.sections[2].height, cone.sections[1].height)
 
     def test_radius_only_extend_negative_direction(self):
-        """Test extend with only radius follows negative height direction"""
+        """Test extend with only radius creates radius-step at same height in negative cone"""
         cone = SmarterCone.base(50).extend(radius=40, height=-50).extend(radius=30)
         self.assertEqual(len(cone.sections), 3)
         self.assertAlmostEqual(cone.sections[2].radius, 30)
-        self.assertLess(cone.sections[2].height, cone.sections[1].height)
+        self.assertAlmostEqual(cone.sections[2].height, cone.sections[1].height)
+
+    def test_radius_step_skipped_in_geometry(self):
+        """Test that radius-step section becomes epsilon segment in geometry"""
+        cone = SmarterCone.base(50).extend(radius=30).extend(radius=20, height=100)
+        self.assertEqual(len(cone.sections), 3)
+        geo = cone._geometry_sections()
+        # base(r=50,h=0) -> step(r=30,h=epsilon) -> extend(r=20,h=100)
+        self.assertEqual(len(geo), 3)
+        self.assertAlmostEqual(geo[0].radius, 50)
+        self.assertAlmostEqual(geo[1].radius, 30)
+        self.assertAlmostEqual(geo[2].radius, 20)
+        self.assertAlmostEqual(cone.z_min, 0, places=1)
+        self.assertAlmostEqual(cone.z_max, 100, places=1)
+
+    def test_radius_step_preserves_previous_segment(self):
+        """Test that radius step doesn't alter the end radius of the previous segment"""
+        cone = SmarterCone.base(50).extend(radius=40, height=50).extend(radius=30).extend(height=50)
+        self.assertEqual(len(cone.sections), 4)
+        self.assertAlmostEqual(cone.sections[2].height, 50)  # same as previous
+        self.assertAlmostEqual(cone.sections[3].height, 100)
+        geo = cone._geometry_sections()
+        # base(r=50,h=0) -> (r=40,h=50) -> step(r=30,h=50+eps) -> (r=30,h=100)
+        self.assertEqual(len(geo), 4)
+        self.assertAlmostEqual(geo[1].radius, 40)  # previous segment end preserved
+        self.assertAlmostEqual(geo[2].radius, 30)  # step starts new radius
+
+    def test_consecutive_radius_steps_monotonic_geometry(self):
+        """Test that multiple consecutive radius steps produce monotonically increasing heights"""
+        cone = SmarterCone.base(50).extend(radius=40, height=50).extend(radius=30).extend(radius=20).extend(height=50)
+        geo = cone._geometry_sections()
+        self.assertEqual(len(geo), 5)
+        for i in range(1, len(geo)):
+            self.assertGreater(geo[i].height, geo[i - 1].height, f"Height at index {i} ({geo[i].height}) should be greater than at index {i - 1} ({geo[i - 1].height})")
+
+    def test_radius_step_negative_height(self):
+        """Test that radius step in a negative-height cone offsets in the correct direction"""
+        cone = SmarterCone.base(50).extend(radius=40, height=-50).extend(radius=30)
+        geo = cone._geometry_sections()
+        self.assertEqual(len(geo), 3)
+        self.assertLess(geo[2].height, geo[1].height, "Radius step should offset in negative direction for negative-height cones")
+
+
+class TestSmarterConeInnerModeRadius(unittest.TestCase):
+
+    def test_radius_mode_preserves_inner_radius_through_extend(self):
+        """Test that RADIUS mode keeps inner_radius constant during extend"""
+        cone = SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS).extend(radius=40, height=100)
+        self.assertAlmostEqual(cone.sections[1].inner_radius, 30)
+
+    def test_radius_mode_chained_extends(self):
+        """Test that RADIUS mode preserves inner_radius through multiple extends"""
+        cone = SmarterCone.base(50).inner(20, mode=InnerMode.RADIUS).extend(radius=40, height=50).extend(radius=30, height=50)
+        self.assertAlmostEqual(cone.sections[1].inner_radius, 20)
+        self.assertAlmostEqual(cone.sections[2].inner_radius, 20)
+
+    def test_radius_mode_preserves_inner_shifts_absolute(self):
+        """Test that RADIUS mode copies inner shifts as-is (not as offset)"""
+        cone = SmarterCone.base(50).extend(radius=50, height=50).inner(30, shift_x=5, shift_y=3, mode=InnerMode.RADIUS).extend(radius=40, height=50, shift_x=10)
+        # RADIUS mode: inner_shift_x stays 5 (not 10 + (5 - 0) = 15 as in THICKNESS)
+        self.assertAlmostEqual(cone.sections[-1].inner_shift_x, 5)
+        self.assertAlmostEqual(cone.sections[-1].inner_shift_y, 3)
+
+    def test_radius_mode_none_shifts_stay_none(self):
+        """Test that None inner shifts stay None in RADIUS mode"""
+        cone = SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS).extend(radius=40, height=100)
+        self.assertIsNone(cone.sections[-1].inner_shift_x)
+        self.assertIsNone(cone.sections[-1].inner_shift_y)
+
+    def test_radius_mode_fillet_preserves_inner_radius(self):
+        """Test that fillet sections keep constant inner_radius in RADIUS mode"""
+        cone = SmarterCone.base(50).inner(20, mode=InnerMode.RADIUS).extend(radius=50, height=50).extend(radius=30, height=50, fillet=5)
+        for i, s in enumerate(cone.sections):
+            if s.inner_radius is not None:
+                self.assertAlmostEqual(s.inner_radius, 20, places=5, msg=f"Section {i} inner_radius should be 20")
+
+    def test_thickness_mode_is_default(self):
+        """Test that THICKNESS mode is the default (existing behavior)"""
+        cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100)
+        # Wall thickness = 10, so inner = 30 - 10 = 20
+        self.assertAlmostEqual(cone.sections[1].inner_radius, 20)
+
+    def test_mode_switch_mid_chain(self):
+        """Test switching from THICKNESS to RADIUS mode mid-chain"""
+        cone = SmarterCone.base(50).inner(40).extend(radius=40, height=50)
+        # Wall thickness = 10, inner = 40 - 10 = 30
+        self.assertAlmostEqual(cone.sections[1].inner_radius, 30)
+        # Switch to RADIUS mode
+        cone.inner(25, mode=InnerMode.RADIUS).extend(radius=30, height=50)
+        # RADIUS mode: inner stays 25
+        self.assertAlmostEqual(cone.sections[-1].inner_radius, 25)
+
+    def test_radius_mode_narrowing_outer_validates(self):
+        """Test that RADIUS mode with outer narrowing below inner raises during build"""
+        with self.assertRaises(AssertionError):
+            # inner_radius=30 but outer=20 would violate inner < outer
+            SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS).extend(radius=20, height=100)
+
+    def test_copy_preserves_inner_mode(self):
+        """Test that copy() preserves the inner mode"""
+        cone = SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS).extend(radius=40, height=100)
+        copied = cone.copy()
+        self.assertEqual(copied._inner_mode, InnerMode.RADIUS)
+
+    def test_inner_without_mode_preserves_existing_mode(self):
+        """Test that inner() without mode parameter keeps the existing mode"""
+        cone = SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS)
+        cone.inner(25)  # no mode specified
+        self.assertEqual(cone._inner_mode, InnerMode.RADIUS)
+
+    def test_inner_mode_only_switches_mode(self):
+        """Test that inner(mode=...) without radius switches mode and recalculates"""
+        cone = SmarterCone.base(50).inner(40).extend(radius=60, height=50)
+        # THICKNESS: wall=10, inner=60-10=50
+        self.assertAlmostEqual(cone.sections[-1].inner_radius, 50)
+        cone.inner(mode=InnerMode.RADIUS)
+        self.assertEqual(cone._inner_mode, InnerMode.RADIUS)
+        # RADIUS recalc: copies prev inner_radius=40
+        self.assertAlmostEqual(cone.sections[-1].inner_radius, 40)
+
+    def test_inner_mode_only_before_any_inner_radius(self):
+        """Test that inner(mode=...) without prior inner_radius is valid"""
+        cone = SmarterCone.base(50).inner(mode=InnerMode.RADIUS)
+        self.assertEqual(cone._inner_mode, InnerMode.RADIUS)
+        self.assertIsNone(cone.sections[0].inner_radius)
+
+    def test_mode_only_recalculates_inner_to_radius(self):
+        """Test that switching to RADIUS mode recalculates current section's inner"""
+        # outer=50->60, wall=10 -> THICKNESS inner=60-10=50
+        cone = SmarterCone.base(50).inner(40).extend(radius=60, height=50)
+        self.assertAlmostEqual(cone.sections[-1].inner_radius, 50)
+        # Switch to RADIUS: should recalculate inner from prev section (inner=40)
+        cone.inner(mode=InnerMode.RADIUS)
+        self.assertAlmostEqual(cone.sections[-1].inner_radius, 40)
+
+    def test_mode_only_recalculates_inner_to_thickness(self):
+        """Test that switching to THICKNESS mode recalculates current section's inner"""
+        cone = SmarterCone.base(50).inner(40, mode=InnerMode.RADIUS).extend(radius=60, height=50)
+        # RADIUS: inner stays 40
+        self.assertAlmostEqual(cone.sections[-1].inner_radius, 40)
+        # Switch to THICKNESS: wall=10, so inner = 60 - 10 = 50
+        cone.inner(mode=InnerMode.THICKNESS)
+        self.assertAlmostEqual(cone.sections[-1].inner_radius, 50)
+
+    def test_mode_only_recalculates_inner_shifts(self):
+        """Test that mode switch recalculates inner shifts"""
+        cone = SmarterCone.base(50).extend(radius=50, height=50).inner(40, shift_x=5, shift_y=3)
+        cone.extend(radius=50, height=50, shift_x=10)
+        # THICKNESS: inner_shift_x = 10 + (5 - 0) = 15
+        self.assertAlmostEqual(cone.sections[-1].inner_shift_x, 15)
+        # Switch to RADIUS: inner_shift_x = prev inner_shift_x = 5
+        cone.inner(mode=InnerMode.RADIUS)
+        self.assertAlmostEqual(cone.sections[-1].inner_shift_x, 5)
+        self.assertAlmostEqual(cone.sections[-1].inner_shift_y, 3)
+
+    def test_mode_only_no_recalc_without_prior_inner(self):
+        """Test that mode switch on base section (no prior) is a no-op on geometry"""
+        cone = SmarterCone.base(50).inner(40)
+        cone.inner(mode=InnerMode.RADIUS)
+        # Only 1 section, no prior to recalculate from — inner unchanged
+        self.assertAlmostEqual(cone.sections[0].inner_radius, 40)
+
+    def test_inner_no_args_raises(self):
+        """Test that inner() with no args raises AssertionError"""
+        with self.assertRaises(AssertionError):
+            SmarterCone.base(50).inner()
 
 
 if __name__ == '__main__':
