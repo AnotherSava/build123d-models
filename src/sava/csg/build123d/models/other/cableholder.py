@@ -128,7 +128,7 @@ class CableHolder:
 
         if dim.ball_floor_diameter:
             cut_offset = dim.ball_radius - math.sqrt(dim.ball_radius ** 2 - dim.ball_floor_diameter ** 2 / 4)
-            sphere.cut_y(-cut_offset)
+            sphere.cut_y(cut=-cut_offset)
 
         return sphere.fuse(segment_out).cut(cable_canal, connector_in, segment_in, text).fuse(teeth, connector_out).rotate_x(-90)
 
@@ -161,7 +161,7 @@ class CableHolder:
     def create_ball_holder(self) -> SmartSolid:
         dim = self.dim
         sphere = SmartSphere(dim.ball_holder_radius_inner)
-        ball_holder = sphere.create_shell(dim.ball_holder_thickness).cut_z(fraction=-dim.ball_holder_cut_fraction)
+        ball_holder = sphere.create_shell(dim.ball_holder_thickness).cut_z(cut_fraction=-dim.ball_holder_cut_fraction)
         bottom_connector = self.create_bottom_connector(ball_holder, sphere)
 
         cable_canal = SmartBox(dim.ball_holder_channel_width, ball_holder.y_size, ball_holder.z_size)
@@ -169,7 +169,7 @@ class CableHolder:
         cable_canal.fillet_z(dim.ball_holder_channel_width * 0.49)
         ball_holder.cut(cable_canal)
         bottom_connector.cut(cable_canal)
-        bottom_connector.cut_z(bottom_connector.z_size - ball_holder.z_size)
+        bottom_connector.cut_z(cut=bottom_connector.z_size - ball_holder.z_size)
         ball_holder.fillet_by(dim.ball_holder_fillet_radius, PositionalFilter(Axis.Z, ball_holder.z_max))
         ball_holder.fuse(bottom_connector)
 

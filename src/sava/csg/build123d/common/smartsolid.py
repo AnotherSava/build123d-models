@@ -599,25 +599,41 @@ class SmartSolid:
         return SmartSolid((self.moved_vector(shift * i) for i in range(count)), label=label)
 
     def cut_off(self, x: float = 0, y: float = 0, z: float = 0) -> 'SmartSolid':
+        """Cut by intersecting with own bounding box shifted by (x, y, z).
+
+        Positive = keep more on the positive side, negative = keep more on the negative side.
+        """
         return self.intersect(self.create_bound_box().move(x, y, z))
 
-    def _resolve_cut_offset(self, offset: float | None, fraction: float | None, size: float) -> float:
-        """Validate params and return the calculated offset."""
-        if offset is None and fraction is None:
-            raise ValueError("Either offset or fraction must be provided")
-        if offset is not None and fraction is not None:
-            raise ValueError("Only one of offset or fraction can be provided, not both")
-        if fraction is not None:
-            if not (-1 < fraction < 0 or 0 < fraction < 1):
-                raise ValueError(f"fraction must satisfy -1 < f < 0 or 0 < f < 1, got {fraction}")
-            return size * fraction
-        return offset
+    def _resolve_cut_offset(self, cut: float | None, cut_fraction: float | None, keep: float | None, keep_fraction: float | None, size: float) -> float:
+        """Validate params and return the calculated offset for cut_off."""
+        provided = sum(x is not None for x in (cut, cut_fraction, keep, keep_fraction))
+        if provided == 0:
+            raise ValueError("One of cut, cut_fraction, keep, or keep_fraction must be provided")
+        if provided > 1:
+            raise ValueError("Only one of cut, cut_fraction, keep, or keep_fraction can be provided")
+        if keep is not None:
+            sign = 1 if keep >= 0 else -1
+            cut = sign * (size - abs(keep))
+        elif keep_fraction is not None:
+            if not (-1 < keep_fraction < 0 or 0 < keep_fraction < 1):
+                raise ValueError(f"keep_fraction must satisfy -1 < f < 0 or 0 < f < 1, got {keep_fraction}")
+            sign = 1 if keep_fraction >= 0 else -1
+            cut_fraction = sign * (1 - abs(keep_fraction))
+        if cut_fraction is not None:
+            if not (-1 < cut_fraction < 0 or 0 < cut_fraction < 1):
+                raise ValueError(f"cut_fraction must satisfy -1 < f < 0 or 0 < f < 1, got {cut_fraction}")
+            return size * cut_fraction
+        return cut
 
-    def cut_x(self, offset: float = None, fraction: float = None) -> 'SmartSolid':
-        return self.cut_off(x=self._resolve_cut_offset(offset, fraction, self.x_size))
+    def cut_x(self, cut: float = None, cut_fraction: float = None, keep: float = None, keep_fraction: float = None) -> 'SmartSolid':
+        """Cut along X. cut/keep: absolute. cut_fraction/keep_fraction: relative to x_size."""
+        return self.cut_off(x=self._resolve_cut_offset(cut, cut_fraction, keep, keep_fraction, self.x_size))
 
-    def cut_y(self, offset: float = None, fraction: float = None) -> 'SmartSolid':
-        return self.cut_off(y=self._resolve_cut_offset(offset, fraction, self.y_size))
+    def cut_y(self, cut: float = None, cut_fraction: float = None, keep: float = None, keep_fraction: float = None) -> 'SmartSolid':
+        """Cut along Y. cut/keep: absolute. cut_fraction/keep_fraction: relative to y_size."""
+        return self.cut_off(y=self._resolve_cut_offset(cut, cut_fraction, keep, keep_fraction, self.y_size))
 
-    def cut_z(self, offset: float = None, fraction: float = None) -> 'SmartSolid':
-        return self.cut_off(z=self._resolve_cut_offset(offset, fraction, self.z_size))
+    def cut_z(self, cut: float = None, cut_fraction: float = None, keep: float = None, keep_fraction: float = None) -> 'SmartSolid':
+        """Cut along Z. cut/keep: absolute. cut_fraction/keep_fraction: relative to z_size."""
+        return self.cut_off(z=self._resolve_cut_offset(cut, cut_fraction, keep, keep_fraction, self.z_size))
