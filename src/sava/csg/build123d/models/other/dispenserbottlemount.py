@@ -5,18 +5,19 @@ from build123d import Plane, Axis
 from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
-from sava.csg.build123d.common.smartercone import SmarterCone
+from sava.csg.build123d.common.smartercone import SmarterCone, InnerMode
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 @dataclass(frozen=True)
 class DispenserBottleMountDimensions:
-    dispenser_inner_diameter: float = 70
+    dispenser_inner_diameter_min: float = 71
+    dispenser_inner_diameter_max: float = 71.5
     dispenser_outer_diameter: float = 76
     bottle_inner_diameter_max: float = 26
     bottle_inner_diameter_min: float = 10
     bottle_mount_gradient_height: float = 70
-    bottle_mount_wall_depth: float = 10
+    bottle_mount_wall_depth: float = 5
     bottle_mount_holder_recess_angle: float = 45
     thickness_wall: float = 2
     thickness_leg: float = 3
@@ -47,10 +48,10 @@ class DispenserBottleMount:
     def create(self) -> SmartSolid:
         self._validate()
         slope = SmarterCone.base(self.dim.bottle_outer_diameter_max / 2 + self.dim.thickness_wall).inner(self.dim.bottle_outer_diameter_max / 2)
-        slope.extend(radius=self.dim.dispenser_inner_diameter / 2, angle=self.dim.bottle_mount_holder_recess_angle)
-        slope.extend(height=self.dim.bottle_mount_wall_depth)
-        slope.extend(radius=self.dim.dispenser_outer_diameter / 2)
-        slope.extend(height=self.dim.thickness_wall).inner(self.dim.dispenser_inner_diameter / 2 - self.dim.thickness_wall)
+        slope.extend(radius=self.dim.dispenser_inner_diameter_min / 2, angle=self.dim.bottle_mount_holder_recess_angle)
+        slope.extend(height=self.dim.bottle_mount_wall_depth, radius=self.dim.dispenser_inner_diameter_max / 2)
+        slope.extend(radius=self.dim.dispenser_outer_diameter / 2).inner(mode=InnerMode.RADIUS)
+        slope.extend(height=self.dim.thickness_wall)
 
         part = self.create_holder_part()
         part.align(slope).z(Alignment.LR)
