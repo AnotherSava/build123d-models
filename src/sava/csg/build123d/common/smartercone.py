@@ -22,8 +22,8 @@ class ConeSection:
     radius: float
     height: float = 0
     inner_radius: float | None = None  # None = no inner hole
-    shift_x: float = 0
-    shift_y: float = 0
+    shift_x: float = 0  # offset of this section's center from the cone axis along X
+    shift_y: float = 0  # offset of this section's center from the cone axis along Y
     inner_shift_x: float | None = None  # None = follow outer shift
     inner_shift_y: float | None = None  # None = follow outer shift
 
@@ -33,7 +33,12 @@ class ConeSection:
             assert self.height == 0, f"Section 0: height must be 0, got {self.height}"
             assert self.shift_x == 0 and self.shift_y == 0, "Section 0: must have no shift"
         if previous is not None:
-            assert self.height > previous.height, f"Section {index}: heights must be monotonically increasing, got {previous.height} then {self.height}"
+            if previous.height == 0:
+                assert self.height != 0, f"Section {index}: height must be non-zero after base"
+            elif previous.height > 0:
+                assert self.height > previous.height, f"Section {index}: heights must be monotonically increasing, got {previous.height} then {self.height}"
+            else:
+                assert self.height < previous.height, f"Section {index}: heights must be monotonically decreasing, got {previous.height} then {self.height}"
         if self.inner_radius is not None:
             assert 0 <= self.inner_radius < self.radius, f"Section {index}: inner radius must satisfy 0 <= inner_radius < radius, got inner={self.inner_radius}, outer={self.radius}"
         if self.inner_shift_x is not None or self.inner_shift_y is not None:
@@ -65,10 +70,15 @@ class SmarterCone(SmartSolid):
         if len(self.sections) == 2 and not has_shift and not self.has_inner and self.angle == 360:
             base = self.sections[0]
             top = self.sections[1]
+            h = top.height
+            build_plane = self.plane
+            if h < 0:
+                build_plane = Plane(self.plane.origin, x_dir=self.plane.x_dir, z_dir=-self.plane.z_dir)
+                h = -h
             if are_numbers_too_close(base.radius, top.radius):
-                return Solid.make_cylinder(base.radius, top.height, self.plane, self.angle)
+                return Solid.make_cylinder(base.radius, h, build_plane, self.angle)
             else:
-                return Solid.make_cone(base.radius, top.radius, top.height, self.plane, self.angle)
+                return Solid.make_cone(base.radius, top.radius, h, build_plane, self.angle)
 
         # Loft path
         faces = []
@@ -216,6 +226,13 @@ class SmarterCone(SmartSolid):
         c2 = self._section_center(self.sections[segment + 1])
         return c1 + (c2 - c1) * fraction
 
+    @property
+    def _height_sign(self) -> int:
+        """Return 1 if heights grow positive, -1 if negative, 0 if direction not yet established."""
+        if len(self.sections) < 2:
+            return 0
+        return 1 if self.sections[1].height > 0 else -1
+
     # --- Builder API ---
 
     @classmethod
@@ -246,7 +263,9 @@ class SmarterCone(SmartSolid):
 
         # height param is relative; convert to absolute for internal storage
         if has_h:
-            assert height > 0, f"Height must be positive, got {height}"
+            assert height != 0, f"Height must be non-zero, got {height}"
+            if self._height_sign != 0:
+                assert (height > 0) == (self._height_sign > 0), f"Height sign must match existing direction"
             height = prev.height + height
 
         if has_r and has_h and not has_a:
@@ -254,7 +273,7 @@ class SmarterCone(SmartSolid):
         elif has_h and not has_r and not has_a:
             radius = prev.radius
         elif has_a and has_h and not has_r:
-            segment_height = height - prev.height
+            segment_height = abs(height - prev.height)
             angle = advanced_mod(angle, 360, -180, 180)
             assert not are_numbers_too_close(advanced_mod(angle, 180, -90, 90), 0), f"Angle is invalid: {angle}"
             radius_change = segment_height / tan(radians(abs(angle)))
@@ -263,13 +282,24 @@ class SmarterCone(SmartSolid):
         elif has_a and has_r and not has_h:
             angle = advanced_mod(angle, 360, -180, 180)
             assert not are_numbers_too_close(advanced_mod(angle, 180, -90, 90), 0), f"Angle is invalid: {angle}"
-            height = prev.height + abs(radius - prev.radius) / abs(tan(radians(angle)))
+            sign = self._height_sign or 1
+            height = prev.height + sign * abs(radius - prev.radius) / abs(tan(radians(angle)))
+        elif has_r and not has_h and not has_a:
+            sign = self._height_sign or 1
+            height = prev.height + sign * MIN_SIZE_OCCT
         else:
-            assert False, "Invalid parameter combination: specify (radius+height), (angle+height), (angle+radius), or (height only)"
+            assert False, "Invalid parameter combination: specify (radius+height), (angle+height), (angle+radius), (radius only), or (height only)"
 
         return radius, height
 
-    def extend(self, *, radius: float = None, height: float = None, angle: float = None, shift_x: float = 0, shift_y: float = 0, fillet: float = None) -> 'SmarterCone':
+    def extend(self, *, radius: float = None, height: float = None, angle: float = None,
+               shift_x: float = 0, shift_y: float = 0, fillet: float = None) -> 'SmarterCone':
+        """Extend the cone with a new section.
+
+        angle: wall steepness in degrees. 90° = vertical wall (no radius change).
+        Positive = inward (radius decreases), negative = outward (radius increases).
+        Direction-independent: same convention regardless of height sign.
+        """
         prev = self.sections[-1]
         radius, height = self._resolve_extend_params(radius, height, angle, shift_x, shift_y)
 

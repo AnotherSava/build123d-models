@@ -50,6 +50,15 @@ f3d models/current_model.3mf --watch --opacity=0.6
 
 - **Pencil**: 2D drawing tool for creating complex profiles via lines and arcs, then extruding/revolving them into 3D shapes. Supports mirroring across axes in arbitrary planes (not just XY)
 
+- **SmarterCone**: Cone/cylinder builder with fluent API. Provides:
+  - Builder pattern: `SmarterCone.base(radius).extend(radius=, height=, angle=)` for chaining sections
+  - Supports negative heights (cone extends in -Z direction)
+  - `extend()` parameter combinations: (radius+height), (angle+height), (angle+radius), (radius only), (height only)
+  - `angle` convention: positive = inward (radius decreases), negative = outward (radius increases)
+  - Shell creation (`create_shell`), offset (`create_offset`), inner/outer extraction
+  - Shift support for off-axis sections
+  - Fillet at section junctions
+
 - **SweepSolid**: Creates 3D shapes by sweeping a 2D profile along a path
 
 - **ModelCutter** (`modelcutter.py`): Advanced cutting system for splitting models along wire paths

@@ -1,3 +1,4 @@
+/.review-venv/
 /venv/
 /models/current_model.3mf
 /.idea/

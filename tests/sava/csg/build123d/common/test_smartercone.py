@@ -57,10 +57,12 @@ class TestSmarterConeShell(unittest.TestCase):
         (-4,),
     ])
     def test_shell_valid_combinations(self, thickness):
-        """Test shell with various valid thickness values"""
+        """Test shell with various valid thickness values produces correct wall thickness"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         shell = cone.create_shell(thickness)
         self.assertTrue(shell.has_inner)
+        for s in shell.sections:
+            self.assertAlmostEqual(s.radius - s.inner_radius, abs(thickness), places=5)
 
     def test_shell_returns_new_instance(self):
         """Test that shell returns new instance, not self"""
@@ -143,6 +145,21 @@ class TestSmarterConeCreateOffset(unittest.TestCase):
         self.assertAlmostEqual(offset.z_min, original.z_min, places=3)
         self.assertAlmostEqual(offset.z_max, original.z_max, places=3)
 
+    def test_create_offset_with_inner_radius(self):
+        """Test that create_offset adjusts both outer and inner radii"""
+        original = SmarterCone.base(50).inner(40).extend(radius=30, height=100)
+        offset = original.create_offset(3)
+        self.assertAlmostEqual(offset.sections[0].radius, 53, places=5)
+        self.assertAlmostEqual(offset.sections[0].inner_radius, 43, places=5)
+        self.assertAlmostEqual(offset.sections[1].radius, 33, places=5)
+        self.assertAlmostEqual(offset.sections[1].inner_radius, 23, places=5)
+
+    def test_create_offset_negative_rejects_too_small_radius(self):
+        """Test that negative offset raising assertion when outer radius would go negative"""
+        original = SmarterCone.base(50).extend(radius=30, height=100)
+        with self.assertRaises(AssertionError):
+            original.create_offset(-35)
+
 
 class TestSmarterConeShift(unittest.TestCase):
 
@@ -192,6 +209,11 @@ class TestSmarterConeShift(unittest.TestCase):
         offset = cone.create_offset(2)
         self.assertAlmostEqual(offset.sections[1].shift_x, 20)
         self.assertGreater(offset.base_radius, cone.base_radius)
+
+    def test_angle_with_shift_raises(self):
+        """Test that combining angle with shift raises AssertionError"""
+        with self.assertRaises(AssertionError):
+            SmarterCone.base(50).extend(angle=45, height=50, shift_x=10)
 
 
 class TestSmarterConeInnerRadius(unittest.TestCase):
@@ -245,11 +267,10 @@ class TestSmarterConeInnerRadius(unittest.TestCase):
     def test_fillet_sections_propagate_inner_radius(self):
         """Test that fillet sections get inner_radius when junction has it"""
         cone = SmarterCone.base(50).inner(40).extend(radius=50, height=50).extend(radius=30, height=50, fillet=5)
-        # All sections between the fillet should have inner_radius
-        for s in cone.sections:
-            if s.inner_radius is not None:
-                self.assertGreater(s.inner_radius, 0)
-        self.assertTrue(cone.has_inner)
+        # All sections should have inner_radius (base has it, so it propagates everywhere)
+        for i, s in enumerate(cone.sections):
+            self.assertIsNotNone(s.inner_radius, f"Section {i} should have inner_radius")
+            self.assertGreater(s.inner_radius, 0, f"Section {i} inner_radius should be > 0")
 
     def test_fillet_sections_no_inner_without_junction_inner(self):
         """Test that fillet sections don't get inner_radius when junction has none"""
@@ -328,10 +349,11 @@ class TestSmarterConeInner(unittest.TestCase):
     def test_inner_shift_offset_propagates_through_fillet(self):
         """Test that inner shift offsets propagate through fillet sections"""
         cone = SmarterCone.base(50).inner(40).extend(radius=50, height=50).inner(40, shift_x=5).extend(radius=30, height=50, fillet=5)
-        # All fillet sections should have inner_shift_x
-        for s in cone.sections:
-            if s.inner_radius is not None and s.inner_shift_x is not None:
-                self.assertAlmostEqual(s.inner_shift_x - s.shift_x, 5, places=3)
+        # Sections after the first (which has no shift) should have inner_shift_x
+        sections_with_inner_shift = [s for s in cone.sections if s.inner_shift_x is not None]
+        self.assertGreater(len(sections_with_inner_shift), 0, "At least one section should have inner_shift_x")
+        for s in sections_with_inner_shift:
+            self.assertAlmostEqual(s.inner_shift_x - s.shift_x, 5, places=3)
 
 
 class TestSmarterConeGetOuterInnerCone(unittest.TestCase):
@@ -395,6 +417,99 @@ class TestSmarterConeGetOuterInnerCone(unittest.TestCase):
         self.assertAlmostEqual(outer.z_max, cone.z_max, places=3)
         self.assertAlmostEqual(inner.z_min, cone.z_min, places=3)
         self.assertAlmostEqual(inner.z_max, cone.z_max, places=3)
+
+
+class TestSmarterConeNegativeHeight(unittest.TestCase):
+
+    def test_negative_height_basic(self):
+        """Test basic cone with negative height"""
+        cone = SmarterCone.base(50).extend(radius=30, height=-100)
+        self.assertAlmostEqual(cone.height, -100)
+        self.assertAlmostEqual(cone.base_radius, 50)
+        self.assertAlmostEqual(cone.top_radius, 30)
+
+    def test_negative_height_bounding_box(self):
+        """Test that negative-height cone extends in -Z direction"""
+        cone = SmarterCone.base(50).extend(radius=30, height=-100)
+        self.assertAlmostEqual(cone.z_min, -100, places=1)
+        self.assertAlmostEqual(cone.z_max, 0, places=1)
+
+    def test_negative_height_with_angle(self):
+        """Test negative height combined with angle computes correct radius"""
+        # angle=-45 outward: radius_change = 100 / tan(45) = 100, so radius = 50 + 100 = 150
+        cone = SmarterCone.base(50).extend(height=-100, angle=-45)
+        self.assertAlmostEqual(cone.top_radius, 150, places=3)
+        # angle=45 inward with small height: radius_change = 20 / tan(45) = 20, so radius = 50 - 20 = 30
+        cone2 = SmarterCone.base(50).extend(height=-20, angle=45)
+        self.assertAlmostEqual(cone2.top_radius, 30, places=3)
+
+    def test_negative_height_chained_extends(self):
+        """Test multiple extends all going negative"""
+        cone = SmarterCone.base(50).extend(radius=40, height=-50).extend(radius=30, height=-50)
+        self.assertAlmostEqual(cone.height, -100)
+        self.assertEqual(len(cone.sections), 3)
+        self.assertAlmostEqual(cone.z_min, -100, places=1)
+        self.assertAlmostEqual(cone.z_max, 0, places=1)
+
+    def test_mixed_height_direction_raises(self):
+        """Test that mixing positive and negative height raises"""
+        with self.assertRaises(AssertionError):
+            SmarterCone.base(50).extend(radius=40, height=-50).extend(radius=30, height=30)
+
+    def test_zero_height_extend_raises(self):
+        """Test that extend(height=0) raises"""
+        with self.assertRaises(AssertionError):
+            SmarterCone.base(50).extend(height=0)
+
+    def test_negative_height_cylinder(self):
+        """Test cylinder with negative height"""
+        cone = SmarterCone.cylinder(50, -100)
+        self.assertAlmostEqual(cone.height, -100)
+        self.assertAlmostEqual(cone.z_min, -100, places=1)
+        self.assertAlmostEqual(cone.z_max, 0, places=1)
+
+    def test_negative_height_shell(self):
+        """Test shell on negative-height cone"""
+        cone = SmarterCone.base(50).extend(radius=30, height=-100)
+        shell = cone.create_shell(2)
+        self.assertTrue(shell.has_inner)
+        self.assertAlmostEqual(shell.height, -100)
+
+    def test_negative_height_offset(self):
+        """Test create_offset on negative-height cone"""
+        cone = SmarterCone.base(50).extend(radius=30, height=-100)
+        offset = cone.create_offset(2)
+        self.assertAlmostEqual(offset.base_radius, 52, places=5)
+        self.assertAlmostEqual(offset.top_radius, 32, places=5)
+        self.assertAlmostEqual(offset.height, -100)
+
+    def test_negative_height_center_interpolation(self):
+        """Test center() returns correct points for negative-height cone"""
+        cone = SmarterCone.base(30).extend(radius=20, height=-100, shift_x=10, shift_y=5)
+        base_center = cone.center(0.0)
+        top_center = cone.center(1.0)
+        self.assertTrue(are_points_too_close(base_center, Vector(0, 0, 0)))
+        self.assertTrue(are_points_too_close(top_center, Vector(10, 5, -100)))
+
+    def test_negative_height_angle_radius_follows_direction(self):
+        """Test that angle+radius extend follows negative direction"""
+        # radius change = 40 - 30 = 10, height change = 10 / tan(45) = 10
+        cone = SmarterCone.base(50).extend(radius=40, height=-50).extend(angle=45, radius=30)
+        self.assertAlmostEqual(cone.height, -60, places=3)
+
+    def test_radius_only_extend(self):
+        """Test extend with only radius creates near-zero-height section"""
+        cone = SmarterCone.base(50).extend(radius=40, height=50).extend(radius=30)
+        self.assertEqual(len(cone.sections), 3)
+        self.assertAlmostEqual(cone.sections[2].radius, 30)
+        self.assertGreater(cone.sections[2].height, cone.sections[1].height)
+
+    def test_radius_only_extend_negative_direction(self):
+        """Test extend with only radius follows negative height direction"""
+        cone = SmarterCone.base(50).extend(radius=40, height=-50).extend(radius=30)
+        self.assertEqual(len(cone.sections), 3)
+        self.assertAlmostEqual(cone.sections[2].radius, 30)
+        self.assertLess(cone.sections[2].height, cone.sections[1].height)
 
 
 if __name__ == '__main__':
