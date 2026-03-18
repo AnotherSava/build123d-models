@@ -1,67 +1,46 @@
+import math
 from dataclasses import dataclass
-
-from build123d import Plane, Axis
 
 from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import Alignment
-from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartercone import SmarterCone, InnerMode
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 @dataclass(frozen=True)
 class DispenserBottleMountDimensions:
+    bottle_outer_diameter_max: float = 32.3
+    bottle_hole_angle: float = 5
+    bottle_hole_depth: float = 20
+
     dispenser_inner_diameter_min: float = 71
     dispenser_inner_diameter_max: float = 71.5
     dispenser_outer_diameter: float = 76
-    bottle_inner_diameter_max: float = 26
-    bottle_inner_diameter_min: float = 10
-    bottle_mount_gradient_height: float = 70
-    bottle_mount_wall_depth: float = 5
-    bottle_mount_holder_recess_angle: float = 45
+    bottle_mount_wall_depth: float = 10
     thickness_wall: float = 2
-    thickness_leg: float = 3
-    section_count: int = 3
-    bottle_holder_top_angle: float = 45
 
     @property
-    def bottle_outer_diameter_max(self) -> float:
-        return self.bottle_inner_diameter_max * 1.3
+    def bottle_outer_diameter_min(self) -> float:
+        return self.bottle_outer_diameter_max - self.bottle_hole_depth * math.sin(math.radians(self.bottle_hole_angle))
 
 
 class DispenserBottleMount:
     def __init__(self, dim: DispenserBottleMountDimensions):
         self.dim = dim
 
-    def create_holder_part(self) -> SmartSolid:
-        pencil = Pencil(Plane.XZ)
-        pencil.right(self.dim.bottle_outer_diameter_max / 2)
-        pencil.jump((self.dim.thickness_leg, self.dim.thickness_leg))
-        pencil.left_to(self.dim.bottle_inner_diameter_max / 2)
-        pencil.jump_to((self.dim.bottle_inner_diameter_min / 2, self.dim.bottle_mount_gradient_height))
-        return pencil.extrude_mirrored_y(self.dim.thickness_wall)
-
-    def _validate(self) -> None:
-        if self.dim.section_count <= 0:
-            raise ValueError(f"section_count must be positive, got {self.dim.section_count}")
-
     def create(self) -> SmartSolid:
-        self._validate()
-        slope = SmarterCone.base(self.dim.bottle_outer_diameter_max / 2 + self.dim.thickness_wall).inner(self.dim.bottle_outer_diameter_max / 2)
-        slope.extend(radius=self.dim.dispenser_inner_diameter_min / 2, angle=self.dim.bottle_mount_holder_recess_angle)
-        slope.extend(height=self.dim.bottle_mount_wall_depth, radius=self.dim.dispenser_inner_diameter_max / 2)
-        slope.extend(radius=self.dim.dispenser_outer_diameter / 2).inner(mode=InnerMode.RADIUS)
-        slope.extend(height=self.dim.thickness_wall)
+        outer = SmarterCone.base(self.dim.dispenser_inner_diameter_min / 2).inner(self.dim.dispenser_inner_diameter_min / 2 - self.dim.thickness_wall)
+        outer.extend(height=self.dim.bottle_mount_wall_depth, radius=self.dim.dispenser_inner_diameter_max / 2)
+        outer.extend(radius=self.dim.dispenser_outer_diameter / 2).inner(mode=InnerMode.RADIUS)
+        outer.extend(height=self.dim.thickness_wall)
 
-        part = self.create_holder_part()
-        part.align(slope).z(Alignment.LR)
-        parts = [part.rotated(Axis.Z, 360 / self.dim.section_count * i) for i in range(self.dim.section_count)]
+        bottle_holder = SmarterCone.base(self.dim.bottle_outer_diameter_min / 2 + self.dim.thickness_wall).inner(self.dim.bottle_outer_diameter_min / 2)
+        bottle_holder.extend(height=self.dim.bottle_hole_depth, radius=self.dim.bottle_outer_diameter_max / 2 + self.dim.thickness_wall)
+        bottle_holder.extend(radius=self.dim.dispenser_outer_diameter / 2).inner(mode=InnerMode.RADIUS)
+        bottle_holder.extend(height=self.dim.thickness_wall)
+        bottle_holder.align(outer).z(Alignment.RL)
 
-        mount = SmartSolid(parts, label="mount")
-
-        parts_cone = SmarterCone.base(0).extend(height=-mount.z_size, angle=-self.dim.bottle_holder_top_angle).aligned(mount)
-
-        return mount.intersect(parts_cone).fuse(slope)
+        return SmartSolid(bottle_holder, outer, label="mount")
 
 
 if __name__ == "__main__":
