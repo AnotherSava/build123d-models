@@ -1,15 +1,12 @@
 # SmarterCone — Builder Guide
 
-Builder for rotationally symmetric solids: cylinders, cones, and multi-section profiles.
-
-Shapes are built by defining a base cross-section and chaining `.extend()` calls
-to add sections upward (or downward). Each section is a circular cross-section
-at a given height with a given radius. The result is a solid of revolution
-created by connecting adjacent sections.
+Builder for rotationally symmetric solids: cylinders, cones, and multi-section profiles. Shapes are built by defining a base cross-section and chaining `.extend()` calls to add sections upward (or downward). Each section is a circular cross-section at a given height with a given radius. The result is a solid of revolution created by connecting adjacent sections. Inherits all fluent API methods from SmartSolid (see `smartsolid.md`).
 
 ## Quick start
 
 ```python
+from sava.csg.build123d.common.smartercone import SmarterCone, InnerMode
+
 # Cylinder: radius 20, height 50
 SmarterCone.base(20).extend(height=50)
 
@@ -155,3 +152,45 @@ Set `angle` < 360 on `base()` to create a partial cone (wedge/sector):
 SmarterCone.base(30, angle=180)  # half-cone
 SmarterCone.base(30, angle=90)   # quarter-cone
 ```
+
+## Properties
+
+| Property | Returns |
+|----------|---------|
+| `height` | Height of the last section (0 if only base) |
+| `base_radius` | Radius of the first section |
+| `top_radius` | Radius of the last section |
+| `has_inner` | `True` if any section has an inner radius |
+
+Interpolated queries by position (0 = base, 1 = first extend, 2 = second extend, etc.):
+
+```python
+cone = SmarterCone.base(30).extend(radius=20, height=50).extend(radius=10, height=100)
+cone.radius(0.5)   # radius halfway through first segment
+cone.center(1.0)    # center point at first extend junction
+```
+
+## Offset, shell, and extraction
+
+```python
+cone = SmarterCone.base(30).extend(radius=20, height=50)
+
+# Grow or shrink all radii by a fixed amount
+bigger = cone.create_offset(5)
+
+# Create a hollow version (positive = outward shell, negative = inward shell)
+shell = cone.create_shell(2)     # outer radius grows by 2, inner = original surface
+shell = cone.create_shell(-2)    # outer stays, inner carved inward by 2
+```
+
+For hollow cones, extract inner or outer as standalone cones:
+
+```python
+hollow = SmarterCone.base(30).inner(20).extend(height=50)
+outer = hollow.get_outer_cone()  # solid cone with outer radii only
+inner = hollow.get_inner_cone()  # solid cone with inner radii only
+```
+
+## Inherited methods
+
+See [smartsolid.md](smartsolid.md) for the full list of inherited methods (alignment, booleans, filleting, bound box, etc.).

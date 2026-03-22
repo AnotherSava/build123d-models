@@ -38,6 +38,8 @@ f3d models/current_model.3mf --watch --opacity=0.6
 
 ## Architecture
 
+> **Detailed usage guides** for each class live in `docs/code/` (e.g. `docs/code/smartsolid.md`, `docs/code/smartbox.md`). Consult those when building or updating models — they contain practical examples, parameter tables, and recommended patterns.
+
 ### Core Classes (in `src/sava/csg/build123d/common/`)
 
 - **SmartSolid**: Primary wrapper around build123d shapes. Provides:
@@ -63,6 +65,12 @@ f3d models/current_model.3mf --watch --opacity=0.6
     - `THICKNESS` (default): preserves wall thickness (outer - inner)
     - `RADIUS`: preserves inner radius and inner shifts as-is
     - Set via `inner(radius, mode=InnerMode.RADIUS)`
+
+- **SmartSphere**: Sphere primitive with inner/outer shell creation and SmartSolid transformations
+
+- **SmartLoft**: Creates 3D shapes by lofting between two profiles or extruding a profile along a direction
+
+- **SmartRevolve**: Creates 3D shapes by revolving a 2D face around an axis
 
 - **SweepSolid**: Creates 3D shapes by sweeping a 2D profile along a path
 
@@ -145,16 +153,25 @@ pieces = cut_with_wires(model, CutSpec(wire, plane), CutSpec(wire2, plane2))
 **Pencil mirroring in custom planes:**
 ```python
 from sava.csg.build123d.common.pencil import Pencil
-from build123d import Plane, Axis
+from build123d import Plane
 
 # Works in any plane orientation, not just XY
 tilted_plane = Plane.XY.rotated((30, 45, 15))
 pencil = Pencil(tilted_plane)
-pencil.draw(50, 45)
-face = pencil.create_mirrored_face(Axis.X)  # Mirrors correctly in tilted plane
+pencil.right(20)
+pencil.up(10)
+face = pencil.create_mirrored_face_x()  # Mirrors correctly in tilted plane
 ```
 
 **Orientation note:** The `rotate()` method uses fixed axes (global coordinate system), while `orient()` uses build123d's default object-attached axes.
+
+### Prefer high-level primitives
+
+When building models, prefer the project's high-level classes (SmartBox, SmarterCone, SmartSphere, Pencil, SmartLoft, SmartRevolve, SweepSolid) over raw build123d primitives (Box, Cylinder, Sphere, etc.). The high-level classes provide alignment, fluent transformations, and consistent patterns. Only drop down to raw build123d when the high-level API doesn't cover your use case.
+
+### Use alignment for positioning
+
+Use `.align()` and alignment operations (`align_x`, `align_y`, `align_z`) for positioning objects relative to each other. Avoid manual coordinate math — the alignment system handles bounding-box-relative positioning cleanly. See `docs/code/smartsolid.md` for full alignment documentation.
 
 ## Code Style Guidelines
 
