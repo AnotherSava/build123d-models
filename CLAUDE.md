@@ -56,7 +56,7 @@ f3d models/current_model.3mf --watch --opacity=0.6
 - **SmarterCone**: Cone/cylinder builder with fluent API. Provides:
   - Builder pattern: `SmarterCone.base(radius).extend(radius=, height=, angle=)` for chaining sections
   - Supports negative heights (cone extends in -Z direction)
-  - `extend()` parameter combinations: (radius+height), (angle+height), (angle+radius), (radius only — radius step at same height), (height only)
+  - `extend()` parameter combinations: (radius+height), (angle+height), (angle+radius), (radius only — radius step at same height), (height only), (no params — inner-only step, chain `.inner()` to change only inner radius)
   - `angle` convention: positive = inward (radius decreases), negative = outward (radius increases)
   - Shell creation (`create_shell`), offset (`create_offset`), inner/outer extraction
   - Shift support for off-axis sections

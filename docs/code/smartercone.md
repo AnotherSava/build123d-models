@@ -38,6 +38,7 @@ the current height). Pick one of these parameter combinations:
 | `.extend(angle=A, height=H)` | compute radius from wall angle and height |
 | `.extend(angle=A, radius=R)` | compute height from wall angle and radius |
 | `.extend(radius=R)` | radius step at same height (sharp ledge) |
+| `.extend()` | no-op step; chain `.inner()` to change only inner radius |
 
 **`angle` convention:**
 - Positive = wall slopes inward (radius decreases)

@@ -28,24 +28,28 @@ class DispenserBottleMount:
     def __init__(self, dim: DispenserBottleMountDimensions):
         self.dim = dim
 
-    def create(self) -> SmartSolid:
-        outer = SmarterCone.base(self.dim.dispenser_inner_diameter_min / 2).inner(self.dim.dispenser_inner_diameter_min / 2 - self.dim.thickness_wall)
-        outer.extend(height=self.dim.bottle_mount_wall_depth, radius=self.dim.dispenser_inner_diameter_max / 2)
-        outer.extend(radius=self.dim.dispenser_outer_diameter / 2).inner(mode=InnerMode.RADIUS)
-        outer.extend(height=self.dim.thickness_wall)
+    def create(self) -> list[SmartSolid]:
+        bottom = SmarterCone.base(self.dim.dispenser_inner_diameter_min / 2, label="bottom").inner(self.dim.bottle_outer_diameter_min / 2)
+        bottom.extend(height=self.dim.thickness_wall)
+        bottom.extend().inner(self.dim.dispenser_inner_diameter_min / 2 - self.dim.thickness_wall)
+        bottom.extend(height=self.dim.bottle_mount_wall_depth, radius=self.dim.dispenser_inner_diameter_max / 2)
+        bottom.extend(radius=self.dim.dispenser_outer_diameter / 2).inner(mode=InnerMode.RADIUS)
+        bottom.extend(height=self.dim.thickness_wall)
 
-        bottle_holder = SmarterCone.base(self.dim.bottle_outer_diameter_min / 2 + self.dim.thickness_wall).inner(self.dim.bottle_outer_diameter_min / 2)
-        bottle_holder.extend(height=self.dim.bottle_hole_depth, radius=self.dim.bottle_outer_diameter_max / 2 + self.dim.thickness_wall)
-        bottle_holder.extend(radius=self.dim.dispenser_outer_diameter / 2).inner(mode=InnerMode.RADIUS)
-        bottle_holder.extend(height=self.dim.thickness_wall)
-        bottle_holder.align(outer).z(Alignment.RL)
+        top = SmarterCone.base(self.dim.dispenser_inner_diameter_min / 2 - self.dim.thickness_wall, label="top")
+        top.inner(self.dim.dispenser_inner_diameter_min / 2 - 2 * self.dim.thickness_wall)
+        top.extend(height=self.dim.bottle_mount_wall_depth, radius=self.dim.dispenser_inner_diameter_max / 2 - self.dim.thickness_wall)
+        top.extend(height=self.dim.thickness_wall)
+        top.extend(radius=self.dim.dispenser_outer_diameter / 2).inner(self.dim.bottle_outer_diameter_min / 2)
+        top.extend(height=self.dim.thickness_wall)
+        top.align(bottom).z(Alignment.RL, self.dim.thickness_wall)
 
-        return SmartSolid(bottle_holder, outer, label="mount")
+        return [top, bottom]
 
 
 if __name__ == "__main__":
     dimensions = DispenserBottleMountDimensions()
     dispenser_bottle_mount = DispenserBottleMount(dimensions)
     model = dispenser_bottle_mount.create()
-    export_3mf("models/other/dispenser_bottle_mount/export.3mf", model)
-    export_stl("models/other/dispenser_bottle_mount/stl", model)
+    export_3mf("models/other/dispenser_bottle_mount/export.3mf", *model)
+    export_stl("models/other/dispenser_bottle_mount/stl", *model)

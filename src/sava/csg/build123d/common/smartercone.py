@@ -366,8 +366,11 @@ class SmarterCone(SmartSolid):
             height = prev.height + sign * abs(radius - prev.radius) / abs(tan(radians(angle)))
         elif has_r and not has_h and not has_a:
             height = prev.height  # radius step: same height, skip in geometry
+        elif not has_r and not has_h and not has_a:
+            radius = prev.radius
+            height = prev.height  # inner-only step: same outer radius and height
         else:
-            assert False, "Invalid parameter combination: specify (radius+height), (angle+height), (angle+radius), (radius only), or (height only)"
+            assert False, "Invalid parameter combination: specify (radius+height), (angle+height), (angle+radius), (radius only), (height only), or (no params)"
 
         return radius, height
 
