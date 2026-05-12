@@ -14,6 +14,16 @@ The project includes a set of high-level wrapper classes that simplify common 3D
 - **SweepSolid** - Creates 3D shapes by sweeping a 2D profile along a path
 - **ModelCutter** - Advanced cutting system for splitting models along wire paths
 
+## Mesh Reconstruction
+
+Convert a triangle mesh (STL, OFF) into authored build123d code: Pencil sketches extruded along a detected axis, plus cylindrical primitives where appropriate. Targets 2.5D-extrudable parts (stacked planar caps with side walls parallel to one axis); aborts with a reason if the input fails the 2.5D check.
+
+```bash
+python -m sava.csg.build123d.reconstruct path/to/blade.stl --out reconstructed_blade.py
+```
+
+See `docs/code/reconstruct/` for the algorithm, findings, and the public Python API.
+
 ## Models
 
 ### Board Game Inserts
@@ -37,7 +47,6 @@ The project includes a set of high-level wrapper classes that simplify common 3D
 
 ## Claude Code Skills
 
-- `/commit` — Analyzes changes and generates Conventional Commit messages
 - `/create_model` — Create new model based on build123d framework
 - `/publish_model` — Create model description and publish to Thingiverse and MakerWorld
 
