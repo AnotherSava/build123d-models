@@ -85,6 +85,10 @@ f3d models/current_model.3mf --watch --opacity=0.6
 
 - **Exporter**: Exports models to 3MF format. Default output is `models/current_model.3mf`. Includes debug helpers (`show_red`, `show_blue`, `show_green`) for visualizing shapes
 
+### Mesh Reconstruction (`src/sava/csg/build123d/reconstruct/`)
+
+Convert 2.5D-extrudable STL/OFF meshes into authored Pencil + build123d code. Research-stage; aborts with a reason when the input isn't 2.5D. Public API: `reconstruct(path) -> ReconstructionResult`. See `docs/code/reconstruct/` for algorithm, findings, and the iris-blade reference test.
+
 ### Geometry Utilities (`geometry.py`)
 
 - **Alignment**: Enum for positioning (Left/Center/Right relative to Left/Center/Right)
