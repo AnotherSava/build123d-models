@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 from build123d import Vector
 
-from ._vec import Vec, vadd, vcross, vmul, vnorm
+from ._vec import Vec, vadd, vcross, vdot, vmul, vnorm
 from .boundary import boundary_polygons, simplify_collinear
 from .datum import build_datum_frame, make_frame, pick_datum, shift_origin_to_first_quadrant, to_local
 from .extrusion import cap_depth_in_frame, classify_planes_vs_axis, pick_axis
@@ -65,6 +65,88 @@ def _filter_noise_loops(loops_2d: list[list[Point2D]]) -> list[list[Point2D]]:
     areas = [abs(_signed_area(p)) for p in loops_2d]
     threshold = max(areas) * _NOISE_LOOP_AREA_FRAC
     return [p for p, a in zip(loops_2d, areas) if a >= threshold]
+
+
+# Plane clusters merge triangles whose offsets agree within ~0.05 mm (planes.py).
+# A "noise step" inside a cluster is a sub-millimeter z-discontinuity left behind
+# by a CAD/STL artifact (rounding in export, fillet collapse, etc.) — too small
+# to be a real feature. We treat anything within this distance as the same level.
+_NOISE_STEP_HEIGHT = 0.1
+
+
+def _filter_noise_step_loops(rings3d: list[list[Vec]],
+                              plane_normal: Vec, plane_d: float,
+                              max_step_height: float = _NOISE_STEP_HEIGHT,
+                              area_rel_tol: float = 1e-3,
+                              centroid_abs_tol: float = 0.1,
+                              exact_dup_z_tol: float = 1e-4) -> list[list[Vec]]:
+    """Detect and remove loops that come from a sub-mm step within a plane cluster.
+
+    Two boundary loops at slightly different plane offsets but identical 2D shape
+    + centroid trace the top and bottom of a tiny "step wall" inside an otherwise
+    flat surface — a mesh artifact, not a real perimeter. Such pairs (or larger
+    groups: triple steps, etc.) are dropped entirely.
+
+    Exact same-position duplicates (z-spread ≤ exact_dup_z_tol) are different:
+    one is kept (probably a degenerate mesh overlap). Groups whose z-spread
+    exceeds max_step_height are distinct features that happen to share an
+    outline — kept as-is.
+    """
+    if len(rings3d) < 2:
+        return rings3d
+
+    # In-plane tangent frame for projecting each loop to 2D for shape comparison.
+    n = vnorm(plane_normal)
+    if abs(n[2]) < 0.9:
+        ex = vnorm((-n[1], n[0], 0.0))
+    else:
+        ex = (1.0, 0.0, 0.0)
+    ey = vnorm(vcross(n, ex))
+
+    summaries: list[tuple[float, float, float, float]] = []
+    for ring in rings3d:
+        m = len(ring)
+        proj = [(vdot(v, ex), vdot(v, ey)) for v in ring]
+        a = abs(_signed_area(proj))
+        cx = sum(p[0] for p in proj) / m
+        cy = sum(p[1] for p in proj) / m
+        z_off = sum(vdot(v, n) for v in ring) / m - plane_d
+        summaries.append((a, cx, cy, z_off))
+
+    # Group loops by 2D shape (similar area + centroid).
+    group_of = [-1] * len(rings3d)
+    groups: list[list[int]] = []
+    for i in range(len(rings3d)):
+        a_i, cx_i, cy_i, _ = summaries[i]
+        for g_idx, group in enumerate(groups):
+            a_g, cx_g, cy_g, _ = summaries[group[0]]
+            same_area = abs(a_i - a_g) <= max(a_i, a_g) * area_rel_tol
+            same_centroid = (abs(cx_i - cx_g) <= centroid_abs_tol
+                             and abs(cy_i - cy_g) <= centroid_abs_tol)
+            if same_area and same_centroid:
+                group.append(i)
+                group_of[i] = g_idx
+                break
+        if group_of[i] == -1:
+            group_of[i] = len(groups)
+            groups.append([i])
+
+    # For each multi-member group, decide based on z-spread.
+    drop: set[int] = set()
+    for group in groups:
+        if len(group) < 2:
+            continue
+        z_offs = [summaries[i][3] for i in group]
+        spread = max(z_offs) - min(z_offs)
+        if spread <= exact_dup_z_tol:
+            # Exact duplicate — keep one (the first), drop the rest.
+            drop.update(group[1:])
+        elif spread <= max_step_height:
+            # Noise step (top + bottom of a sliver wall) — drop all members.
+            drop.update(group)
+        # else: distinct features happening to share shape — keep all.
+
+    return [r for i, r in enumerate(rings3d) if i not in drop]
 
 
 def _deduplicate_loops(loops_2d: list[list[Point2D]],
@@ -204,6 +286,7 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
     silhouettes: list[tuple[PlaneCluster, list[list[Point2D]]]] = []
     for p in cap_planes:
         rings3d = boundary_polygons(verts, faces, p.tris)
+        rings3d = _filter_noise_step_loops(rings3d, p.normal, p.d)
         raw2d = [[to_local(pt, origin3, ex0, ey0) for pt in ring3d] for ring3d in rings3d]
         raw2d = _deduplicate_loops(_filter_noise_loops(raw2d))
         loops2d: list[list[Point2D]] = []
@@ -234,6 +317,7 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
     new_silhouettes: list[tuple[PlaneCluster, list[list[Point2D]]]] = []
     for plane, _old in silhouettes:
         rings3d = boundary_polygons(verts, faces, plane.tris)
+        rings3d = _filter_noise_step_loops(rings3d, plane.normal, plane.d)
         raw2d = [[to_local(pt, new_origin, x_dir, y_dir) for pt in ring3d] for ring3d in rings3d]
         raw2d = _deduplicate_loops(_filter_noise_loops(raw2d))
         loops_new: list[list[Point2D]] = []
