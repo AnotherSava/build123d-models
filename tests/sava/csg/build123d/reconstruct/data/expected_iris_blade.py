@@ -39,4 +39,5 @@ blade.fuse(pivot_pin)
 # Place the blade into the source-mesh world frame.
 # Delete if object orientation and position are irrelevant.
 cross_section = Plane(origin=Vector(208.598, 193.608, 0), x_dir=Vector(0.731, 0.683, 0), z_dir=Vector(0.683, -0.731, 0))
-blade = SmartSolid(cross_section * blade.solid, label='blade')
+_parts = list(blade.solid) if hasattr(blade.solid, '__iter__') else [blade.solid]
+blade = SmartSolid(*(cross_section * s for s in _parts), label='blade')

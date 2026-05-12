@@ -67,6 +67,43 @@ def _filter_noise_loops(loops_2d: list[list[Point2D]]) -> list[list[Point2D]]:
     return [p for p, a in zip(loops_2d, areas) if a >= threshold]
 
 
+def _deduplicate_loops(loops_2d: list[list[Point2D]],
+                       area_rel_tol: float = 1e-4,
+                       centroid_abs_tol: float = 0.01) -> list[list[Point2D]]:
+    """Drop loops that are geometric duplicates of one already kept.
+
+    Coplanar caps occasionally carry the same boundary twice — e.g. when two
+    coplanar surfaces (a face and the floor of a flush inset) share an
+    outline. The duplicate confuses nesting classification (the second copy
+    looks "contained" in the first because they coincide), which flips the
+    cut/fuse parity for everything underneath it.
+
+    Two loops are considered the same when their signed-area magnitudes match
+    within a relative tolerance and their centroids coincide within an
+    absolute distance — same shape, same place.
+    """
+    if not loops_2d:
+        return loops_2d
+    out: list[list[Point2D]] = []
+    sigs: list[tuple[float, float, float]] = []
+    for poly in loops_2d:
+        a = abs(_signed_area(poly))
+        n = len(poly)
+        cx = sum(p[0] for p in poly) / n
+        cy = sum(p[1] for p in poly) / n
+        is_dup = False
+        for a2, cx2, cy2 in sigs:
+            if abs(a - a2) <= max(a, a2) * area_rel_tol and \
+               abs(cx - cx2) <= centroid_abs_tol and \
+               abs(cy - cy2) <= centroid_abs_tol:
+                is_dup = True
+                break
+        if not is_dup:
+            out.append(poly)
+            sigs.append((a, cx, cy))
+    return out
+
+
 def _point_in_polygon(point: Point2D, polygon: list[Point2D]) -> bool:
     """Ray-casting: True if `point` is strictly inside `polygon` (winding-agnostic)."""
     x, y = point
@@ -168,7 +205,7 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
     for p in cap_planes:
         rings3d = boundary_polygons(verts, faces, p.tris)
         raw2d = [[to_local(pt, origin3, ex0, ey0) for pt in ring3d] for ring3d in rings3d]
-        raw2d = _filter_noise_loops(raw2d)
+        raw2d = _deduplicate_loops(_filter_noise_loops(raw2d))
         loops2d: list[list[Point2D]] = []
         for poly2d in raw2d:
             poly2d = simplify_collinear(poly2d)
@@ -198,7 +235,7 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
     for plane, _old in silhouettes:
         rings3d = boundary_polygons(verts, faces, plane.tris)
         raw2d = [[to_local(pt, new_origin, x_dir, y_dir) for pt in ring3d] for ring3d in rings3d]
-        raw2d = _filter_noise_loops(raw2d)
+        raw2d = _deduplicate_loops(_filter_noise_loops(raw2d))
         loops_new: list[list[Point2D]] = []
         for poly_new in raw2d:
             poly_new = simplify_collinear(poly_new)
@@ -311,6 +348,75 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
     )
 
 
+def _depth_role_name(depth: int) -> str:
+    """Hierarchical loop-role label: outer | hole | island | deephole | deepisland ..."""
+    if depth == 0:
+        return 'outer'
+    if depth == 1:
+        return 'hole'
+    if depth == 2:
+        return 'island'
+    # Beyond depth 2, fall back to a generic name.
+    return f'deep{depth - 1}'
+
+
+def _emit_nested_loops(
+    code: list[str],
+    loops: list[list[Point2D]],
+    parents: list[int],
+    *,
+    thickness: float,
+    shift_z: float,
+    op_outer: str,
+    op_hole: str,
+    base_name: str,
+    blade_var: str,
+    preferred_start: Point2D | None,
+    skip_outer_emit: int | None = None,
+) -> None:
+    """Walk the nesting tree depth-first; emit each loop with alternating op.
+
+    op_outer applies at even depths (0, 2, ...), op_hole at odd depths (1, 3, ...).
+    Each loop is extruded `thickness` mm and moved `shift_z` in local z, then
+    combined into `blade_var` via .fuse/.cut.
+
+    `skip_outer_emit` is the loop index whose own emit should be skipped (used
+    for the body's first outer which is already emitted as the blade initializer);
+    its children are still walked.
+    """
+    children_of: dict[int, list[int]] = defaultdict(list)
+    for i, p in enumerate(parents):
+        if p != -1:
+            children_of[p].append(i)
+    outers = [i for i, p in enumerate(parents) if p == -1]
+
+    sibling_counter: dict[tuple[int, int], int] = {}
+
+    def visit(idx: int, depth: int, parent_name: str | None) -> None:
+        if depth == 0:
+            name = base_name if len(outers) == 1 else f'{base_name}_{outers.index(idx)}'
+        else:
+            role = _depth_role_name(depth)
+            key = (parents[idx], depth)
+            n = sibling_counter.get(key, 0)
+            sibling_counter[key] = n + 1
+            name = f'{parent_name}_{role}_{n}'
+        op = op_outer if depth % 2 == 0 else op_hole
+
+        if idx != skip_outer_emit:
+            code.extend(emit_pencil_for(loops[idx], name, preferred_start))
+            code.append(f'{name}_body = {name}.extrude({fmt(thickness)})')
+            if abs(shift_z) > 1e-9:
+                code.append(f'{name}_body.move(0, 0, {fmt(shift_z)})')
+            code.append(f'{blade_var}.{op}({name}_body)')
+
+        for ch in children_of[idx]:
+            visit(ch, depth + 1, name)
+
+    for o_idx in outers:
+        visit(o_idx, 0, None)
+
+
 def _emit_code(cross_origin: Vec, x_dir: Vec, y_dir: Vec, z_dir: Vec,
                datum_plane: PlaneCluster | None, datum_total: float,
                layers: list[Layer], cylinders: list[CylinderFeature],
@@ -357,42 +463,28 @@ def _emit_code(cross_origin: Vec, x_dir: Vec, y_dir: Vec, z_dir: Vec,
     if front is not None:
         parents = _classify_loops(front.loops)
         outers = [i for i, p in enumerate(parents) if p == -1]
-        children_of: dict[int, list[int]] = defaultdict(list)
-        for i, p in enumerate(parents):
-            if p != -1:
-                children_of[p].append(i)
         if outers:
             o0 = outers[0]
-            n_holes = len(children_of[o0])
+            children_of_o0 = sum(1 for p in parents if p == o0)
             descriptor = (f'front-cap silhouette, the {len(front.loops[o0])}-gon'
-                          if n_holes == 0 and len(outers) == 1
+                          if children_of_o0 == 0 and len(outers) == 1
                           else f'front-cap outer silhouette, '
                                f'the {len(front.loops[o0])}-gon outline')
             code.append(f'# Main body ({descriptor})')
+            # Emit the first outer manually as the blade initializer; its
+            # children + any extra outers are then emitted by the recursive
+            # walker with skip_outer_emit set so we don't re-emit o0 itself.
             code.extend(emit_pencil_for(front.loops[o0], 'body', preferred_start))
             code.append(f'blade = body.extrude({fmt(body_thickness)})')
+            _emit_nested_loops(
+                code, front.loops, parents,
+                thickness=body_thickness, shift_z=0.0,
+                op_outer='fuse', op_hole='cut',
+                base_name='body', blade_var='blade',
+                preferred_start=preferred_start,
+                skip_outer_emit=o0,
+            )
             code.append('')
-            # Holes inside the first outer become through-cuts the full body height.
-            for hk, h_idx in enumerate(children_of[o0]):
-                hname = f'body_hole_{hk}'
-                code.append(f'# Through-hole from front cap ({len(front.loops[h_idx])} pts)')
-                code.extend(emit_pencil_for(front.loops[h_idx], hname, preferred_start))
-                code.append(f'{hname}_body = {hname}.extrude({fmt(body_thickness)})')
-                code.append(f'blade.cut({hname}_body)')
-                code.append('')
-            # Any further top-level outers on the front cap (rare): fuse with their holes.
-            for ek, o_idx in enumerate(outers[1:], start=1):
-                ename = f'body_region_{ek}'
-                code.append(f'# Additional disjoint body region on front cap')
-                code.extend(emit_pencil_for(front.loops[o_idx], ename, preferred_start))
-                code.append(f'{ename}_body = {ename}.extrude({fmt(body_thickness)})')
-                code.append(f'blade.fuse({ename}_body)')
-                for hk, h_idx in enumerate(children_of[o_idx]):
-                    hname = f'{ename}_hole_{hk}'
-                    code.extend(emit_pencil_for(front.loops[h_idx], hname, preferred_start))
-                    code.append(f'{hname}_body = {hname}.extrude({fmt(body_thickness)})')
-                    code.append(f'blade.cut({hname}_body)')
-                code.append('')
 
     for L in layers:
         if L.name in ('front', 'back'):
@@ -420,25 +512,14 @@ def _emit_code(cross_origin: Vec, x_dir: Vec, y_dir: Vec, z_dir: Vec,
             op_hole = 'fuse'
 
         parents = _classify_loops(L.loops)
-        outers = [i for i, p in enumerate(parents) if p == -1]
-        children_of = defaultdict(list)
-        for i, p in enumerate(parents):
-            if p != -1:
-                children_of[p].append(i)
-
         code.append(comment_head)
-        for k, o_idx in enumerate(outers):
-            base_name = L.name if len(outers) == 1 else f'{L.name}_{k}'
-            code.extend(emit_pencil_for(L.loops[o_idx], base_name, preferred_start))
-            code.append(f'{base_name}_body = {base_name}.extrude({fmt(thickness)})')
-            code.append(f'{base_name}_body.move(0, 0, {fmt(shift_z)})')
-            code.append(f'blade.{op_outer}({base_name}_body)')
-            for hk, h_idx in enumerate(children_of[o_idx]):
-                hname = f'{base_name}_hole_{hk}'
-                code.extend(emit_pencil_for(L.loops[h_idx], hname, preferred_start))
-                code.append(f'{hname}_body = {hname}.extrude({fmt(thickness)})')
-                code.append(f'{hname}_body.move(0, 0, {fmt(shift_z)})')
-                code.append(f'blade.{op_hole}({hname}_body)')
+        _emit_nested_loops(
+            code, L.loops, parents,
+            thickness=thickness, shift_z=shift_z,
+            op_outer=op_outer, op_hole=op_hole,
+            base_name=L.name, blade_var='blade',
+            preferred_start=preferred_start,
+        )
         code.append('')
 
     for i, c in enumerate(cylinders):
@@ -460,5 +541,9 @@ def _emit_code(cross_origin: Vec, x_dir: Vec, y_dir: Vec, z_dir: Vec,
         f'x_dir=Vector({fmt(x_dir[0])}, {fmt(x_dir[1])}, {fmt(x_dir[2])}), '
         f'z_dir=Vector({fmt(z_dir[0])}, {fmt(z_dir[1])}, {fmt(z_dir[2])}))'
     )
-    code.append('blade = SmartSolid(cross_section * blade.solid, label=\'blade\')')
+    # blade.solid may be a single Solid or a ShapeList (when nested cut/fuse
+    # ops produced disconnected pieces — e.g. an island in a through-hole).
+    # SmartSolid's variadic constructor fuses all parts back into one shape.
+    code.append('_parts = list(blade.solid) if hasattr(blade.solid, \'__iter__\') else [blade.solid]')
+    code.append('blade = SmartSolid(*(cross_section * s for s in _parts), label=\'blade\')')
     return '\n'.join(code).rstrip() + '\n'
