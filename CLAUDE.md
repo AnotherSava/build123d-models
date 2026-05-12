@@ -173,7 +173,7 @@ When building models, prefer the project's high-level classes (SmartBox, Smarter
 
 Use `.align()` and alignment operations (`align_x`, `align_y`, `align_z`) for positioning objects relative to each other. Avoid manual coordinate math — the alignment system handles bounding-box-relative positioning cleanly. See `docs/code/smartsolid.md` for full alignment documentation.
 
-## Code Style Guidelines
+## Code Style
 
 ### Model Dimensions
 
@@ -189,29 +189,6 @@ class MyModelDimensions:
 def make_my_model(dim: MyModelDimensions):
     base = Box(dim.length, dim.width, dim.height)
 ```
-
-### Type Hints
-
-Always specify parameter and return types:
-
-```python
-def calculate_distance(point1: Vector, point2: Vector) -> float:
-    return (point2 - point1).length
-
-def create_boxes(count: int, size: float = 1.0) -> list[Box]:
-    return [Box(size, size, size) for _ in range(count)]
-```
-
-### Import Organization
-
-Always place imports at the top of the file unless there is a specific reason not to (such as circular dependencies). Order (with blank lines between groups):
-1. Standard library (`import os`, `from typing import List`)
-2. Third-party (`from build123d import Vector, Plane, Box`)
-3. Local (`from sava.common.common import flatten`)
-
-Inline imports are only allowed for:
-- Circular import resolution (add comment: `# inline to avoid circular import`)
-- Type checking only (`if TYPE_CHECKING:` block)
 
 ### Testing
 
@@ -229,64 +206,12 @@ def test_flatten(input, expected):
     assert list(flatten(input)) == expected
 ```
 
-### Refactoring Safety
+### Refactoring
 
-- When changing field/function names, check all usages (including tests) and update accordingly
-- Use search tools to find all references before making breaking changes
-- Run all tests after refactoring
 - After modifying code, update any related documentation in `docs/code/`, comments, and docstrings to stay in sync
-- **Backwards compatibility**: Don't worry too much about maintaining backwards compatibility for internal APIs. As long as you check all usages in the codebase (using Grep/search tools) and update them, breaking changes are fine. This is a personal project, not a public library.
+- **Backwards compatibility**: Don't worry about maintaining backwards compatibility for internal APIs. As long as you check all usages and update them, breaking changes are fine. This is a personal project, not a public library.
 
 ### Git Workflow
 
-- **IMPORTANT**: Do not create git commits unless explicitly asked by the user
 - When the user requests commits, group related changes into logical, focused commits with clear messages
 - Put model file (.stl and .3mf) changes into the same commit as the code changes for that model
-- Never mention "Claude Code" or AI assistance in commit messages
-- Do not push to remote unless explicitly requested
-
-### Windows Bash Commands
-
-When running commands via Bash on Windows, always use forward slashes (`/`) in paths, not backslashes (`\`). Backslashes are interpreted as escape characters by bash and get stripped.
-
-```bash
-# Good
-cd D:/projects/3d/build123d-models && ./venv/Scripts/python.exe -m pytest tests/
-
-# Bad - backslashes will be stripped
-D:\projects\3d\build123d-models\venv\Scripts\python.exe -m pytest tests/
-```
-
-### Formatting
-
-- Leave an empty line at the end of every file
-- Prefer single-line expressions over multi-line formatting. Keep expressions on one line even if they're long, rather than breaking them across multiple lines with parentheses.
-  ```python
-  # Good
-  radius_at_bottom = self.dim.outer_radius_top * (1 - z_param_bottom) + self.dim.outer_radius_bottom * z_param_bottom
-
-  # Avoid
-  radius_at_bottom = (
-      self.dim.outer_radius_top * (1 - z_param_bottom) +
-      self.dim.outer_radius_bottom * z_param_bottom
-  )
-  ```
-
-  **Exception**: Multi-line formatting is acceptable when creating objects or calling functions with all parameters as named parameters:
-  ```python
-  # Acceptable
-  thread = IsoThread(
-      major_diameter=major_diameter,
-      pitch=pitch,
-      length=height,
-      external=False,
-      end_finishes=("chamfer", "fade")
-  )
-
-  # Also acceptable for single-line if not too long
-  thread = IsoThread(major_diameter=major_diameter, pitch=pitch, length=height, external=False, end_finishes=("chamfer", "fade"))
-  ```
-
-### Early Returns
-
-Avoid adding early return guards like `if not items: return` when the function would behave identically without them (e.g., a `for` loop over an empty collection naturally does nothing). Only add early returns when they actually change behavior or prevent errors.
