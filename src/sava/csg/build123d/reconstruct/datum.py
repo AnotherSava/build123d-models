@@ -1,7 +1,7 @@
 import math
 
 from ._vec import Vec, vsub, vdot, vcross, vnorm
-from .boundary import boundary_polygon
+from .boundary import boundary_polygons
 from .planes import PlaneCluster
 
 Face = tuple[int, int, int]
@@ -37,14 +37,14 @@ def pick_datum(side_planes: list[PlaneCluster]) -> PlaneCluster:
 
 
 def build_datum_frame(extrusion_axis: Vec, datum: PlaneCluster,
-                      silhouettes: list[tuple[PlaneCluster, list[Point2D]]],
+                      silhouettes: list[tuple[PlaneCluster, list[list[Point2D]]]],
                       origin3_provisional: Vec, ex0: Vec, ey0: Vec) -> tuple[Vec, Vec, Vec]:
     datum_normal = vnorm(datum.normal)
     datum_line = plane_line_in_xs(datum, origin3_provisional, ex0, ey0)
-    total_pts = sum(len(poly) for _, poly in silhouettes)
+    total_pts = sum(len(loop) for _, loops in silhouettes for loop in loops)
     if total_pts > 0:
-        cx = sum(p[0] for _, poly in silhouettes for p in poly) / total_pts
-        cy = sum(p[1] for _, poly in silhouettes for p in poly) / total_pts
+        cx = sum(p[0] for _, loops in silhouettes for loop in loops for p in loop) / total_pts
+        cy = sum(p[1] for _, loops in silhouettes for loop in loops for p in loop) / total_pts
         a, b, c = datum_line
         centroid_signed = a * cx + b * cy - c
         if centroid_signed < 0:
@@ -58,8 +58,8 @@ def shift_origin_to_first_quadrant(verts: list[Vec], faces: list[Face],
     min_u = float('inf')
     min_v = float('inf')
     for plane in cap_planes:
-        ring3d_raw = boundary_polygon(verts, faces, plane.tris)
-        for pt in ring3d_raw:
-            min_u = min(min_u, vdot(pt, x_dir))
-            min_v = min(min_v, vdot(pt, y_dir))
+        for ring3d in boundary_polygons(verts, faces, plane.tris):
+            for pt in ring3d:
+                min_u = min(min_u, vdot(pt, x_dir))
+                min_v = min(min_v, vdot(pt, y_dir))
     return tuple(x_dir[i] * min_u + y_dir[i] * min_v for i in range(3))

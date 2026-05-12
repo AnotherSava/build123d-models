@@ -7,7 +7,15 @@ Face = tuple[int, int, int]
 Point2D = tuple[float, float]
 
 
-def boundary_polygon(verts: list[Vec], faces: list[Face], tri_indices: list[int]) -> list[Vec]:
+def boundary_polygons(verts: list[Vec], faces: list[Face], tri_indices: list[int]) -> list[list[Vec]]:
+    """All boundary loops of a planar face set, each as an ordered 3D vertex list.
+
+    A planar cap on a manifold mesh can have multiple boundary loops: one outer
+    perimeter plus one inner loop per hole/cutout. Each boundary edge is shared
+    by exactly one triangle, so its direction is well-defined; we walk those
+    directed edges loop by loop until none remain. Outer loops come out CCW
+    (positive shoelace area); holes come out CW (negative).
+    """
     edge_count: dict = defaultdict(int)
     edge_to_tri: dict = {}
     for ti in tri_indices:
@@ -21,32 +29,50 @@ def boundary_polygon(verts: list[Vec], faces: list[Face], tri_indices: list[int]
     if not boundary_edges:
         return []
 
-    directed = []
+    adj: dict = defaultdict(list)
     for key in boundary_edges:
         _ti, u, v = edge_to_tri[key][0]
-        directed.append((u, v))
-
-    adj: dict = defaultdict(list)
-    for u, v in directed:
         adj[u].append(v)
 
-    if not adj:
-        return []
-    start = next(iter(adj))
-    ring = [start]
-    cur = start
+    loops: list[list[Vec]] = []
+    safety_limit = len(boundary_edges) + 5
     while True:
-        if not adj[cur]:
+        start = None
+        for u, nbrs in adj.items():
+            if nbrs:
+                start = u
+                break
+        if start is None:
             break
-        nxt = adj[cur].pop()
-        if nxt == start:
-            break
-        ring.append(nxt)
-        cur = nxt
-        if len(ring) > len(boundary_edges) + 5:
-            break
+        ring = [start]
+        cur = start
+        steps = 0
+        while True:
+            if not adj.get(cur):
+                break
+            nxt = adj[cur].pop()
+            if nxt == start:
+                break
+            ring.append(nxt)
+            cur = nxt
+            steps += 1
+            if steps > safety_limit:
+                break
+        if len(ring) >= 3:
+            loops.append([verts[i] for i in ring])
+    return loops
 
-    return [verts[i] for i in ring]
+
+def boundary_polygon(verts: list[Vec], faces: list[Face], tri_indices: list[int]) -> list[Vec]:
+    """Single boundary loop of a planar face set — the largest, by vertex count.
+
+    Thin compatibility shim over `boundary_polygons` for callers that only
+    need one loop. Prefer `boundary_polygons` for new code.
+    """
+    loops = boundary_polygons(verts, faces, tri_indices)
+    if not loops:
+        return []
+    return max(loops, key=len)
 
 
 def simplify_collinear(poly2d: list[Point2D], perp_tol: float = 0.05) -> list[Point2D]:
@@ -59,7 +85,7 @@ def simplify_collinear(poly2d: list[Point2D], perp_tol: float = 0.05) -> list[Po
         out: list[Point2D] = []
         n = len(poly)
         i = 0
-        while i < n:
+        for _ in range(n):
             a = poly[(i - 1) % n]
             b = poly[i]
             c = poly[(i + 1) % n]
@@ -77,5 +103,10 @@ def simplify_collinear(poly2d: list[Point2D], perp_tol: float = 0.05) -> list[Po
             else:
                 out.append(b)
             i += 1
+        # Collapsing every point in a pass means the boundary is densely curved
+        # (a tessellated circle, not a polygon with collinear runs). Keep the
+        # pre-pass polygon — circle detection will handle it downstream.
+        if len(out) < 3:
+            return poly
         poly = out
     return poly
