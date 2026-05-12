@@ -124,22 +124,29 @@ Detection heuristic:
 
 Alternatively, if RANSAC output is available, use its cylinder fits directly — they're more accurate.
 
-### 9. Code emission — `pencil_emit.emit(frame, layers, cylinders)`
+### 9. Code emission — `api.py::_emit_code` + `pencil_emit.emit_pencil_for`
 
-For each silhouette layer (sorted by depth):
-- Pick start vertex (typically the leftmost-bottommost).
-- Emit Pencil strokes:
-  - `right(dx)` / `left(-dx)` if `|dy| < 1e-3`
-  - `up(dy)` / `down(-dy)` if `|dx| < 1e-3`
-  - `draw(length, angle)` otherwise
-- Rely on `create_face(enclose=True)` to auto-close back to (0, 0) — exploit this to save one stroke.
-- `.extrude(thickness)` where `thickness = depth_top - depth_bottom`.
+**Layer classification.** Non-body caps are tagged by their depth relative to the body's z-range `[min(back_depth, front_depth), max(...)]`:
+- depth **below** that range → `back_protrusion` (fused below the body)
+- depth **above** that range → `front_protrusion` (fused above the body)
+- depth **inside** that range → `pocket` (cut from the body)
 
-For each cylinder: `Cylinder(radius=R, height=H)` positioned via `Pos()` and rotated via `Rot()`.
+A cylinder feature replaces the polygon emit for the `front_protrusion` layer when its silhouette is roughly circular; its `base` is the centroid of the base face in cross-section local `(u, v, z)` coords (`api.py::_polygon_centroid` via shoelace formula).
 
-Compose: `body = main_layer + protrusion - recess + cylinders`.
+**Shared anchor.** Before emit, the cross-section origin is shifted onto the vertex shared by the most emit-eligible polygons (`find_shared_start`, ties broken by leftmost-bottommost). After the shift, that vertex is at local `(0, 0)`, so every `Pencil` opens with bare `Pencil()` and drops `start=`.
 
-Apply `numbers.fmt()` to every numeric literal:
+**Build in default `Plane.XY`.** All Pencil ops, extrudes, moves, and `SmarterCone.cylinder(r, h)` run in clean local coords. A single optional `cross_section` Plane transform at the end places the blade in the source-mesh world frame; deleting that block keeps the blade local-frame.
+
+**Pencil strokes** (per silhouette, after CW polygons are reversed to CCW so `extrude(+h)` lands in `+z_dir`):
+- `right(dx)` / `left(-dx)` when `|dy| < 1e-3`; `up(dy)` / `down(-dy)` when `|dx| < 1e-3`. The argument is **omitted** when the destination lands on the local-anchor axis (`right()` / `down()` snaps to 0).
+- Otherwise compute `angle = degrees(atan2(-dx, dy))` (matches `Pencil.draw`'s CCW-from-+Y convention). If it snaps to a multiple of 15° within 0.05°, emit `draw(length, angle)`; else emit `jump((dx, dy))` — `jump` is more readable than a `draw` with an ugly angle.
+- Auto-close on `extrude` handles the final edge.
+
+**Cylinder placement.** `SmarterCone.cylinder(r, h)` (defaults to `Plane.XY`, base at origin) followed by `.move(cu, cv, cz)` — `cz` is the base z, not the center, matching `CylinderFeature.base`.
+
+**Composition.** `.fuse()` for protrusions and cylinders, `.cut()` for pockets. (Don't emit `+` / `-` — `SmartSolid` doesn't define those operators.)
+
+**Number formatting.** Apply `numbers.fmt()` to every literal:
 - Snap `|x| < 0.0005` to `0`
 - Strip trailing zeros (`3.000` → `3`)
 - Drop unsigned `+` prefix
@@ -160,8 +167,9 @@ The reference test is the iris blade (`obj_1_Diaf 3.stl`, 162 vertices, 320 tria
 - 9 significant planes detected (4 caps + 6 side walls of which 5 are flat, 1 is the floor)
 - Extrusion axis: `(+0.683, -0.731, 0)` within ±0.001
 - Datum: the floor (normal = world Z), area 74.87 mm²
-- 4 depth layers at `−0.611, +0.889, +3.889, +7.889`
-- 1 cylinder detected at `(205.22, 191.67, ~)` with axis = extrusion axis, radius ~1.82
-- Reconstruction: 6-stroke main silhouette + 3-stroke recess + 1 Cylinder primitive
+- 4 depth layers at `−0.611, +0.889, +3.889, +7.889` named `back_protrusion`, `back`, `front`, `front_protrusion` (the last replaced by the cylinder primitive)
+- 1 cylinder: `r ≈ 1.8`, `h = 4`, base at cross-section-local `(-3.78, 1.70, 3)` after the shared-anchor shift
+- Emitted code: 5-stroke body (jump + draw + left + draw + down) + 3-stroke back protrusion (jump + left + down) + 1 `SmarterCone.cylinder` primitive + an optional `cross_section` Plane transform that places everything back in the source-mesh world frame
+- `exec()`ing the emitted code reproduces the source mesh's bbox `(18.9 × 17.5 × 26.5 mm)` and volume `~1125 mm³`
 
 Run `python -m pytest tests/sava/csg/build123d/reconstruct/` to validate end-to-end.

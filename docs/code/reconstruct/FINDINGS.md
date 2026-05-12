@@ -8,20 +8,11 @@ The actual mesh `obj_1_Diaf 3.stl` (162 vertices, 320 triangles, bbox 18.9 × 17
 
 Aspect ratio along the part's own axes: **3 × 22 × 26.5 mm** (thickness × length × height). This is what an iris diaphragm blade actually looks like: a thin, tall, broadly-triangular petal that pivots around a pin at its base.
 
-### iris.py defaults are stale
+### iris.py has been rewritten from this reconstruction (RESOLVED)
 
-The `IrisDimensions` dataclass in `src/sava/csg/build123d/models/other/iris.py` defines defaults that **do not match the STL**:
+Historical: an earlier version of `IrisDimensions` had tapered-loft defaults (`body_base_length: 13.0`, `body_base_width: 14.0`) that did not match the source STL, derived from a projection artifact of the tilted blade.
 
-```python
-body_base_length: float = 13.0   # X size at base
-body_base_width: float = 14.0    # Y size at base
-```
-
-A 13 × 14 base produces a chunky tapered wedge of volume ~1969 mm³. The actual body is closer to a 3 × 22 mm cross-section of volume ~1100 mm³ (which the docstring acknowledges as the measured value).
-
-The docstring's own claim — "a roughly 5×5 mm column at the base that tapers to ~2.5×2.5 mm at the top" — was derived from looking at vertices in world XY at low Z, which projects the **tilted, thin blade** into a ~5×5 footprint. That's a projection artifact, not the actual cross-section. The blade has no "column"; it's flat.
-
-**Action item**: rewrite iris.py to reproduce the actual STL via Pencil-extrude rather than tapered loft. The reconstructed `blade_datum_aligned.py` (in this transfer package) is a starting point.
+`src/sava/csg/build123d/models/other/iris.py` has since been rewritten to mirror the reconstruction emit directly — three stacked Pencil-extruded layers (back protrusion + body + pivot pin) built in default `Plane.XY`, translated to put the pivot at `(pcd_radius, 0)`. Blade volume now matches the source mesh (~1155 mm³).
 
 ## The 2.5D property is mathematically exact, not approximate
 
@@ -45,7 +36,7 @@ SIDE-WALL faces (∥ to extrusion axis):
 OTHER: 0
 ```
 
-The blade is a true 2.5D stepped extrusion. The structure has four cap depths (`−0.611, +0.889, +3.889, +7.889`) and three thickness layers: a 1.5 mm recess on the back, a 3 mm main body, and a 4 mm pivot protrusion on the front.
+The blade is a true 2.5D stepped extrusion. The structure has four cap depths (`−0.611, +0.889, +3.889, +7.889`) and three thickness layers: a 1.5 mm **back protrusion** (a small strip extending behind the body's back face — *not* a pocket cut into the body), a 3 mm main body, and a 4 mm pivot protrusion on the front. The algorithm names them `back_protrusion` / `front_protrusion` and fuses them rather than subtracting; the older "recess" name was misleading.
 
 This property is detectable with a single dot-product test. Once detected, the entire reconstruction is mechanical.
 
