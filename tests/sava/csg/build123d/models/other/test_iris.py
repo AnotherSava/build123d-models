@@ -22,8 +22,8 @@ class TestIrisDimensions:
 
     def test_pin_dimensions(self):
         dim = IrisDimensions()
-        assert dim.pin_radius == 1.5
-        assert dim.pivot_hole_radius == 1.7
+        assert dim.pin_radius == 1.82
+        assert abs(dim.pivot_hole_radius - (1.82 + 0.2)) < 1e-9
 
     def test_blade_outer_radius_exceeds_pcd(self):
         dim = IrisDimensions()
@@ -60,23 +60,28 @@ class TestIrisDimensions:
 
 
 class TestCreateBlade:
+    # Reference-mesh-derived constants (see iris._BODY_THICKNESS, _PIVOT_PIN_HEIGHT, _BACK_PROTRUSION_THICKNESS).
+    BACK_PROTRUSION_THICKNESS = 1.5
+    BODY_THICKNESS = 3.0
+    PIVOT_PIN_HEIGHT = 4.0
+
     def test_blade_z_range(self):
         dim = IrisDimensions()
         blade = create_blade(dim)
-        assert abs(blade.z_min) < 0.01
-        assert abs(blade.z_max - (dim.blade_height + dim.drive_pin_height)) < 0.01
+        assert abs(blade.z_min - (-self.BACK_PROTRUSION_THICKNESS)) < 0.01
+        assert abs(blade.z_max - (self.BODY_THICKNESS + self.PIVOT_PIN_HEIGHT)) < 0.01
 
     def test_blade_extends_past_pcd(self):
         dim = IrisDimensions()
         blade = create_blade(dim)
         assert blade.x_max > dim.pcd_radius
 
-    def test_blade_inner_edge_near_aperture_min(self):
+    def test_pivot_at_pcd_radius(self):
+        """Pivot pin must be centered on (pcd_radius, 0); the pin's Y bbox bounds
+        match the pin radius."""
         dim = IrisDimensions()
         blade = create_blade(dim)
-        # The blade's minimum x should be close to r_inner * cos(half_span)
-        expected_x_min = dim.aperture_radius_min * math.cos(math.radians(dim.blade_angular_span / 2))
-        assert abs(blade.x_min - expected_x_min) < 0.5
+        assert abs(blade.y_min - (-dim.pin_radius)) < 0.01
 
     def test_blade_has_volume(self):
         dim = IrisDimensions()

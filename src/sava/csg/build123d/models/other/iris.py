@@ -1,11 +1,33 @@
 import math
 from dataclasses import dataclass
 
-from build123d import Cylinder
-
-from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
+from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
+
+
+# Geometry constants derived from the reference STL `tmp/diaframma/obj_1_Diaf 3.stl`,
+# reconstructed via `sava.csg.build123d.reconstruct` (see `docs/code/reconstruct/`).
+# The blade is a 2.5D stepped extrusion with three stacked layers along +Z:
+#   - 1.5 mm back protrusion (small strip behind the body's back face)
+#   - 3 mm main body
+#   - 4 mm cylindrical pivot pin extending forward from the body's front face
+# The pencil paths in `create_blade` are anchored so the shared body/back-protrusion
+# vertex on the datum line sits at local (0, 0); the pivot pin centroid lives at
+# (_PIVOT_U, _PIVOT_V) in that same frame.
+_BODY_THICKNESS = 3.0
+_BACK_PROTRUSION_THICKNESS = 1.5
+_PIVOT_PIN_RADIUS = 1.82
+_PIVOT_PIN_HEIGHT = 4.0
+_PIVOT_U = -3.776
+_PIVOT_V = 1.701
+
+# Maximum distance from the pivot to any body silhouette vertex (mm).
+# Derived from the source mesh; reaches the tip of the petal at (-3.513, 26.500).
+_BODY_MAX_FROM_PIVOT = 24.80
+
+# Total blade Z extent: back protrusion + body + pivot pin.
+_BLADE_HEIGHT = _BACK_PROTRUSION_THICKNESS + _BODY_THICKNESS + _PIVOT_PIN_HEIGHT
 
 
 def _polar(radius: float, angle_deg: float) -> tuple[float, float]:
@@ -19,10 +41,10 @@ class IrisDimensions:
     blade_count: int = 5
     aperture_diameter_min: float = 25.0
     aperture_diameter_max: float = 35.0
-    pin_diameter: float = 3.0
+    pin_diameter: float = _PIVOT_PIN_RADIUS * 2
     pin_clearance: float = 0.2
-    blade_height: float = 20.0
-    blade_thickness: float = 2.0
+    blade_height: float = _BLADE_HEIGHT
+    blade_thickness: float = _BODY_THICKNESS
     pcd_radius: float = 30.0
     drive_pin_offset: float = 5.0
     drive_pin_height: float = 3.0
@@ -50,17 +72,12 @@ class IrisDimensions:
 
     @property
     def blade_outer_radius(self) -> float:
-        """Outer radius of blade profile — extends past pivot to contain the pivot hole."""
-        return self.pcd_radius + self.pin_diameter + 1.0
+        """Max radial extent of the blade body from the iris center, in mm."""
+        return self.pcd_radius + _BODY_MAX_FROM_PIVOT
 
     @property
     def rotation_range(self) -> float:
-        """Rotation angle in degrees from closed (min aperture) to fully open (max aperture).
-
-        Derived from the geometry: the inner edge midpoint is at distance lever_arm from the pivot.
-        Rotating by this angle moves the midpoint from aperture_radius_min to aperture_radius_max
-        distance from the iris center.
-        """
+        """Rotation angle in degrees from closed (min aperture) to fully open (max aperture)."""
         lever = self.pcd_radius - self.aperture_radius_min
         cos_delta = (self.pcd_radius ** 2 + lever ** 2 - self.aperture_radius_max ** 2) / (2 * self.pcd_radius * lever)
         return math.degrees(math.acos(max(-1.0, min(1.0, cos_delta))))
@@ -77,51 +94,42 @@ class IrisDimensions:
 
 
 def create_blade(dim: IrisDimensions) -> SmartSolid:
-    """Create a single iris blade in closed position, centered on angle 0.
+    """Create a single iris blade with its pivot pin axis at (pcd_radius, 0, 0) along +Z.
 
-    The blade is an arc sector with inner edge at aperture_radius_min,
-    outer edge beyond pcd_radius. Pivot hole at pcd_radius on angle 0.
-    Drive pin on top surface, offset inward from pivot.
+    The petal silhouette, back protrusion, and pivot pin geometry are reconstructed
+    from the reference STL via `sava.csg.build123d.reconstruct`. Only the placement
+    (pcd_radius) is parametric; the blade shape itself is fixed by the source mesh.
+
+    The blade is assembled in default Plane.XY local coords, then translated so the
+    pivot pin lands at (pcd_radius, 0) in world XY. Final Z layout:
+    - Back protrusion: Z in [-_BACK_PROTRUSION_THICKNESS, 0].
+    - Main body:       Z in [0, _BODY_THICKNESS].
+    - Pivot pin:       Z in [_BODY_THICKNESS, _BODY_THICKNESS + _PIVOT_PIN_HEIGHT].
     """
-    half_span = dim.blade_angular_span / 2
-    r_inner = dim.aperture_radius_min
-    r_outer = dim.blade_outer_radius
+    # Main body (front-cap silhouette, the 6-gon)
+    body = Pencil()
+    body.jump((6.858, 8.536))
+    body.draw(20.743, 30)
+    body.left(0.577)
+    body.draw(23.094, 150)
+    body.down()
+    blade = body.extrude(_BODY_THICKNESS, label='blade')
 
-    # Profile vertices in global coords
-    a = _polar(r_inner, -half_span)
-    b = _polar(r_inner, half_span)
-    c = _polar(r_outer, half_span)
-    d = _polar(r_outer, -half_span)
-    inner_mid = _polar(r_inner, 0)
-    outer_mid = _polar(r_outer, 0)
+    # Back protrusion (thin strip behind the body's back face)
+    back_protrusion = Pencil()
+    back_protrusion.jump((1.366, 1.7))
+    back_protrusion.left(16.167)
+    back_protrusion.down()
+    back_protrusion_body = back_protrusion.extrude(_BACK_PROTRUSION_THICKNESS)
+    back_protrusion_body.move(0, 0, -_BACK_PROTRUSION_THICKNESS)
+    blade.fuse(back_protrusion_body)
 
-    # Use start=a so local (0,0) maps to vertex a in global coords.
-    # Auto-close returns to local (0,0) = vertex a.
-    pencil = Pencil(start=a)
+    # Cylindrical pivot pin standing on the body's front face
+    pivot_pin = SmarterCone.cylinder(_PIVOT_PIN_RADIUS, _PIVOT_PIN_HEIGHT)
+    pivot_pin.move(_PIVOT_U, _PIVOT_V, _BODY_THICKNESS)
+    blade.fuse(pivot_pin)
 
-    def local(pt: tuple[float, float]) -> tuple[float, float]:
-        return (pt[0] - a[0], pt[1] - a[1])
-
-    pencil.jump_to(local(d))
-    pencil.arc_abs(local(outer_mid), local(c))
-    pencil.jump_to(local(b))
-    pencil.arc_abs(local(inner_mid), (0, 0))
-
-    blade = pencil.extrude(dim.blade_height, label="blade")
-
-    # Cut pivot hole through the full blade height
-    pivot_xy = _polar(dim.pcd_radius, 0)
-    pivot_hole = SmartSolid(Cylinder(dim.pivot_hole_radius, dim.blade_height + 2))
-    pivot_hole.move(pivot_xy[0], pivot_xy[1], 0)
-    pivot_hole.align_z(blade, Alignment.C)
-    blade.cut(pivot_hole)
-
-    # Add drive pin protruding from top surface
-    drive_pin = SmartSolid(Cylinder(dim.pin_radius, dim.drive_pin_height))
-    drive_pin.move(dim.drive_pin_radius_from_center, 0, 0)
-    drive_pin.align_z(blade, Alignment.RR)
-    blade.fuse(drive_pin)
-
+    blade.move(dim.pcd_radius - _PIVOT_U, -_PIVOT_V, 0)
     return blade
 
 
