@@ -7,8 +7,9 @@
 # blade back into the source-mesh world frame. Drop that transform to use
 # the blade as a clean, axis-aligned local-frame component.
 
-from build123d import Plane, Vector
+from build123d import Axis, Plane, Vector
 from sava.csg.build123d.common.pencil import Pencil
+from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -30,11 +31,10 @@ back_protrusion_body = back_protrusion.extrude(1.5)
 back_protrusion_body.move(0, 0, -1.5)
 blade.fuse(back_protrusion_body)
 
-# Cylinder (r=1.799, h=4, area=10.17 mm²)
-# Oriented along the extrusion axis, positioned at the layer centroid.
-pivot_pin = SmarterCone.cylinder(1.799, 4)
-pivot_pin.move(-3.776, 1.701, 3)
-blade.fuse(pivot_pin)
+# Front protrusion (depth 3.889 → 7.889, 4 mm), fused above the body
+front_protrusion = SmarterCone.cylinder(1.815, 4)
+front_protrusion.move(-3.776, 1.701, 3)
+blade.fuse(front_protrusion)
 
 # Place the blade into the source-mesh world frame.
 # Delete if object orientation and position are irrelevant.

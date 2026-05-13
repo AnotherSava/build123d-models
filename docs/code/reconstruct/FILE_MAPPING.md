@@ -13,7 +13,7 @@ Module structure to create (rename + light refactor as part of the move):
 | `stl_to_off.py` | folded into `mesh_io.py::read_stl()` | The conversion step was an artifact of feeding InverseCSG's pipeline. Direct STL reading is simpler. |
 | `plane_to_pencil.py` (boundary + simplify) | `src/sava/csg/build123d/reconstruct/boundary.py` | The `boundary_polygon()` + `simplify_collinear()` parts. |
 | `plane_to_pencil.py` (Pencil emission) | `src/sava/csg/build123d/reconstruct/pencil_emit.py` | The `emit_pencil()`, `emit_plane()`, and `fmt()` parts. Or split `fmt()` into `numbers.py` if you prefer a tiny dedicated module. |
-| `extrusion_view.py` (`classify_planes_vs_axis`, `pick_axis`) | `src/sava/csg/build123d/reconstruct/extrusion.py` | The classification + axis-pick logic. Cylinder detection is currently a basic area-derived heuristic (radius from cap area); a richer detector is a TODO. |
+| `extrusion_view.py` (`classify_planes_vs_axis`, `pick_axis`) | `src/sava/csg/build123d/reconstruct/extrusion.py` | The classification + axis-pick logic. Per-loop cylinder detection lives in `api.py::_detect_circle` and runs during emit on every layer's loops. |
 | `find_datum_and_repencil.py` (datum picking, frame construction) | `src/sava/csg/build123d/reconstruct/datum.py` | The `plane_line_in_xs()`, `pick_datum()`, frame-builder, origin-shift logic. |
 
 Additionally create:

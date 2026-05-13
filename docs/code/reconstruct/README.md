@@ -23,8 +23,8 @@ result: ReconstructionResult = reconstruct('path/to/iris_blade.off')
 # result.extrusion_axis: Vector
 # result.x_dir / y_dir / z_dir / origin: Vector — datum-aligned local frame
 # result.datum_plane: PlaneCluster
-# result.layers: list[Layer] — silhouettes + depths + names ('front'/'back'/'recess'/'pivot_tip')
-# result.cylinders: list[CylinderFeature] — axis: Vector, radius / height / area: float
+# result.layers: list[Layer] — silhouettes + depths + names ('front'/'back'/'front_protrusion'/'back_protrusion'/'pocket') + parallel circles list
+# result.cylinders: list[CylinderFeature] — every circular loop the emit walker replaced with SmarterCone.cylinder
 # result.code: str — clean Pencil + build123d source that reproduces the body
 # result.error: str | None — reason if is_2d5_extrudable is False
 ```
@@ -42,7 +42,7 @@ python -m sava.csg.build123d.reconstruct path/to/blade.stl --out reconstructed_b
 | `mesh_io.py` | Read OFF/STL → `(vertices, faces)` |
 | `planes.py` | Cluster mesh triangles into coplanar groups |
 | `boundary.py` | Walk boundary edges of a plane → ordered polygon, simplify collinear |
-| `extrusion.py` | Pick extrusion axis, classify caps/side-walls, detect cylinders |
+| `extrusion.py` | Pick extrusion axis, classify caps/side-walls |
 | `datum.py` | Choose datum plane, build local frame, shift origin to 1st quadrant |
 | `pencil_emit.py` | Emit Pencil polygon-walks with `fmt()`-cleaned numbers |
 | `numbers.py` | `fmt()` helper for readable numeric literals |

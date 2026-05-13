@@ -16,7 +16,7 @@ The project includes a set of high-level wrapper classes that simplify common 3D
 
 ## Mesh Reconstruction
 
-Convert a triangle mesh (STL, OFF) into authored build123d code: Pencil sketches extruded along a detected axis, plus cylindrical primitives where appropriate. Targets 2.5D-extrudable parts (stacked planar caps with side walls parallel to one axis); aborts with a reason if the input fails the 2.5D check.
+Convert a triangle mesh (STL, OFF) into authored build123d code: Pencil sketches extruded along a detected axis, with primitive recognition for cylinders and rectangular boxes, plus N-fold polar pattern detection that collapses repeated features into a single template + rotate loop. Targets 2.5D-extrudable parts (stacked planar caps with side walls parallel to one axis); aborts with a reason if the input fails the 2.5D check.
 
 ```bash
 python -m sava.csg.build123d.reconstruct path/to/blade.stl --out reconstructed_blade.py
