@@ -60,7 +60,14 @@ class SmartBox(SmartSolid):
             top = Face(Wire.make_rect(self.tapered_length, self.tapered_width)).move(Location((0, 0, height)))
             solid = loft([base, top])
         else:
-            solid = Solid.make_box(length, width, height).move(Location((-length / 2, -width / 2, 0)))
+            # Build the box already centered in XY (and base-aligned in Z) by
+            # constructing on a shifted plane, so the resulting Solid keeps an
+            # identity Location. Building via `.move(Location((-L/2, -W/2, 0)))`
+            # would leave the Location at (-L/2, -W/2, 0), and build123d's
+            # `.orientation` setter rotates around the Location's position —
+            # which would mean subsequent .rotate_z calls would rotate the box
+            # around a point on the box's edge instead of through its centre.
+            solid = Solid.make_box(length, width, height, plane=Plane(origin=(-length / 2, -width / 2, 0)))
 
         if plane != Plane.XY:
             solid = solid.locate(Location(plane))

@@ -369,7 +369,16 @@ def multi_rotate_vector(vector: VectorLike, plane: Plane, rotations: VectorLike)
     return result
 
 def rotate_axis(axis_to_rotate: Axis, axis_rotate_around: Axis, angle: float) -> Axis:
-    return Axis(axis_to_rotate.position, rotate_vector(axis_to_rotate.direction, axis_rotate_around, angle))
+    """Rotate the direction of `axis_to_rotate` around `axis_rotate_around` by `angle`.
+
+    Direction vectors live at the origin, so they're rotated WITHOUT the position
+    translation that `rotate_vector` would otherwise apply for off-origin axes —
+    rotating a unit X vector around a Z-axis at (5, 5, 0) by 90° should still
+    yield a unit vector, not be displaced into space. Position of `axis_to_rotate`
+    is preserved untouched.
+    """
+    direction_only = Axis((0, 0, 0), axis_rotate_around.direction)
+    return Axis(axis_to_rotate.position, rotate_vector(axis_to_rotate.direction, direction_only, angle))
 
 def rotate_plane(plane: Plane, axis: Axis, angle: float) -> Plane:
     """Rotate a plane around an axis by a given angle using our own math (no build123d rotate).

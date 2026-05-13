@@ -1,8 +1,10 @@
 from copy import copy
 from collections.abc import Iterable
+from math import radians
 from typing import TYPE_CHECKING
 
 from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean, Face
+from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Trsf
 
 from sava.common.common import flatten
 from sava.common.logging import logger
@@ -10,7 +12,7 @@ from sava.csg.build123d.common.alignmentbuilder import AlignmentBuilder
 
 
 from sava.csg.build123d.common.edgefilters import PositionalFilter, SurfaceFilter, AxisFilter, EdgeFilter, FilletDebug, AXIS_X, AXIS_Y, AXIS_Z, filter_edges_by_position, filter_edges_by_axis, filter_edges_by_surface
-from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, multi_rotate_vector, orient_axis, calculate_orientation, rotate_vector
+from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, multi_rotate_vector, orient_axis, calculate_orientation, rotate_vector, rotate_axis
 
 
 def get_solid(element, apply_bed_orientation: bool = False):
@@ -226,28 +228,56 @@ class SmartSolid:
         return self.copy(label).orient(rotations)
 
     def rotate(self, axis: Axis, angle: float) -> 'SmartSolid':
+        """Rotate the solid by `angle` degrees around `axis` (position + direction).
+
+        For the three world axes through the origin (`Axis.X`, `Axis.Y`, `Axis.Z`),
+        the rotation goes through `orient()` so subclass overrides (`SmartLoft`,
+        `SweepSolid`) can keep their subsidiary profiles/paths in sync.
+
+        For any other axis (including off-origin parallel axes like the polar
+        pivot used by N-fold patterns), the rotation is applied directly via
+        an OCP `gp_Trsf` — `orient()` only knows how to rotate around the
+        solid's construction origin, so it can't handle off-origin axes.
+        Subsidiary objects in subclasses won't follow the rotation in that
+        case; the use of off-origin rotation on lofts/sweeps is rare enough
+        that it hasn't been needed.
+        """
         old_origin = Vector(self.origin)
         if axis == Axis.X:
             new_orient = rotate_orientation(self._orientation, (angle, 0, 0), Plane.XY)
+            self.orient(new_orient)
+            delta = rotate_vector(old_origin, axis, angle) - old_origin
+            if delta.length > 1e-10:
+                self.solid = self.solid.moved(Location(tuple(delta)))
         elif axis == Axis.Y:
             new_orient = rotate_orientation(self._orientation, (0, angle, 0), Plane.XY)
+            self.orient(new_orient)
+            delta = rotate_vector(old_origin, axis, angle) - old_origin
+            if delta.length > 1e-10:
+                self.solid = self.solid.moved(Location(tuple(delta)))
         elif axis == Axis.Z:
             new_orient = rotate_orientation(self._orientation, (0, 0, angle), Plane.XY)
+            self.orient(new_orient)
+            delta = rotate_vector(old_origin, axis, angle) - old_origin
+            if delta.length > 1e-10:
+                self.solid = self.solid.moved(Location(tuple(delta)))
         else:
-            # Arbitrary axis: compute new orientation by rotating current axes
+            trsf = gp_Trsf()
+            trsf.SetRotation(
+                gp_Ax1(
+                    gp_Pnt(float(axis.position.X), float(axis.position.Y), float(axis.position.Z)),
+                    gp_Dir(float(axis.direction.X), float(axis.direction.Y), float(axis.direction.Z)),
+                ),
+                radians(angle),
+            )
+            self.solid = self.solid.moved(Location(trsf))
             x_ax, y_ax, z_ax = orient_axis(self._orientation)
-            new_x = Axis(x_ax.position, rotate_vector(x_ax.direction, axis, angle))
-            new_y = Axis(y_ax.position, rotate_vector(y_ax.direction, axis, angle))
-            new_z = Axis(z_ax.position, rotate_vector(z_ax.direction, axis, angle))
-            new_orient = calculate_orientation(new_x, new_y, new_z)
-        # orient() is polymorphic — subclass overrides handle subsidiary objects (profiles, paths)
-        self.orient(new_orient)
-        # orient() only sets rotation; compute and apply position delta
-        new_origin = rotate_vector(old_origin, axis, angle)
-        delta = new_origin - old_origin
-        if delta.length > 1e-10:
-            self.solid = self.solid.moved(Location(tuple(delta)))
-        self.origin = new_origin
+            self._orientation = calculate_orientation(
+                rotate_axis(x_ax, axis, angle),
+                rotate_axis(y_ax, axis, angle),
+                rotate_axis(z_ax, axis, angle),
+            )
+        self.origin = rotate_vector(old_origin, axis, angle)
         return self
 
     def rotated(self, axis: Axis, angle: float) -> 'SmartSolid':
