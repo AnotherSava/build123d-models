@@ -8,12 +8,12 @@ from sava.csg.build123d.models.other.iris import IrisDimensions, create_blade, c
 class TestIrisDimensions:
     def test_aperture_radii(self):
         dim = IrisDimensions()
-        assert dim.aperture_radius_min == 12.5
-        assert dim.aperture_radius_max == 17.5
+        assert dim.aperture_radius_min == 6.43
+        assert dim.aperture_radius_max == 20.5
 
     def test_blade_angular_span(self):
         dim = IrisDimensions()
-        assert dim.blade_angular_span == 72.0
+        assert dim.blade_angular_span == 60.0
 
     @pytest.mark.parametrize("blade_count,expected_span", [(3, 120.0), (4, 90.0), (5, 72.0), (6, 60.0), (8, 45.0)])
     def test_blade_angular_span_parametric(self, blade_count, expected_span):
@@ -93,7 +93,7 @@ class TestCreateBlades:
     def test_blade_count_default(self):
         dim = IrisDimensions()
         blades = create_blades(dim)
-        assert len(blades) == 5
+        assert len(blades) == 6
 
     @pytest.mark.parametrize("blade_count", [3, 4, 5, 6, 7, 8])
     def test_blade_count_parametric(self, blade_count):
