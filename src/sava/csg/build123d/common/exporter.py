@@ -20,6 +20,11 @@ BASIC_COLORS = ["yellow", "blue", "green", "orange", "purple", "cyan", "magenta"
 _shapes: dict[str, list] = {}
 _label_colors: dict[str, str] = {}
 _index: int = 1
+# Raw triangle meshes loaded from external STL files. These bypass the normal
+# Mesher.add_shape pipeline (which would re-tessellate and often fail lib3MF's
+# IsValid check on imported geometry) — the triangles go straight into the
+# 3MF/STL output as-is. Keyed by label, list of (verts, faces) tuples.
+_raw_meshes: dict[str, list[tuple[list, list]]] = {}
 
 
 def _is_valid_color(name: str) -> bool:
@@ -90,8 +95,49 @@ def clear() -> None:
     """Clear all stored shapes and color assignments. Useful for testing."""
     global _index
     _shapes.clear()
+    _raw_meshes.clear()
     _label_colors.clear()
     _index = 1
+
+
+def _add_raw_mesh_to_mesher(mesher: Mesher, verts: list, faces: list, label: str) -> None:
+    """Append a raw triangle mesh to `mesher` under `label`'s colour."""
+    v3, t3 = Mesher._create_3mf_mesh(verts, faces)
+    mesh = mesher.model.AddMeshObject()
+    mesh.SetGeometry(v3, t3)
+    mesh.SetName(label)
+    color = Color(_get_color_for_label(label))
+    grp = mesher.model.AddBaseMaterialGroup()
+    rgb = mesher.wrapper.FloatRGBAToColor(*tuple(color))
+    mat_id = grp.AddMaterial(Name=str(color), DisplayColor=rgb)
+    mesh.SetObjectLevelProperty(grp.GetResourceID(), mat_id)
+    mesher.meshes.append(mesh)
+    mesher.model.AddBuildItem(mesh, mesher.wrapper.GetIdentityTransform())
+
+
+def export_stl_file(stl_path: str, label: str = 'source',
+                    shift: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> None:
+    """Register an existing STL file's triangle mesh for inclusion in the next
+    `save_3mf()` / `save_stl()` call.
+
+    The mesh is added as-is; re-tessellating an imported STL through the
+    standard `Mesher.add_shape` pipeline usually fails lib3MF's IsValid
+    check, so this side-channel copies the triangles directly.
+
+    Args:
+        stl_path: path to the source STL.
+        label: label used for grouping and colour assignment (same as
+            `export()`).
+        shift: per-vertex translation, useful for placing the mesh beside
+            a reconstructed model for visual comparison.
+    """
+    from sava.csg.build123d.reconstruct.mesh_io import read_mesh
+
+    verts, faces = read_mesh(_resolve_path(stl_path))
+    if any(s != 0 for s in shift):
+        sx, sy, sz = shift
+        verts = [(v[0] + sx, v[1] + sy, v[2] + sz) for v in verts]
+    _raw_meshes.setdefault(label, []).append((verts, faces))
 
 
 def _copy_shape_for_storage(shape):
@@ -249,6 +295,10 @@ def _save_3mf(location: str) -> None:
                     for w in caught_warnings:
                         print(f"WARNING: Shape with label '{label}': {w.message}")
 
+    for label, meshes in _raw_meshes.items():
+        for verts, faces in meshes:
+            _add_raw_mesh_to_mesher(mesher, verts, faces, label)
+
     _report_labels(edge_max_length)
 
     # Write to the temporary file first, then copy to the actual location
@@ -302,6 +352,14 @@ def save_stl(directory: str = None) -> None:
             for prepared in _prepare_shape(shape, label, edge_max_length, prepare_for_stl=True):
                 mesher.add_shape(prepared)
 
+        file_path = create_file_path(actual_directory, f"{label}.stl")
+        mesher.write(str(file_path))
+        print(f"  - {Path(file_path).name}")
+
+    for label, meshes in _raw_meshes.items():
+        mesher = Mesher()
+        for verts, faces in meshes:
+            _add_raw_mesh_to_mesher(mesher, verts, faces, label)
         file_path = create_file_path(actual_directory, f"{label}.stl")
         mesher.write(str(file_path))
         print(f"  - {Path(file_path).name}")

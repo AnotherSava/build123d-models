@@ -28,6 +28,13 @@ class Layer:
     # angle_deg) when the boundary is a rectangle (possibly with minor
     # corner chamfers) — those emit as SmartBox(...).rotate_z().move().
     boxes: list[tuple[float, float, Point2D, float] | None] = field(default_factory=list)
+    # Parallel to `loops`. The raw (pre-simplify) 2D boundary for each loop.
+    # Used by Pencil emit so arc detection can recover curved walls that the
+    # 0.05 mm simplification tolerance would otherwise smooth into straight
+    # chords (e.g. an 89-vert curved bar collapsing into a 4-vert rectangle).
+    # Simplified `loops` are still preferred for nesting / dedup / detection
+    # since their vertex count is stable across instances of the same shape.
+    raw_loops: list[list[Point2D]] = field(default_factory=list)
 
 
 @dataclass
@@ -261,32 +268,53 @@ def _detect_circle(raw: list[Point2D], simplified: list[Point2D],
                    min_vertices: int = 16) -> tuple[float, Point2D] | None:
     """Return (radius, center) if `raw` is a tessellated circle, else None.
 
-    A polygon is treated as a circle when its enclosed area equals π·r̄²
-    within `area_rel_tol` (r̄ = mean distance from area-weighted centroid).
-    Pure radial-equidistance can't be used: real STL cylinders often gain
-    flat sections at CSG boolean intersections (e.g. where a pin meets a
-    flat face) — radial deviation balloons to 10-20% even though the area
-    ratio stays within 1%. The minimum-vertex floor (≥16) keeps regular
-    n-gons like squares, hexagons, and octagons out of the circle bucket;
-    real STL exports of circles use ≥32 segments, while polygonal features
-    almost never exceed 8 sides.
-    Center is computed from `simplified` (post-collinear-merge), which
-    discards those flat chords and tracks the underlying CAD center more
-    accurately than the area-weighted raw centroid would.
+    Two complementary tests are tried in order:
+
+    1. **Simplified** polygon area vs π·r̄² where r̄ is the mean radius of
+       simplified vertices. Catches the case where `raw` is a tessellated
+       circle interrupted by smoothly-curved protrusions: simplify_collinear
+       smooths those away, leaving the inner cusps that trace the circle's
+       actual wall — the simplified polygon then looks like a regular
+       12+gon and passes the area test. Returns the simplified radius (the
+       inner-wall radius, not pulled outward by the protrusions).
+    2. **Raw** polygon area vs π·r̄² where r̄ is the mean radius of raw
+       vertices. Catches the clean-tessellated-circle case where simplify
+       collapsed densely-sampled near-collinear vertices down to a coarse
+       3–6-vert polygon — that simplified polygon fails the area test, but
+       the raw boundary is unambiguously circular. Returns the raw radius.
+
+    The minimum-vertex floor (≥16) applies to the raw polygon: real STL
+    exports of circles use ≥32 segments, while polygonal features almost
+    never exceed 8 sides. The area test (≤5% off) then filters out regular
+    n-gons (hexagon ~17% off, octagon ~10% off, decagon ~6% off) while
+    accepting 12+gon-like tessellations.
     """
     if len(raw) < min_vertices:
         return None
+
+    # Test 1: simplified polygon.
+    if len(simplified) >= 3:
+        cx, cy = _polygon_centroid(simplified)
+        distances = [math.hypot(x - cx, y - cy) for x, y in simplified]
+        r_mean = sum(distances) / len(distances)
+        if r_mean > 1e-9:
+            actual_area = abs(_signed_area(simplified))
+            ideal_area = math.pi * r_mean * r_mean
+            if abs(actual_area - ideal_area) / ideal_area <= area_rel_tol:
+                return (r_mean, (cx, cy))
+
+    # Test 2: raw polygon.
     cx_raw, cy_raw = _polygon_centroid(raw)
-    distances = [math.hypot(x - cx_raw, y - cy_raw) for x, y in raw]
-    r_mean = sum(distances) / len(distances)
-    if r_mean < 1e-9:
+    distances_raw = [math.hypot(x - cx_raw, y - cy_raw) for x, y in raw]
+    r_raw = sum(distances_raw) / len(distances_raw)
+    if r_raw < 1e-9:
         return None
     actual_area = abs(_signed_area(raw))
-    ideal_area = math.pi * r_mean * r_mean
+    ideal_area = math.pi * r_raw * r_raw
     if abs(actual_area - ideal_area) / ideal_area > area_rel_tol:
         return None
     cx, cy = _polygon_centroid(simplified) if len(simplified) >= 3 else (cx_raw, cy_raw)
-    return (r_mean, (cx, cy))
+    return (r_raw, (cx, cy))
 
 
 def _detect_box(poly: list[Point2D],
@@ -399,8 +427,11 @@ def _canonical_polygon(poly: list[Point2D]) -> tuple[list[Point2D], float, Point
     the origin, then rotated so the PCA principal axis aligns with +X. The
     rotation needed to place a canonical-form polygon back into its original
     pose is `rotation_deg` (CCW around Z), followed by translation by
-    `original_centroid`. A 180° ambiguity in the principal-axis direction is
-    resolved by orienting the vertex with the largest |x| to land on +x.
+    `original_centroid`. The 180° ambiguity in the principal-axis direction
+    is resolved by picking the orientation whose sorted-vertex tuple is
+    lexicographically smaller — robust for shapes with long-axis (X-mirror)
+    symmetry, where the largest-|x| vertex ties on both ends and a
+    sign-of-x tiebreaker would flip-flop with tessellation order.
     """
     n = len(poly)
     if n < 3:
@@ -414,10 +445,15 @@ def _canonical_polygon(poly: list[Point2D]) -> tuple[list[Point2D], float, Point
     cos_t = math.cos(-theta)
     sin_t = math.sin(-theta)
     canon = [(x * cos_t - y * sin_t, x * sin_t + y * cos_t) for x, y in p]
-    # 180° ambiguity: ensure the vertex with the largest |x| sits on +x.
-    x_max_idx = max(range(n), key=lambda i: abs(canon[i][0]))
-    if canon[x_max_idx][0] < 0:
-        canon = [(-x, -y) for x, y in canon]
+    canon_rot = [(-x, -y) for x, y in canon]
+    # Compare on a quantized grid: with X-mirror-symmetric shapes the two
+    # smallest-x vertices coincide in design and only differ by µm of
+    # tessellation noise, so a raw-float lex-min would flip-flop between
+    # the two 180°-rotated orientations.
+    def _quant(verts, g=0.05):
+        return tuple(sorted((round(x / g), round(y / g)) for x, y in verts))
+    if _quant(canon_rot) < _quant(canon):
+        canon = canon_rot
         theta += math.pi
     # Normalise to (-180, 180].
     theta_deg = math.degrees(theta)
@@ -431,11 +467,19 @@ def _canonical_polygon(poly: list[Point2D]) -> tuple[list[Point2D], float, Point
 def _loop_signature(loop: list[Point2D],
                     circle: tuple[float, Point2D] | None,
                     box: tuple[float, float, Point2D, float] | None,
-                    grid: float = 0.01) -> tuple:
+                    grid: float = 0.05,
+                    area_grid: float = 0.5) -> tuple:
     """Hashable signature for duplicate detection. Same shape → same signature.
 
-    Quantisation grid is 0.01 mm by default; finer than mesh tessellation noise,
-    coarser than meaningful design variation.
+    Polygons sign on canonical bbox + signed area + vertex count, all
+    quantised. Per-vertex matching would be more discriminating but is
+    fragile: tiny PCA-angle differences between mesh instances rotate the
+    canonical frame by ~0.3°, shifting every vertex's canonical x by up to
+    `bbox_radius × sin(0.3°)` ≈ 0.05 mm — enough to push vertices across
+    any reasonable quantisation grid. Canonical bbox and area are stable
+    invariants under such micro-rotations. Vertex count adds a sanity check
+    that keeps unrelated shapes (rectangle vs ellipse with matching bbox+
+    area) from colliding.
     """
     if circle is not None:
         return ('cylinder', round(circle[0] / grid))
@@ -443,12 +487,18 @@ def _loop_signature(loop: list[Point2D],
         L, W, _, _ = box
         return ('box', round(L / grid), round(W / grid))
     canon, _, _ = _canonical_polygon(loop)
-    # Sort to absorb cyclic-rotation differences (two boundary walks of the
-    # same shape may start at different vertices). False positives (different
-    # shapes with the same vertex multiset) are vanishingly rare for real
-    # CAD geometry.
-    quantised = tuple(sorted((round(x / grid), round(y / grid)) for x, y in canon))
-    return ('polygon', quantised)
+    xs = [x for x, _ in canon]
+    ys = [y for _, y in canon]
+    bbox_l = max(xs) - min(xs)
+    bbox_w = max(ys) - min(ys)
+    area = abs(_signed_area(canon))
+    return (
+        'polygon',
+        round(bbox_l / grid),
+        round(bbox_w / grid),
+        round(area / area_grid),
+        len(canon),
+    )
 
 
 def _detect_polar_pattern(placements: list[tuple[float, float, float]],
@@ -607,7 +657,8 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
 
     new_silhouettes: list[tuple[PlaneCluster, list[list[Point2D]],
                                  list[tuple[float, Point2D] | None],
-                                 list[tuple[float, float, Point2D, float] | None]]] = []
+                                 list[tuple[float, float, Point2D, float] | None],
+                                 list[list[Point2D]]]] = []
     for plane, _old in silhouettes:
         rings3d = boundary_polygons(verts, faces, plane.tris)
         rings3d = _filter_noise_step_loops(rings3d, plane.normal, plane.d)
@@ -616,6 +667,7 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
         loops_new: list[list[Point2D]] = []
         circles_new: list[tuple[float, Point2D] | None] = []
         boxes_new: list[tuple[float, float, Point2D, float] | None] = []
+        raw_new: list[list[Point2D]] = []
         for poly_new in raw2d:
             # Detect circles on the RAW tessellation; simplify_collinear can
             # collapse a 48-vertex circle into 4 points (radial deviation
@@ -623,13 +675,14 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
             simplified = simplify_collinear(poly_new)
             if len(simplified) >= 3:
                 loops_new.append(simplified)
+                raw_new.append(poly_new)
                 circle = _detect_circle(poly_new, simplified)
                 circles_new.append(circle)
                 # Box detection runs on the simplified polygon — that's where
                 # collinear chamfer artefacts collapse into clean ~4 vertices.
                 # Skip if already detected as a circle (avoid double-emit).
                 boxes_new.append(_detect_box(simplified) if circle is None else None)
-        new_silhouettes.append((plane, loops_new, circles_new, boxes_new))
+        new_silhouettes.append((plane, loops_new, circles_new, boxes_new, raw_new))
 
     new_silhouettes.sort(key=lambda t: cap_depth_in_frame(t[0], z_dir, new_origin))
 
@@ -650,7 +703,7 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
     if back_plane is not None:
         name_for_plane[id(back_plane)] = 'back'
     eps = 1e-3
-    for plane, _, _, _ in new_silhouettes:
+    for plane, _, _, _, _ in new_silhouettes:
         if id(plane) in name_for_plane:
             continue
         d = cap_depth_in_frame(plane, z_dir, new_origin)
@@ -664,8 +717,8 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
     layers = [
         Layer(plane=p, name=name_for_plane[id(p)],
               depth=cap_depth_in_frame(p, z_dir, new_origin),
-              loops=loops, circles=circles, boxes=boxes)
-        for p, loops, circles, boxes in new_silhouettes
+              loops=loops, circles=circles, boxes=boxes, raw_loops=raws)
+        for p, loops, circles, boxes, raws in new_silhouettes
     ]
 
     # Anchor the cross-section origin on the vertex shared by the most polygon
@@ -683,6 +736,7 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
         new_origin = vadd(new_origin, vadd(vmul(x_dir, su), vmul(y_dir, sv)))
         for L in layers:
             L.loops = [[(u - su, v - sv) for u, v in loop] for loop in L.loops]
+            L.raw_loops = [[(u - su, v - sv) for u, v in loop] for loop in L.raw_loops]
             L.circles = [None if c is None else (c[0], (c[1][0] - su, c[1][1] - sv))
                          for c in L.circles]
             L.boxes = [None if b is None else (b[0], b[1], (b[2][0] - su, b[2][1] - sv), b[3])
@@ -742,6 +796,7 @@ def _emit_nested_loops(
     cylinders_out: list['CylinderFeature'],
     boxes_out: list['BoxFeature'],
     skip_outer_emit: int | None = None,
+    raw_loops: list[list[Point2D]] | None = None,
 ) -> None:
     """Walk the nesting tree depth-first; emit each loop with alternating op.
 
@@ -753,79 +808,195 @@ def _emit_nested_loops(
     paths skip the Pencil + extrude emission and are recorded in their
     respective `*_out` lists.
 
+    Leaf siblings (loops with no children) that share a canonical signature
+    are deduplicated at every depth: a single template is emitted once and
+    placed at each location, preferring an `Axis`-pivoted polar pattern when
+    one is detected.
+
     `skip_outer_emit` is the loop index whose own emit should be skipped (used
     for the body's first outer which is already emitted as the blade initializer);
     its children are still walked.
+
+    `thickness` and `shift_z` accept either a scalar (applied to every loop in
+    the layer) or a list of length `len(loops)` (per-loop override). The
+    per-loop form lets a front-protrusion layer extrude polygon tabs that
+    extend outside the body silhouette as full-height features (from
+    body_min_depth up to the layer) while keeping cylinder/box co-axial
+    features (e.g. annular rings) as thin caps on the body's top face.
     """
+    n = len(loops)
+    t_per = thickness if isinstance(thickness, list) else [thickness] * n
+    sz_per = shift_z if isinstance(shift_z, list) else [shift_z] * n
+    # Polygon emit prefers the pre-simplify raw boundary so arc detection can
+    # recover curved walls. Simplified `loops` are still used for nesting,
+    # signature, circle/box detection, and centroid/rotation alignment.
+    emit_loops = raw_loops if raw_loops is not None else loops
+
     children_of: dict[int, list[int]] = defaultdict(list)
     for i, p in enumerate(parents):
         if p != -1:
             children_of[p].append(i)
     outers = [i for i, p in enumerate(parents) if p == -1]
 
-    sibling_counter: dict[tuple[int, int], int] = {}
-
-    def visit(idx: int, depth: int, parent_name: str | None) -> None:
-        if depth == 0:
-            name = base_name if len(outers) == 1 else f'{base_name}_{outers.index(idx)}'
-        else:
-            role = _depth_role_name(depth)
-            key = (parents[idx], depth)
-            n = sibling_counter.get(key, 0)
-            sibling_counter[key] = n + 1
-            name = f'{parent_name}_{role}_{n}'
+    def emit_loop_at(idx: int, depth: int, name: str) -> None:
+        """Emit a single loop (circle, box, or polygon) under `name`. No recursion."""
+        if idx == skip_outer_emit:
+            return
+        t = t_per[idx]
+        sz = sz_per[idx]
         op = op_outer if depth % 2 == 0 else op_hole
+        circle = circles[idx]
+        box = boxes[idx]
+        if circle is not None:
+            radius, (cu, cv) = circle
+            code.append(f'{name} = SmarterCone.cylinder({fmt(radius)}, {fmt(t)})')
+            if abs(cu) > 1e-9 or abs(cv) > 1e-9 or abs(sz) > 1e-9:
+                code.append(f'{name}.move({fmt(cu)}, {fmt(cv)}, {fmt(sz)})')
+            code.append(f'{blade_var}.{op}({name})')
+            cylinders_out.append(CylinderFeature(
+                axis=Vector(*z_dir),
+                radius=radius,
+                height=t,
+                area=math.pi * radius * radius,
+                base=(cu, cv, sz),
+                layer_name=base_name,
+            ))
+        elif box is not None:
+            L, W, (cu, cv), angle = box
+            # SmartBox is XY-centered but Z-base-aligned (see SmartBox.__init__):
+            # `.move(cu, cv, sz)` lands the box centroid at (cu, cv) with
+            # its base at z=sz and top at z=sz+t.
+            code.append(f'{name} = SmartBox({fmt(L)}, {fmt(W)}, {fmt(t)})')
+            if abs(angle) > 1e-3:
+                code.append(f'{name}.rotate_z({fmt(angle)})')
+            if abs(cu) > 1e-9 or abs(cv) > 1e-9 or abs(sz) > 1e-9:
+                code.append(f'{name}.move({fmt(cu)}, {fmt(cv)}, {fmt(sz)})')
+            code.append(f'{blade_var}.{op}({name})')
+            boxes_out.append(BoxFeature(
+                length=L, width=W, height=t,
+                base=(cu, cv, sz),
+                angle_deg=angle,
+                layer_name=base_name,
+            ))
+        else:
+            code.extend(emit_pencil_for(emit_loops[idx], name, preferred_start))
+            code.append(f'{name}_body = {name}.extrude({fmt(t)})')
+            if abs(sz) > 1e-9:
+                code.append(f'{name}_body.move(0, 0, {fmt(sz)})')
+            code.append(f'{blade_var}.{op}({name}_body)')
 
-        if idx != skip_outer_emit:
-            circle = circles[idx]
-            box = boxes[idx]
-            if circle is not None:
-                radius, (cu, cv) = circle
-                code.append(f'{name} = SmarterCone.cylinder({fmt(radius)}, {fmt(thickness)})')
-                if abs(cu) > 1e-9 or abs(cv) > 1e-9 or abs(shift_z) > 1e-9:
-                    code.append(f'{name}.move({fmt(cu)}, {fmt(cv)}, {fmt(shift_z)})')
-                code.append(f'{blade_var}.{op}({name})')
-                cylinders_out.append(CylinderFeature(
-                    axis=Vector(*z_dir),
-                    radius=radius,
-                    height=thickness,
-                    area=math.pi * radius * radius,
-                    base=(cu, cv, shift_z),
-                    layer_name=base_name,
-                ))
-            elif box is not None:
-                L, W, (cu, cv), angle = box
-                # SmartBox is XY-centered but Z-base-aligned (see SmartBox.__init__):
-                # `.move(cu, cv, shift_z)` lands the box centroid at (cu, cv) with
-                # its base at z=shift_z and top at z=shift_z+thickness.
-                code.append(f'{name} = SmartBox({fmt(L)}, {fmt(W)}, {fmt(thickness)})')
-                if abs(angle) > 1e-3:
-                    code.append(f'{name}.rotate_z({fmt(angle)})')
-                if abs(cu) > 1e-9 or abs(cv) > 1e-9 or abs(shift_z) > 1e-9:
-                    code.append(f'{name}.move({fmt(cu)}, {fmt(cv)}, {fmt(shift_z)})')
-                code.append(f'{blade_var}.{op}({name})')
-                boxes_out.append(BoxFeature(
-                    length=L, width=W, height=thickness,
-                    base=(cu, cv, shift_z),
-                    angle_deg=angle,
-                    layer_name=base_name,
-                ))
+    def is_annulus(idx: int) -> bool:
+        """True when `idx` is an outer cylinder with exactly one circular hole
+        child and nothing nested below the hole. The naive emit (fuse outer,
+        then cut inner) leaves OCCT with a degenerate "lid over an open ring"
+        when another same-radius cut sits directly below — building the ring
+        as a standalone solid first sidesteps the issue universally."""
+        if idx == skip_outer_emit:
+            return False
+        if circles[idx] is None:
+            return False
+        kids = children_of[idx]
+        if len(kids) != 1:
+            return False
+        ch = kids[0]
+        return circles[ch] is not None and not children_of[ch]
+
+    def emit_annulus_at(outer_idx: int, inner_idx: int, depth: int, name: str) -> None:
+        op = op_outer if depth % 2 == 0 else op_hole
+        t = t_per[outer_idx]
+        sz = sz_per[outer_idx]
+        outer_r, (cu, cv) = circles[outer_idx]
+        inner_r, (icu, icv) = circles[inner_idx]
+        hole_name = f'{name}_hole'
+        code.append(f'{name} = SmarterCone.cylinder({fmt(outer_r)}, {fmt(t)})')
+        code.append(f'{hole_name} = SmarterCone.cylinder({fmt(inner_r)}, {fmt(t)})')
+        if abs(cu) > 1e-9 or abs(cv) > 1e-9 or abs(sz) > 1e-9:
+            code.append(f'{name}.move({fmt(cu)}, {fmt(cv)}, {fmt(sz)})')
+        if abs(icu) > 1e-9 or abs(icv) > 1e-9 or abs(sz) > 1e-9:
+            code.append(f'{hole_name}.move({fmt(icu)}, {fmt(icv)}, {fmt(sz)})')
+        code.append(f'{name}.cut({hole_name})')
+        code.append(f'{blade_var}.{op}({name})')
+        cylinders_out.append(CylinderFeature(
+            axis=Vector(*z_dir), radius=outer_r, height=t,
+            area=math.pi * outer_r * outer_r,
+            base=(cu, cv, sz), layer_name=base_name,
+        ))
+        cylinders_out.append(CylinderFeature(
+            axis=Vector(*z_dir), radius=inner_r, height=t,
+            area=math.pi * inner_r * inner_r,
+            base=(icu, icv, sz), layer_name=base_name,
+        ))
+
+    def visit(idx: int, depth: int, name: str) -> None:
+        """Emit `idx` with the given `name` and recurse into its children."""
+        if is_annulus(idx):
+            emit_annulus_at(idx, children_of[idx][0], depth, name)
+            return
+        emit_loop_at(idx, depth, name)
+        emit_children(children_of[idx], depth + 1, name)
+
+    def emit_children(child_indices: list[int], child_depth: int,
+                      parent_name: str) -> None:
+        """Emit the children of a node, collapsing leaf siblings that share a
+        signature into a single template + placement loop. Non-leaf children
+        and singleton leaves visit individually."""
+        if not child_indices:
+            return
+        role = _depth_role_name(child_depth)
+        child_op = op_outer if child_depth % 2 == 0 else op_hole
+
+        # Map each child to its signature (None = non-leaf, can't be deduped).
+        sig_of: dict[int, tuple | None] = {}
+        sig_to_indices: dict[tuple, list[int]] = {}
+        for ch in child_indices:
+            if children_of[ch]:
+                sig_of[ch] = None
             else:
-                code.extend(emit_pencil_for(loops[idx], name, preferred_start))
-                code.append(f'{name}_body = {name}.extrude({fmt(thickness)})')
-                if abs(shift_z) > 1e-9:
-                    code.append(f'{name}_body.move(0, 0, {fmt(shift_z)})')
-                code.append(f'{blade_var}.{op}({name}_body)')
+                sig = _loop_signature(loops[ch], circles[ch], boxes[ch])
+                sig_of[ch] = sig
+                sig_to_indices.setdefault(sig, []).append(ch)
 
-        for ch in children_of[idx]:
-            visit(ch, depth + 1, name)
+        # Walk children in tree order; each non-leaf, multi-member group
+        # (counted once at first occurrence), or singleton leaf consumes one
+        # emission "unit" slot.
+        units: list[tuple[str, object]] = []
+        seen_groups: set[tuple] = set()
+        for ch in child_indices:
+            sig = sig_of[ch]
+            if sig is None:
+                units.append(('nonleaf', ch))
+            elif sig in seen_groups:
+                continue
+            elif len(sig_to_indices[sig]) > 1:
+                seen_groups.add(sig)
+                units.append(('group', sig))
+            else:
+                units.append(('singleton', ch))
 
-    # Dedup pass: outers with no nested children that share a canonical
-    # signature (same primitive type + dimensions, or same polygon shape up to
-    # rotation/translation) collapse into a single template + placement loop.
-    # Outers with children stay on the per-instance visit path — deduplicating
-    # a shape that contains other shapes would need to also walk its tree,
-    # not worth the complexity for what's typically a rare case.
+        single_unit = len(units) == 1
+        for i, (kind, payload) in enumerate(units):
+            label = f'{parent_name}_{role}' if single_unit else f'{parent_name}_{role}_{i}'
+            if kind == 'nonleaf':
+                visit(payload, child_depth, label)
+            elif kind == 'group':
+                indices = sig_to_indices[payload]
+                # Members of a dedup group share a signature and thus end up
+                # with the same classification (inside vs outside body
+                # silhouette). Use the first member's per-loop thickness/shift.
+                _emit_dedup_group(
+                    code, indices, payload, loops, circles, boxes,
+                    thickness=t_per[indices[0]], shift_z=sz_per[indices[0]],
+                    op=child_op,
+                    base_name=label, blade_var=blade_var,
+                    z_dir=z_dir, cylinders_out=cylinders_out, boxes_out=boxes_out,
+                    group_idx=0, single_group=True,
+                    raw_loops=raw_loops,
+                )
+            else:  # singleton
+                visit(payload, child_depth, label)
+
+    # Top-level (depth-0): outers without children that share a signature
+    # collapse into a single template; outers with children visit recursively.
     leaf_groups: dict[tuple, list[int]] = defaultdict(list)
     visited_individually: list[int] = []
     for o_idx in outers:
@@ -835,8 +1006,11 @@ def _emit_nested_loops(
             sig = _loop_signature(loops[o_idx], circles[o_idx], boxes[o_idx])
             leaf_groups[sig].append(o_idx)
 
+    def outer_name(o_idx: int) -> str:
+        return base_name if len(outers) == 1 else f'{base_name}_{outers.index(o_idx)}'
+
     for o_idx in visited_individually:
-        visit(o_idx, 0, None)
+        visit(o_idx, 0, outer_name(o_idx))
 
     single_group = len(leaf_groups) == 1 and not visited_individually
     group_idx = 0
@@ -844,14 +1018,16 @@ def _emit_nested_loops(
         if len(indices) > 1:
             _emit_dedup_group(
                 code, indices, sig, loops, circles, boxes,
-                thickness=thickness, shift_z=shift_z, op=op_outer,
+                thickness=t_per[indices[0]], shift_z=sz_per[indices[0]],
+                op=op_outer,
                 base_name=base_name, blade_var=blade_var,
                 z_dir=z_dir, cylinders_out=cylinders_out, boxes_out=boxes_out,
                 group_idx=group_idx, single_group=single_group,
+                raw_loops=raw_loops,
             )
             group_idx += 1
         else:
-            visit(indices[0], 0, None)
+            visit(indices[0], 0, outer_name(indices[0]))
 
 
 _PRIMITIVE_ROTATION_MODULUS = {
@@ -879,6 +1055,7 @@ def _emit_polar_group(
     cylinders_out: list['CylinderFeature'],
     boxes_out: list['BoxFeature'],
     group_label: str,
+    raw_loops: list[list[Point2D]] | None = None,
 ) -> None:
     """Emit an N-fold polar pattern: build one template, rotate it N times around a Z-axis pivot."""
     (cx, cy), _r, sorted_indices, step = polar
@@ -902,7 +1079,12 @@ def _emit_polar_group(
         chain += f'.move({fmt(cu0)}, {fmt(cv0)}, {fmt(shift_z)})'
         code.append(f'{template_name} = {chain}')
     else:  # polygon
-        canon, _, _ = _canonical_polygon(loops[template_loop_idx])
+        # Use raw polygon for the template Pencil emit so arc-bounded shapes
+        # (curved bars, etc.) keep their curvature instead of collapsing into
+        # the simplified bbox quadrilateral.
+        source_loop = (raw_loops[template_loop_idx]
+                       if raw_loops is not None else loops[template_loop_idx])
+        canon, _, _ = _canonical_polygon(source_loop)
         pencil_name = f'{template_name}_pencil'
         code.extend(emit_pencil_for(canon, pencil_name, None))
         code.append(f'{template_name} = {pencil_name}.extrude({fmt(thickness)})')
@@ -914,7 +1096,7 @@ def _emit_polar_group(
     pivot_name = f'{group_label}_pivot'
     code.append(f'{pivot_name} = Axis(({fmt(cx)}, {fmt(cy)}, 0), (0, 0, 1))')
     code.append(f'for i in range({n}):')
-    code.append(f'    {blade_var}.{op}({template_name}.copy().rotate({pivot_name}, i * {fmt(step)}))')
+    code.append(f'    {blade_var}.{op}({template_name}.rotated({pivot_name}, i * {fmt(step)}))')
 
     # Record one feature per placement (in sorted order).
     for sorted_idx in sorted_indices:
@@ -957,6 +1139,7 @@ def _emit_dedup_group(
     boxes_out: list['BoxFeature'],
     group_idx: int,
     single_group: bool,
+    raw_loops: list[list[Point2D]] | None = None,
 ) -> None:
     """Emit a `for` loop over placements that share a single template.
 
@@ -977,6 +1160,7 @@ def _emit_dedup_group(
             blade_var=blade_var, z_dir=z_dir,
             cylinders_out=cylinders_out, boxes_out=boxes_out,
             group_label=group_label,
+            raw_loops=raw_loops,
         )
         return
 
@@ -1012,7 +1196,9 @@ def _emit_dedup_group(
                 layer_name=base_name,
             ))
     else:  # polygon
-        canon, _, _ = _canonical_polygon(loops[indices[0]])
+        source_loop = (raw_loops[indices[0]]
+                       if raw_loops is not None else loops[indices[0]])
+        canon, _, _ = _canonical_polygon(source_loop)
         template_name = f'{group_label}_template'
         code.append(f'# {group_label}: {n} × custom polygon template')
         code.extend(emit_pencil_for(canon, template_name, None))
@@ -1067,22 +1253,39 @@ def _emit_code(cross_origin: Vec, x_dir: Vec, y_dir: Vec, z_dir: Vec,
         emit_polys.extend(_polygon_loops(L.loops, L.circles, L.boxes))
     preferred_start = find_shared_start(emit_polys)
 
+    body_silhouette: list[Point2D] | None = None
     if front is not None:
         parents = _classify_loops(front.loops)
         outers = [i for i, p in enumerate(parents) if p == -1]
         if outers:
             o0 = outers[0]
+            body_silhouette = front.loops[o0]
+            body_circle = front.circles[o0]
             children_of_o0 = sum(1 for p in parents if p == o0)
-            descriptor = (f'front-cap silhouette, the {len(front.loops[o0])}-gon'
-                          if children_of_o0 == 0 and len(outers) == 1
-                          else f'front-cap outer silhouette, '
-                               f'the {len(front.loops[o0])}-gon outline')
-            code.append(f'# Main body ({descriptor})')
-            # Emit the first outer manually as the blade initializer; its
-            # children + any extra outers are then emitted by the recursive
-            # walker with skip_outer_emit set so we don't re-emit o0 itself.
-            code.extend(emit_pencil_for(front.loops[o0], 'body', preferred_start))
-            code.append(f'blade = body.extrude({fmt(body_thickness)})')
+            if body_circle is not None:
+                radius, (bcx, bcy) = body_circle
+                descriptor = f'circular front-cap silhouette, r={fmt(radius)}'
+                code.append(f'# Main body ({descriptor})')
+                code.append(f'body = SmarterCone.cylinder({fmt(radius)}, {fmt(body_thickness)})')
+                if abs(bcx) > 1e-9 or abs(bcy) > 1e-9:
+                    code.append(f'body.move({fmt(bcx)}, {fmt(bcy)}, 0)')
+                code.append('blade = body')
+                cylinders.append(CylinderFeature(
+                    axis=Vector(*z_dir), radius=radius, height=body_thickness,
+                    area=math.pi * radius * radius,
+                    base=(bcx, bcy, 0.0), layer_name='body',
+                ))
+            else:
+                descriptor = (f'front-cap silhouette, the {len(front.loops[o0])}-gon'
+                              if children_of_o0 == 0 and len(outers) == 1
+                              else f'front-cap outer silhouette, '
+                                   f'the {len(front.loops[o0])}-gon outline')
+                code.append(f'# Main body ({descriptor})')
+                # Emit the first outer manually as the blade initializer; its
+                # children + any extra outers are then emitted by the recursive
+                # walker with skip_outer_emit set so we don't re-emit o0 itself.
+                code.extend(emit_pencil_for(front.loops[o0], 'body', preferred_start))
+                code.append(f'blade = body.extrude({fmt(body_thickness)})')
             _emit_nested_loops(
                 code, front.loops, front.circles, front.boxes, parents,
                 thickness=body_thickness, shift_z=0.0,
@@ -1091,28 +1294,78 @@ def _emit_code(cross_origin: Vec, x_dir: Vec, y_dir: Vec, z_dir: Vec,
                 preferred_start=preferred_start,
                 z_dir=z_dir, cylinders_out=cylinders, boxes_out=boxes_out,
                 skip_outer_emit=o0,
+                raw_loops=front.raw_loops,
             )
             code.append('')
 
     for L in layers:
         if L.name in ('front', 'back'):
             continue
-        thickness = abs(L.depth - (body_min_depth if L.name == 'back_protrusion' else body_max_depth))
+        cap_thickness = abs(L.depth - (body_min_depth if L.name == 'back_protrusion' else body_max_depth))
         if L.name == 'back_protrusion':
-            shift_z = -thickness
+            thickness = cap_thickness
+            shift_z = -cap_thickness
             comment_head = (f'# Back protrusion (depth {fmt(L.depth)} → '
-                            f'{fmt(body_min_depth)}, {fmt(thickness)} mm), fused below the body')
+                            f'{fmt(body_min_depth)}, {fmt(cap_thickness)} mm), fused below the body')
             op_outer = 'fuse'
             op_hole = 'cut'
         elif L.name == 'front_protrusion':
-            shift_z = body_thickness
-            comment_head = (f'# Front protrusion (depth {fmt(body_max_depth)} → '
-                            f'{fmt(L.depth)}, {fmt(thickness)} mm), fused above the body')
+            # Per-loop classification: polygon loops whose silhouettes extend
+            # outside the body's z=0 silhouette get extruded full-height (from
+            # body_min_depth up to the layer) so they have proper support down
+            # to the floor instead of floating as caps over open air. Cylinder
+            # and box loops (e.g. annular rings co-axial with the body) stay
+            # as thin caps regardless — extending them would fill back cuts
+            # made by pocket layers below.
+            cap_shift = body_thickness
+            full_thickness = L.depth - body_min_depth
+            full_shift = 0.0
+            sub_parents = _classify_loops(L.loops)
+            n_loops = len(L.loops)
+            cls: list[bool | None] = [None] * n_loops
+            for i in range(n_loops):
+                if sub_parents[i] == -1:
+                    if L.circles[i] is not None or L.boxes[i] is not None:
+                        cls[i] = False
+                    elif body_silhouette is None:
+                        cls[i] = False
+                    else:
+                        cls[i] = any(
+                            not _point_in_polygon(v, body_silhouette)
+                            for v in L.loops[i]
+                        )
+            # Propagate classification from each outer to its descendants so
+            # holes inside an outside-body tab inherit the tab's full-height
+            # treatment (avoids breaking parent-child topology in the emit).
+            changed = True
+            while changed:
+                changed = False
+                for i in range(n_loops):
+                    if cls[i] is None and cls[sub_parents[i]] is not None:
+                        cls[i] = cls[sub_parents[i]]
+                        changed = True
+            thickness = [full_thickness if cls[i] else cap_thickness for i in range(n_loops)]
+            shift_z = [full_shift if cls[i] else cap_shift for i in range(n_loops)]
+            n_full = sum(1 for c in cls if c)
+            n_cap = n_loops - n_full
+            if n_full and n_cap:
+                comment_head = (f'# Front protrusion ({n_cap} cap loop(s) at '
+                                f'depth {fmt(body_max_depth)} → {fmt(L.depth)}, '
+                                f'{n_full} full-height loop(s) at '
+                                f'depth {fmt(body_min_depth)} → {fmt(L.depth)}), fused')
+            elif n_full:
+                comment_head = (f'# Front protrusion (depth {fmt(body_min_depth)} → '
+                                f'{fmt(L.depth)}, {fmt(full_thickness)} mm full-height '
+                                f'— silhouette extends outside body), fused')
+            else:
+                comment_head = (f'# Front protrusion (depth {fmt(body_max_depth)} → '
+                                f'{fmt(L.depth)}, {fmt(cap_thickness)} mm), fused above the body')
             op_outer = 'fuse'
             op_hole = 'cut'
         else:  # pocket
+            thickness = cap_thickness
             shift_z = L.depth - body_min_depth
-            comment_head = (f'# Pocket at local z={fmt(shift_z)} ({fmt(thickness)} mm deep), '
+            comment_head = (f'# Pocket at local z={fmt(shift_z)} ({fmt(cap_thickness)} mm deep), '
                             f'cut from body')
             op_outer = 'cut'
             op_hole = 'fuse'
@@ -1126,6 +1379,7 @@ def _emit_code(cross_origin: Vec, x_dir: Vec, y_dir: Vec, z_dir: Vec,
             base_name=L.name, blade_var='blade',
             preferred_start=preferred_start,
             z_dir=z_dir, cylinders_out=cylinders, boxes_out=boxes_out,
+            raw_loops=L.raw_loops,
         )
         code.append('')
 
