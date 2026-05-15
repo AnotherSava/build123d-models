@@ -1,7 +1,7 @@
 import shutil
 import tempfile
 import warnings
-from copy import copy
+from copy import copy, deepcopy
 from pathlib import Path
 from collections.abc import Iterable
 
@@ -25,6 +25,13 @@ _index: int = 1
 # IsValid check on imported geometry) — the triangles go straight into the
 # 3MF/STL output as-is. Keyed by label, list of (verts, faces) tuples.
 _raw_meshes: dict[str, list[tuple[list, list]]] = {}
+# Labels for which the caller opted into emergency export: on add_shape
+# failure, fall back to writing raw triangles instead of raising. Set by
+# `export(..., emergency=True)`.
+_emergency_labels: set[str] = set()
+# Labels where the emergency fallback actually fired (output is NOT slicer-safe).
+# Drives the warning banner at the end of save_3mf / save_stl.
+_emergency_used: set[str] = set()
 
 
 def _is_valid_color(name: str) -> bool:
@@ -96,8 +103,49 @@ def clear() -> None:
     global _index
     _shapes.clear()
     _raw_meshes.clear()
+    _emergency_labels.clear()
+    _emergency_used.clear()
     _label_colors.clear()
     _index = 1
+
+
+def _try_add_shape(mesher: Mesher, prepared: Shape, label: str, **kwargs) -> None:
+    """Add `prepared` to `mesher`. On lib3MF validation failure, fall back to
+    raw triangles iff `label` is emergency-flagged; otherwise re-raise.
+
+    The fallback is opt-in (via `export(..., emergency=True)`) and prints a
+    loud per-shape warning; a final banner is emitted by save_3mf / save_stl
+    if any fallback fired.
+    """
+    try:
+        mesher.add_shape(prepared, **kwargs)
+    except RuntimeError as e:
+        if label not in _emergency_labels:
+            raise
+        print(f"!!! EMERGENCY: '{label}' failed lib3MF validation: {e}")
+        print(f"!!! Writing raw triangles -- geometry is NOT slicer-safe.")
+        verts, tris = Mesher._mesh_shape(deepcopy(prepared), 0.001, 0.1)
+        _add_raw_mesh_to_mesher(mesher, verts, tris, label)
+        _emergency_used.add(label)
+
+
+def _print_emergency_banner() -> None:
+    """Print a loud reminder that any emergency-flagged fallbacks ran."""
+    if not _emergency_used:
+        return
+    bar = "=" * 70
+    print()
+    print(bar)
+    print("WARNING: emergency export bypassed lib3MF validation for:")
+    for lbl in sorted(_emergency_used):
+        print(f"  - {lbl}")
+    print()
+    print("Output is NOT usable as-is. The geometry contains defects")
+    print("(typically non-manifold edges from dense CSG) that will fail")
+    print("in slicers (PrusaSlicer/Bambu/Cura). Fix the modeling code that")
+    print("produced these shapes before printing.")
+    print(bar)
+    print()
 
 
 def _add_raw_mesh_to_mesher(mesher: Mesher, verts: list, faces: list, label: str) -> None:
@@ -153,11 +201,17 @@ def _copy_shape_for_storage(shape):
         return copy(shape)
 
 
-def export(*shapes, label: str = None):
+def export(*shapes, label: str = None, emergency: bool = False):
     """Add shape(s) to export storage.
 
     If label is provided, all shapes use that label.
     Otherwise, each shape uses its own .label attribute or gets an auto-generated label.
+
+    `emergency=True` opts the label into a raw-triangle fallback if
+    lib3MF rejects the shape's tessellation during save (typical for
+    densely-CSG'd solids with non-manifold edges). The bypass prints a
+    loud warning per shape and a final banner. Output produced this way
+    is NOT slicer-safe and is intended for diagnostic visualization only.
     """
     global _index
 
@@ -169,6 +223,8 @@ def export(*shapes, label: str = None):
 
         if shape_label not in _shapes:
             _shapes[shape_label] = []
+        if emergency:
+            _emergency_labels.add(shape_label)
         _shapes[shape_label].append(_copy_shape_for_storage(shape))
 
 
@@ -277,6 +333,7 @@ def save_3mf(location: str = None, current: bool = False) -> None:
         print(f"\nCopying 3MF to use as a current model: {current_model_location}\n")
         shutil.copy2(actual_location, current_model_location)
 
+    _print_emergency_banner()
     logger.info("Done")
 
 def _save_3mf(location: str) -> None:
@@ -289,7 +346,7 @@ def _save_3mf(location: str) -> None:
             for prepared in _prepare_shape(shape, label, edge_max_length):
                 with warnings.catch_warnings(record=True) as caught_warnings:
                     warnings.simplefilter("always")
-                    mesher.add_shape(prepared, angular_deflection=0.05)
+                    _try_add_shape(mesher, prepared, label, angular_deflection=0.05)
 
                     # Print any warnings with label information
                     for w in caught_warnings:
@@ -350,7 +407,7 @@ def save_stl(directory: str = None) -> None:
         mesher = Mesher()
         for shape in shapes:
             for prepared in _prepare_shape(shape, label, edge_max_length, prepare_for_stl=True):
-                mesher.add_shape(prepared)
+                _try_add_shape(mesher, prepared, label)
 
         file_path = create_file_path(actual_directory, f"{label}.stl")
         mesher.write(str(file_path))
@@ -364,4 +421,5 @@ def save_stl(directory: str = None) -> None:
         mesher.write(str(file_path))
         print(f"  - {Path(file_path).name}")
 
+    _print_emergency_banner()
     logger.info("Done")
