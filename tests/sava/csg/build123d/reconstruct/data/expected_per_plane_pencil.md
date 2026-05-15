@@ -1,4 +1,4 @@
-# Pencil sketches for each plane of `obj_1.off`
+# Pencil sketches for each plane of `iris_blade.off`
 
 Total surface area: **1047.19 mm²**
 Significant planes (≥1% of surface area): **9**

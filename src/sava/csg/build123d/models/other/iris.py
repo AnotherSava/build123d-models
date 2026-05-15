@@ -91,10 +91,10 @@ def create_diaphragm_plate(dim: IrisDimensions) -> tuple[SmartSolid, SmartBox]:
     dim.protrusion_thickness slot pockets at the top, in a 6-fold polar
     pattern around the iris axis. Z thickness from `dim.plate_thickness`.
 
-    Simplified from `tmp/diaframma/obj_8_Diaf 1.stl` reconstruction: the 42-gon
-    source body is replaced by its enclosing disc, and the slot polar pattern
-    is centred exactly on the iris axis (the source mesh had a ~0.4 mm offset
-    that was likely tessellation noise).
+    Simplified from the source-mesh reconstruction: the 42-gon source body is
+    replaced by its enclosing disc, and the slot polar pattern is centred
+    exactly on the iris axis (the source mesh had a ~0.4 mm offset that was
+    likely tessellation noise).
     """
     plate = SmarterCone.cylinder(45.9268, dim.plate_thickness, label='diaphragm_plate')
     plate.cut(SmarterCone.cylinder(20.5, dim.plate_thickness))
@@ -169,7 +169,7 @@ def _aligned_cover_rotation(dim: IrisDimensions, slot_position: float) -> float:
 def create_cover(dim: IrisDimensions) -> SmartSolid:
     """Iris front cover — the disc that caps the housing in front of the blades.
 
-    Reverse-engineered from `tmp/diaframma/obj_7_Diaf 2.stl`. XY geometry:
+    Reverse-engineered from the source-mesh reconstruction. XY geometry:
     Ø86.584 body; central Ø40.6 through-hole; six stadium clearance slots in
     a 6-fold polar pattern. Stadium centre and length come from helper
     functions so the slot fits the pin's sp=0..1 travel with exactly

@@ -1,10 +1,10 @@
 # Findings — research log
 
-Discoveries from developing the 2.5D reconstruction algorithm, anchored to the iris blade case (`obj_1_Diaf 3.stl`). Read this before iterating on the algorithm — most of these were surprising and several were arrived at after wrong turns.
+Discoveries from developing the 2.5D reconstruction algorithm, anchored to the iris blade case (`tests/sava/csg/build123d/reconstruct/data/iris_blade.off`). Read this before iterating on the algorithm — most of these were surprising and several were arrived at after wrong turns.
 
 ## What the iris blade actually is
 
-The actual mesh `obj_1_Diaf 3.stl` (162 vertices, 320 triangles, bbox 18.9 × 17.5 × 26.5 mm) is **a flat 3-mm-thick petal**, oriented in a plane whose normal is `(+0.683, −0.731, 0)` — tilted ~47° from world X around Z.
+The reference mesh (162 vertices, 320 triangles, bbox 18.9 × 17.5 × 26.5 mm) is **a flat 3-mm-thick petal**, oriented in a plane whose normal is `(+0.683, −0.731, 0)` — tilted ~47° from world X around Z.
 
 Aspect ratio along the part's own axes: **3 × 22 × 26.5 mm** (thickness × length × height). This is what an iris diaphragm blade actually looks like: a thin, tall, broadly-triangular petal that pivots around a pin at its base.
 

@@ -168,7 +168,7 @@ Total: linear in mesh size for the geometries this targets.
 
 ## Verification
 
-The reference test is the iris blade (`obj_1_Diaf 3.stl`, 162 vertices, 320 triangles). Expected behavior:
+The reference test is the iris blade (`tests/sava/csg/build123d/reconstruct/data/iris_blade.off`, 162 vertices, 320 triangles). Expected behavior:
 
 - 9 significant planes detected (4 caps + 6 side walls of which 5 are flat, 1 is the floor)
 - Extrusion axis: `(+0.683, -0.731, 0)` within ±0.001
