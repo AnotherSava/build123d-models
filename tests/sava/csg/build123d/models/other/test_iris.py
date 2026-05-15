@@ -1,153 +1,123 @@
-import math
-
 import pytest
 
-from sava.csg.build123d.models.other.iris import IrisDimensions, create_blade, create_blades, _polar
+from sava.csg.build123d.models.other.iris import (
+    IrisDimensions,
+    create_blade,
+    create_blades,
+    create_cover,
+    create_diaphragm_plate,
+    _pin_along_stadium_axis,
+)
+
+
+@pytest.fixture(scope='module')
+def dim():
+    return IrisDimensions()
+
+
+@pytest.fixture(scope='module')
+def slot(dim):
+    _, slot = create_diaphragm_plate(dim)
+    return slot
 
 
 class TestIrisDimensions:
-    def test_aperture_radii(self):
-        dim = IrisDimensions()
-        assert dim.aperture_radius_min == 6.43
-        assert dim.aperture_radius_max == 20.5
+    @pytest.mark.parametrize("plate_thickness,min_thickness,expected", [
+        (2.999, 0.8, 2.199),
+        (3.0, 1.0, 2.0),
+        (5.0, 0.5, 4.5),
+    ])
+    def test_protrusion_thickness_derivation(self, plate_thickness, min_thickness, expected):
+        dim = IrisDimensions(plate_thickness=plate_thickness, min_thickness=min_thickness)
+        assert abs(dim.protrusion_thickness - expected) < 1e-9
 
-    def test_blade_angular_span(self):
-        dim = IrisDimensions()
-        assert dim.blade_angular_span == 60.0
+    @pytest.mark.parametrize("pin_diameter,expected_radius", [(3.64, 1.82), (4.0, 2.0), (5.0, 2.5)])
+    def test_pin_radius_derivation(self, pin_diameter, expected_radius):
+        dim = IrisDimensions(pin_diameter=pin_diameter)
+        assert abs(dim.pin_radius - expected_radius) < 1e-9
 
-    @pytest.mark.parametrize("blade_count,expected_span", [(3, 120.0), (4, 90.0), (5, 72.0), (6, 60.0), (8, 45.0)])
-    def test_blade_angular_span_parametric(self, blade_count, expected_span):
-        dim = IrisDimensions(blade_count=blade_count)
-        assert dim.blade_angular_span == expected_span
-
-    def test_pin_dimensions(self):
-        dim = IrisDimensions()
-        assert dim.pin_radius == 1.82
-        assert abs(dim.pivot_hole_radius - (1.82 + 0.2)) < 1e-9
-
-    def test_blade_outer_radius_exceeds_pcd(self):
-        dim = IrisDimensions()
-        assert dim.blade_outer_radius > dim.pcd_radius
-
-    def test_rotation_range_positive(self):
-        dim = IrisDimensions()
-        assert dim.rotation_range > 0
-
-    def test_rotation_range_produces_correct_max_aperture(self):
-        """Verify that rotating by rotation_range moves the inner edge midpoint
-        from aperture_radius_min to aperture_radius_max distance from center."""
-        dim = IrisDimensions()
-        lever = dim.pcd_radius - dim.aperture_radius_min
-        delta = math.radians(dim.rotation_range)
-        distance = math.sqrt(dim.pcd_radius ** 2 - 2 * dim.pcd_radius * lever * math.cos(delta) + lever ** 2)
-        assert abs(distance - dim.aperture_radius_max) < 0.001
-
-    @pytest.mark.parametrize("aperture_min,aperture_max", [(20, 30), (25, 35), (30, 40), (10, 20)])
-    def test_rotation_range_parametric_apertures(self, aperture_min, aperture_max):
-        dim = IrisDimensions(aperture_diameter_min=aperture_min, aperture_diameter_max=aperture_max)
-        lever = dim.pcd_radius - dim.aperture_radius_min
-        delta = math.radians(dim.rotation_range)
-        distance = math.sqrt(dim.pcd_radius ** 2 - 2 * dim.pcd_radius * lever * math.cos(delta) + lever ** 2)
-        assert abs(distance - dim.aperture_radius_max) < 0.001
-
-    def test_drive_slot_arc_length_positive(self):
-        dim = IrisDimensions()
-        assert dim.drive_slot_arc_length > 0
-
-    def test_drive_pin_radius_from_center(self):
-        dim = IrisDimensions()
-        assert dim.drive_pin_radius_from_center == dim.pcd_radius - dim.drive_pin_offset
+    @pytest.mark.parametrize("pin_diameter,pin_padding,expected", [
+        (3.64, 0.2, 4.04),
+        (4.0, 0.3, 4.6),
+        (5.0, 0.0, 5.0),
+    ])
+    def test_cover_slot_width_derivation(self, pin_diameter, pin_padding, expected):
+        dim = IrisDimensions(pin_diameter=pin_diameter, pin_padding=pin_padding)
+        assert abs(dim.cover_slot_width - expected) < 1e-9
 
 
 class TestCreateBlade:
-    # Reference-mesh-derived constants (see iris._BODY_THICKNESS, _PIVOT_PIN_HEIGHT, _BACK_PROTRUSION_THICKNESS).
-    BACK_PROTRUSION_THICKNESS = 1.5
-    BODY_THICKNESS = 3.0
-    PIVOT_PIN_HEIGHT = 4.0
+    @pytest.mark.parametrize("slot_position", [0.0, 0.5, 1.0])
+    def test_blade_z_range(self, dim, slot, slot_position):
+        """Aligned blade: back protrusion sits in the slot pocket, body and
+        pin stack above. Total Z span is back + body + pin."""
+        blade = create_blade(dim, slot, slot_position)
+        expected_height = dim.protrusion_thickness + dim.blade_thickness + dim.pin_height
+        assert abs(blade.z_min - slot.z_min) < 0.01
+        assert abs((blade.z_max - blade.z_min) - expected_height) < 0.01
 
-    def test_blade_z_range(self):
-        dim = IrisDimensions()
-        blade = create_blade(dim)
-        assert abs(blade.z_min - (-self.BACK_PROTRUSION_THICKNESS)) < 0.01
-        assert abs(blade.z_max - (self.BODY_THICKNESS + self.PIVOT_PIN_HEIGHT)) < 0.01
-
-    def test_blade_extends_past_pcd(self):
-        dim = IrisDimensions()
-        blade = create_blade(dim)
-        assert blade.x_max > dim.pcd_radius
-
-    def test_pivot_at_pcd_radius(self):
-        """Pivot pin must be centered on (pcd_radius, 0); the pin's Y bbox bounds
-        match the pin radius."""
-        dim = IrisDimensions()
-        blade = create_blade(dim)
-        assert abs(blade.y_min - (-dim.pin_radius)) < 0.01
-
-    def test_blade_has_volume(self):
-        dim = IrisDimensions()
-        blade = create_blade(dim)
+    @pytest.mark.parametrize("slot_position", [0.0, 0.5, 1.0])
+    def test_blade_has_volume(self, dim, slot, slot_position):
+        blade = create_blade(dim, slot, slot_position)
         assert blade.solid.volume > 0
 
 
 class TestCreateBlades:
-    def test_blade_count_default(self):
-        dim = IrisDimensions()
-        blades = create_blades(dim)
+    def test_blade_count_default(self, dim, slot):
+        blades = create_blades(dim, slot)
         assert len(blades) == 6
 
-    @pytest.mark.parametrize("blade_count", [3, 4, 5, 6, 7, 8])
-    def test_blade_count_parametric(self, blade_count):
-        dim = IrisDimensions(blade_count=blade_count)
-        blades = create_blades(dim)
-        assert len(blades) == blade_count
-
-    def test_all_blades_have_volume(self):
-        dim = IrisDimensions()
-        blades = create_blades(dim)
+    @pytest.mark.parametrize("slot_position", [0.0, 0.5, 1.0])
+    def test_all_blades_have_volume(self, dim, slot, slot_position):
+        blades = create_blades(dim, slot, slot_position=slot_position)
         for blade in blades:
             assert blade.solid.volume > 0
 
-    def test_blades_at_closed_have_same_volume(self):
-        dim = IrisDimensions()
-        blades = create_blades(dim, rotation_angle=0)
+    @pytest.mark.parametrize("slot_position", [0.0, 0.5, 1.0])
+    def test_blades_have_equal_volume(self, dim, slot, slot_position):
+        """All blades come from the same template, just rotated — volumes must match."""
+        blades = create_blades(dim, slot, slot_position=slot_position)
         volumes = [b.solid.volume for b in blades]
         for v in volumes:
             assert abs(v - volumes[0]) < 0.01
 
-    def test_blades_at_open_have_same_volume(self):
-        dim = IrisDimensions()
-        blades = create_blades(dim, rotation_angle=dim.rotation_range)
-        volumes = [b.solid.volume for b in blades]
-        for v in volumes:
-            assert abs(v - volumes[0]) < 0.01
 
-    def test_closed_aperture_matches_min(self):
-        """At closed position, the inner edge midpoint of blade 0 should be at aperture_radius_min from center."""
-        dim = IrisDimensions()
-        # The inner edge midpoint in global coords is at (aperture_radius_min, 0) for blade 0
-        # Verify by checking blade 0's geometry — the innermost point along the x-axis
-        # should be at approximately aperture_radius_min
-        blades = create_blades(dim, rotation_angle=0)
-        blade_0 = blades[0]
-        # Blade 0 is centered on angle 0, inner edge midpoint at (r_min, 0)
-        # The blade's x_min is at the corners (cos(half_span) * r_inner), not the midpoint
-        # So we check the expected aperture geometrically
-        inner_mid = _polar(dim.aperture_radius_min, 0)
-        distance_from_center = math.sqrt(inner_mid[0] ** 2 + inner_mid[1] ** 2)
-        assert abs(distance_from_center - dim.aperture_radius_min) < 0.001
+class TestCreateDiaphragmPlate:
+    def test_plate_has_volume(self, dim):
+        plate, _ = create_diaphragm_plate(dim)
+        assert plate.solid.volume > 0
 
-    def test_open_aperture_matches_max(self):
-        """At open position, the rotated inner edge midpoint should be at aperture_radius_max from center."""
-        dim = IrisDimensions()
-        # Inner edge midpoint at closed: (aperture_radius_min, 0)
-        # Pivot at: (pcd_radius, 0)
-        # After rotating by rotation_range around pivot:
-        pivot = _polar(dim.pcd_radius, 0)
-        inner_mid_rel = (dim.aperture_radius_min - pivot[0], 0 - pivot[1])
-        angle = math.radians(dim.rotation_range)
-        rotated_x = inner_mid_rel[0] * math.cos(angle) - inner_mid_rel[1] * math.sin(angle)
-        rotated_y = inner_mid_rel[0] * math.sin(angle) + inner_mid_rel[1] * math.cos(angle)
-        abs_x = pivot[0] + rotated_x
-        abs_y = pivot[1] + rotated_y
-        distance = math.sqrt(abs_x ** 2 + abs_y ** 2)
-        assert abs(distance - dim.aperture_radius_max) < 0.001
+    @pytest.mark.parametrize("plate_thickness", [2.0, 2.999, 5.0])
+    def test_plate_thickness_drives_z_extent(self, plate_thickness):
+        dim = IrisDimensions(plate_thickness=plate_thickness)
+        plate, _ = create_diaphragm_plate(dim)
+        assert abs((plate.z_max - plate.z_min) - plate_thickness) < 0.01
+
+
+class TestCreateCover:
+    def test_cover_has_volume(self, dim):
+        cover = create_cover(dim)
+        assert cover.solid.volume > 0
+
+    @pytest.mark.parametrize("cover_thickness", [1.5, 2.0, 3.5])
+    def test_cover_thickness_drives_z_extent(self, cover_thickness):
+        dim = IrisDimensions(cover_thickness=cover_thickness)
+        cover = create_cover(dim)
+        assert abs((cover.z_max - cover.z_min) - cover_thickness) < 0.01
+
+    @pytest.mark.parametrize("pin_padding", [0.1, 0.2, 0.5])
+    @pytest.mark.parametrize("pin_diameter", [2.5, 3.0, 3.64])
+    def test_both_extremes_have_exact_pin_padding_clearance(self, pin_diameter, pin_padding):
+        """Stadium centre is shifted along the long axis so pin travel is
+        symmetric — both extremes (sp=0 and sp=1) get exactly `pin_padding`
+        of clearance from the pin OD to the stadium end."""
+        dim = IrisDimensions(pin_diameter=pin_diameter, pin_padding=pin_padding)
+        a_0 = _pin_along_stadium_axis(dim, 0.0)
+        a_1 = _pin_along_stadium_axis(dim, 1.0)
+        # Symmetric around the (shifted) stadium centre
+        assert abs(a_0 + a_1) < 1e-9
+        slot_length = 2 * abs(a_0) + dim.cover_slot_width
+        gap_at_sp0 = slot_length / 2 - (abs(a_0) + dim.pin_radius)
+        gap_at_sp1 = slot_length / 2 - (abs(a_1) + dim.pin_radius)
+        assert abs(gap_at_sp0 - pin_padding) < 1e-9
+        assert abs(gap_at_sp1 - pin_padding) < 1e-9
