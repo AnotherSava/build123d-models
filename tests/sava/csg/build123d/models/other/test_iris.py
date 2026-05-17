@@ -12,7 +12,9 @@ from sava.csg.build123d.models.other.iris import (
 
 @pytest.fixture(scope='module')
 def dim():
-    return IrisDimensions()
+    # The blade-Z assertions assume a single back protrusion. Disable
+    # `plate_cut_through` so the captive-tab slabs aren't stacked below.
+    return IrisDimensions(plate_cut_through=False)
 
 
 @pytest.fixture(scope='module')

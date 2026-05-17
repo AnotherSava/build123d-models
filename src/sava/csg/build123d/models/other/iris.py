@@ -17,19 +17,15 @@ class IrisDimensions:
     plate_min_thickness: float = 0.0      # minimum floor left under the plate slot pocket (can be 0)
     plate_cut_through: bool = True # extend slots all the way to the side
     plate_slot_length_coefficient: float = 0.7 # length of the slot coefficient (1 for full possible length)
-    plate_slot_width: float = 2.5
+    plate_slot_width: float = 2.5   # Y-extent of the plate's slot pockets the blade protrusion rides in
     cover_thickness: float = 2.0    # front cover disc
     pin_diameter: float = 3      # blade pivot pin
     pin_height: float = 4.0         # blade pivot pin
     pin_padding: float = 0.25       # radial clearance between pin and cover stadium walls
     bore_diameter: float = 35.0    # central through-hole, shared by plate and cover
     outer_diameter: float = 71.0    # outer disc, shared by plate and cover
-    cut_length: float = 5.0
-    cut_angle: float = 10.0
-
-    # aperture_diameter_min: float = 25.0
-    # aperture_diameter_max: float = 35.0
-    # pcd_radius: float = 30.0
+    cut_length: float = 5.0         # radial depth of the six decorative cuts on the plate's outer edge
+    cut_angle: float = 10.0         # angular full-width (deg) of each decorative outer-edge cut
 
     @property
     def protrusion_thickness(self) -> float:
@@ -56,17 +52,31 @@ class IrisDimensions:
         of clearance on each side."""
         return self.pin_diameter + 2 * self.pin_padding
 
+
 def _create_protrusion(width: float, thickness: float, align_to: SmartSolid) -> SmartSolid:
+    """Build a back-protrusion slab and attach it under the back of `align_to`.
+
+    The XY footprint is a right trapezoid: `length_base` long along +X, `width`
+    deep along -Y, with the trailing edge canted at `angle` so it tracks the
+    body's B-C edge (28.78° off the Y axis). `thickness` is the Z extrusion.
+
+    Alignment is x(LR) y(LR) z(LL): the slab's left-X and low-Y line up with
+    `align_to`'s left-X and low-Y, and its top-Z sits at `align_to`'s bottom-Z
+    — i.e. the slab hangs below `align_to`. Stacking via repeated calls (used
+    by `create_blade` when `plate_cut_through` is on) keeps stepping further
+    down because each fuse moves `align_to.z_min` down.
+    """
     length_base = 14.07
+    angle = -38.7829
 
     back_protrusion = Pencil()
     back_protrusion.down(width)
     back_protrusion.right(length_base)
-    angle = -38.7829
     back_protrusion.up_to(0, angle)
     back_protrusion_body = back_protrusion.extrude(thickness)
     back_protrusion_body.align(align_to).x(Alignment.LR).y(Alignment.LR).z(Alignment.LL)
     return back_protrusion_body
+
 
 def create_blade(dim: IrisDimensions, slot: SmartBox, slot_position: float) -> SmartSolid:
     """Create a single iris blade aligned into the given plate slot.
@@ -83,6 +93,9 @@ def create_blade(dim: IrisDimensions, slot: SmartBox, slot_position: float) -> S
     - Back protrusion: Z in [-dim.protrusion_thickness, 0].
     - Main body:       Z in [0, dim.blade_thickness].
     - Pivot pin:       Z in [dim.blade_thickness, dim.blade_thickness + dim.pin_height].
+
+    When `dim.plate_cut_through` is on, two extra slabs are stacked further
+    below the back protrusion to form a captive tab — see the cut-through block.
     """
     # Main body (front-cap silhouette, the 6-gon)
     body = Pencil()
@@ -98,6 +111,9 @@ def create_blade(dim: IrisDimensions, slot: SmartBox, slot_position: float) -> S
     blade.fuse(back_protrusion_body)
 
     if dim.plate_cut_through:
+        # Captive tab below the plate: a `pin_padding * 2` shim that clears the
+        # plate floor, then a wider slab (Y wider than the plate slot) that
+        # latches under the plate so the blade can't lift back through the slot.
         blade.fuse(_create_protrusion(protrusion_width, dim.pin_padding * 2, blade))
         blade.fuse(_create_protrusion(dim.plate_slot_width * 1.5, protrusion_width, blade))
 
@@ -114,9 +130,10 @@ def create_blade(dim: IrisDimensions, slot: SmartBox, slot_position: float) -> S
 
 def create_diaphragm_plate(dim: IrisDimensions) -> tuple[SmartSolid, SmartBox]:
     """Diaphragm plate: `dim.outer_diameter` disc with a `dim.bore_diameter`
-    central bore and six 39 × 2 × dim.protrusion_thickness slot pockets at
-    the top, in a 6-fold polar pattern around the iris axis. Z thickness from
-    `dim.plate_thickness`.
+    central bore and six `slot_length × dim.plate_slot_width × dim.protrusion_thickness`
+    slot pockets at the top, in a 6-fold polar pattern around the iris axis.
+    Z thickness from `dim.plate_thickness`. Six decorative notches are carved
+    into the outer edge between the slot positions (see `cut_length`, `cut_angle`).
 
     Simplified from the source-mesh reconstruction: the 42-gon source body is
     replaced by its enclosing disc, and the slot polar pattern is centred
@@ -125,25 +142,31 @@ def create_diaphragm_plate(dim: IrisDimensions) -> tuple[SmartSolid, SmartBox]:
     """
     plate = SmarterCone.base(dim.outer_radius, label='diaphragm_plate').inner(dim.bore_radius).extend(height=dim.plate_thickness)
 
+    # Decorative outer-edge cutter: an arc along the disc rim that mirrors
+    # across Y into a teardrop shape, extruded full-thickness for cutting.
     pencil = Pencil()
     pencil.arc_with_radius(dim.outer_radius, 180, dim.cut_angle / 2)
     pencil.jump_to((0, -dim.cut_length))
     plate_cut = pencil.extrude_mirrored_y(dim.plate_thickness)
     plate_cut.align(plate).y(Alignment.RL)
 
-    # SmartBox is Z-base-aligned, so the slot's bottom sits at min_thickness
+    # SmartBox is Z-base-aligned, so the slot's bottom sits at plate_min_thickness
     # above the plate base, making the pocket flush with the plate's top face
-    # and leaving `min_thickness` of plate material below. Slot 0 lies along +X
-    # (source-mesh slot orientation -76.955° + 76.955° world rotation = 0°);
-    # centre rotated by the same 76.955°.
+    # and leaving `plate_min_thickness` of plate material below. The slot's
+    # inner X edge is anchored at x = -24.4233 (radially inner); slot_length
+    # grows the slot outward. Slot 0 lies along +X (source-mesh slot orientation
+    # -76.955° + 76.955° world rotation = 0°); centre rotated by the same 76.955°.
     slot_length = 35.1 * dim.plate_slot_length_coefficient
     slot = SmartBox(slot_length, dim.plate_slot_width, dim.protrusion_thickness).move(slot_length / 2 - 24.4233, 23.8221, dim.plate_min_thickness)
     for i in range(6):
+        # +15° offsets the decorative notches off the slot positions so they
+        # sit on the rim between adjacent slots, not on top of them.
         plate.cut(plate_cut.rotated(Axis.Z, i * 60 + 15))
         plate.cut(slot.rotated(Axis.Z, i * 60))
         if dim.plate_cut_through:
+            # Extend the slot outward past the plate edge so the blade
+            # protrusion can be slid in radially during assembly.
             plate.cut(slot.aligned(slot).x(Alignment.LL).done().rotate(Axis.Z, i * 60))
-
 
     return plate, slot
 
@@ -222,8 +245,6 @@ def create_cover(dim: IrisDimensions) -> SmartSolid:
     slot.move(*_cover_stadium_center(dim), 0)
     for i in range(6):
         cover.cut(slot.rotated(Axis.Z, i * 60))
-
-    cover.cut(SmarterCone.cylinder(dim.bore_radius, dim.cover_thickness))
 
     return cover
 
