@@ -299,9 +299,19 @@ class SmarterCone(SmartSolid):
             assert 0 < radius < last.radius, f"Inner radius must satisfy 0 < inner_radius < radius, got inner={radius}, outer={last.radius}"
             replaced = ConeSection(last.radius, last.height, inner_radius=radius, shift_x=last.shift_x, shift_y=last.shift_y, inner_shift_x=shift_x, inner_shift_y=shift_y)
         self.sections[-1] = replaced
-        self.solid = self._build_solid()
-        self.assert_valid()
+        self._rebuild()
         return self
+
+    def _rebuild(self) -> None:
+        """Rebuild `self.solid` from `self.sections` and re-apply tracked
+        transforms (`self._orientation`, `self.origin`) so prior `rotate()` /
+        `move()` calls survive the rebuild. Without this, mid-build transforms
+        would silently disappear because `_build_solid()` always produces an
+        unrotated solid at the origin in `self.plane`.
+        """
+        self.solid = self._build_solid()
+        self._apply_tracked_transforms()
+        self.assert_valid()
 
     def _propagate_inner(self, prev: ConeSection, outer_radius: float, shift_x: float, shift_y: float) -> tuple[float | None, float | None, float | None]:
         """Compute inner radius/shifts for a new section based on the previous section and current mode.
@@ -332,8 +342,7 @@ class SmarterCone(SmartSolid):
             return
         inner_radius, inner_shift_x, inner_shift_y = self._propagate_inner(prev, last.radius, last.shift_x, last.shift_y)
         self.sections[-1] = ConeSection(last.radius, last.height, inner_radius=inner_radius, shift_x=last.shift_x, shift_y=last.shift_y, inner_shift_x=inner_shift_x, inner_shift_y=inner_shift_y)
-        self.solid = self._build_solid()
-        self.assert_valid()
+        self._rebuild()
 
     def _resolve_extend_params(self, radius: float, height: float, angle: float, shift_x: float, shift_y: float) -> tuple[float, float]:
         """Resolve extend parameters into absolute (radius, height)."""
@@ -394,8 +403,7 @@ class SmarterCone(SmartSolid):
             self.sections.pop()
             self.sections.extend(fillet_sections)
         self.sections.append(new_section)
-        self.solid = self._build_solid()
-        self.assert_valid()
+        self._rebuild()
         return self
 
     # --- create_offset / create_shell / copy ---

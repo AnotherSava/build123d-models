@@ -5,6 +5,7 @@ from parameterized import parameterized
 
 from sava.csg.build123d.common.geometry import MIN_SIZE_OCCT, are_points_too_close
 from sava.csg.build123d.common.smartercone import InnerMode, SmarterCone
+from tests.sava.csg.build123d.test_utils import assertVectorAlmostEqual
 
 
 class TestSmarterConeShell(unittest.TestCase):
@@ -675,6 +676,78 @@ class TestSmarterConeInnerModeRadius(unittest.TestCase):
         """Test that inner() with no args raises AssertionError"""
         with self.assertRaises(AssertionError):
             SmarterCone.base(50).inner()
+
+
+class TestSmarterConeBuilderTransformCommute(unittest.TestCase):
+    """SmarterCone's builder methods (`inner`, `extend`, `_recalculate_inner`)
+    rebuild `self.solid` from `self.sections` via `_build_solid()`, which
+    always produces an unrotated, origin-anchored solid in `self.plane`. To
+    keep prior `rotate()` / `move()` calls from silently disappearing across
+    rebuilds, the rebuild path replays `self._orientation` and `self.origin`.
+
+    These tests pin the resulting commutativity: builder calls and transforms
+    can be interleaved in any order and the final world geometry matches
+    "complete all builder calls, then apply all transforms."
+    """
+
+    def _bbox_tuple(self, s):
+        bb = s.bound_box
+        return (bb.min.X, bb.min.Y, bb.min.Z, bb.max.X, bb.max.Y, bb.max.Z)
+
+    def _assert_bbox_close(self, s1, s2):
+        b1, b2 = self._bbox_tuple(s1), self._bbox_tuple(s2)
+        for a, b in zip(b1, b2):
+            self.assertAlmostEqual(a, b, places=4)
+
+    @parameterized.expand([(30,), (60,), (90,), (180,), (-60,)])
+    def test_rotate_before_extend_matches_rotate_after(self, angle):
+        """Wedge built via inner+extend: rotate-then-extend == extend-then-rotate."""
+        a = SmarterCone.base(35.5, angle=20).inner(25.5)
+        a.rotate_z(angle)
+        a.extend(height=2)
+
+        b = SmarterCone.base(35.5, angle=20).inner(25.5)
+        b.extend(height=2)
+        b.rotate_z(angle)
+
+        self._assert_bbox_close(a, b)
+
+    def test_move_before_extend_matches_move_after(self):
+        """Translation also commutes with builder rebuild."""
+        a = SmarterCone.base(35.5, angle=20).inner(25.5)
+        a.move(10, 0, 0)
+        a.extend(height=2)
+
+        b = SmarterCone.base(35.5, angle=20).inner(25.5)
+        b.extend(height=2)
+        b.move(10, 0, 0)
+
+        self._assert_bbox_close(a, b)
+
+    def test_rotate_and_move_interleaved(self):
+        """rotate-move-extend produces the same geometry as extend-move-rotate
+        with the equivalent reordering (move target adjusted for rotation)."""
+        a = SmarterCone.base(35.5, angle=20).inner(25.5)
+        a.rotate_z(60)
+        a.move(5, 5, 0)
+        a.extend(height=2)
+
+        b = SmarterCone.base(35.5, angle=20).inner(25.5)
+        b.extend(height=2)
+        b.rotate_z(60)
+        b.move(5, 5, 0)
+
+        self._assert_bbox_close(a, b)
+
+    def test_rebuild_preserves_invariant(self):
+        """After mid-build rotate + extend, the SmartSolid invariants hold:
+        `self.origin == self.solid.location.position` and
+        `self._orientation == self.solid.orientation`."""
+        s = SmarterCone.base(35.5, angle=20).inner(25.5)
+        s.rotate_z(60)
+        s.extend(height=2)
+        assertVectorAlmostEqual(self, s.origin, s.solid.location.position)
+        assertVectorAlmostEqual(self, s._orientation, s.solid.orientation)
 
 
 if __name__ == '__main__':

@@ -55,21 +55,32 @@ def fuse(*args):
 
 
 class SmartSolid:
-    """Invariant: `self.origin == self.solid.location.position` for single-shape
-    solids. This is what makes `orient()`'s location-anchored rotation pivot
-    coincide with the user-facing anchor, so `rotate()` around the world axes
-    behaves as expected (rotation around the world axis line, not around some
-    stale construction anchor).
+    """Two coupled invariants for single-shape solids:
+      - `self.origin == self.solid.location.position`
+      - `self._orientation == self.solid.orientation`
+
+    These let `orient()`'s location-anchored rotation pivot coincide with the
+    user-facing anchor, so `rotate()` around the world axes behaves as expected
+    (rotation around the world axis line, not around some stale construction
+    anchor) and `rotate(0)` is a true no-op.
 
     Construction and operations that produce a fresh OCC shape (`fuse`, `cut`,
-    `intersect`, `mirror`, `scale`) typically leave `location.position` at the
-    OCC default (corner anchor or `(0, 0, 0)` post-boolean). `_reanchor()`
-    re-syncs `location.position` to `self.origin` without moving world geometry,
-    so the invariant holds after every operation.
+    `intersect`, `mirror`, `scale`) bake the prior orientation/position into
+    the new BRep at identity location and orientation. These ops therefore
+    reset `self.origin` AND `self._orientation` to identity and call
+    `_reanchor()` to restore the location invariant.
+
+    Subclass builder methods (e.g. `SmarterCone.extend/inner`) take the
+    opposite tack: `_build_solid()` produces an *unrotated* solid that needs
+    the tracked transforms re-applied. They call `_apply_tracked_transforms()`
+    after rebuild, which sets `solid.orientation = self._orientation` and
+    translates to `self.origin` — making builder calls commute with prior
+    `rotate()`/`move()` calls.
 
     For `ShapeList`-valued solids (boolean ops that produced disconnected
-    pieces) there's no single `location` to anchor; `_reanchor()` is a no-op
-    and `rotate()` falls back to rotating a wrapped `Compound` at origin.
+    pieces) there's no single `location` to anchor; the invariant helpers
+    are no-ops and `rotate()` falls back to rotating a wrapped `Compound`
+    at origin.
     """
 
     def __init__(self, *args, label: str = None):
@@ -108,6 +119,30 @@ class SmartSolid:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             self.solid.relocate(Location(target, self.solid.location.orientation))
+        return self
+
+    def _apply_tracked_transforms(self) -> 'SmartSolid':
+        """Replay `self._orientation` and `self.origin` onto a freshly built
+        `self.solid` (one with identity location and identity orientation).
+        Used by subclass builder methods (e.g. `SmarterCone.extend`/`inner`)
+        which call `_build_solid()` to rebuild from sections — the rebuild
+        always produces an unrotated, origin-anchored solid in `self.plane`,
+        so prior `rotate()`/`move()` calls would silently disappear. This
+        re-applies them so the visible geometry stays consistent with the
+        tracked state across builder iterations.
+
+        For single-axis cumulative rotations and translations the result is
+        equivalent to "complete the builder chain first, then transform" —
+        i.e. builder calls commute with transforms applied through
+        `rotate(Axis.X/Y/Z)` and `move()`.
+        """
+        if self.solid is None or isinstance(self.solid, ShapeList):
+            return self
+        if self._orientation.length > 1e-10:
+            self.solid.orientation = self._orientation
+        current_pos = Vector(self.solid.location.position)
+        if (current_pos - self.origin).length > 1e-10:
+            self.solid = self.solid.moved(Location(tuple(self.origin - current_pos)))
         return self
 
     @property
@@ -399,6 +434,7 @@ class SmartSolid:
             with SkipClean():
                 self.solid = wrap(original) - cutter
         self.origin = Vector(0, 0, 0)
+        self._orientation = Vector(0, 0, 0)
         self._reanchor()
         self.assert_valid()
         return self
@@ -409,6 +445,7 @@ class SmartSolid:
     def fuse(self, *args) -> 'SmartSolid':
         self.solid = fuse(self.solid, *args)
         self.origin = Vector(0, 0, 0)
+        self._orientation = Vector(0, 0, 0)
         self._reanchor()
         self.assert_valid()
         return self
@@ -595,6 +632,7 @@ class SmartSolid:
             with SkipClean():
                 self.solid = original & other
         self.origin = Vector(0, 0, 0)
+        self._orientation = Vector(0, 0, 0)
         self._reanchor()
         self.assert_valid()
         return self
@@ -640,6 +678,7 @@ class SmartSolid:
 
         self.solid = self._scale_solid(1 + pad_x / self.x_size, 1 + pad_y / self.y_size, 1 + pad_z / self.z_size)
         self.origin = Vector(0, 0, 0)
+        self._orientation = Vector(0, 0, 0)
         self._reanchor()
         return self
 
@@ -649,6 +688,7 @@ class SmartSolid:
     def scale(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None):
         self.solid = self._scale_solid(factor_x, factor_y, factor_z)
         self.origin = Vector(0, 0, 0)
+        self._orientation = Vector(0, 0, 0)
         self._reanchor()
         return self
 
@@ -658,6 +698,7 @@ class SmartSolid:
     def mirror(self, about: Plane = Plane.XZ) -> 'SmartSolid':
         self.solid = mirror(self.solid, about)
         self.origin = Vector(0, 0, 0)
+        self._orientation = Vector(0, 0, 0)
         self._reanchor()
         return self
 

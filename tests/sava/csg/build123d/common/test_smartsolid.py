@@ -993,6 +993,26 @@ class TestSmartSolidRotateAroundWorldOrigin(unittest.TestCase):
 
         assertVectorAlmostEqual(self, a.origin, (0, 0, 0))
 
+    def test_rotate_fuse_rotate_zero_does_not_double_rotate(self):
+        """Regression: pre-fix, `self._orientation` lingered through `fuse()`
+        even though the fused BRep already incorporated the rotation. A
+        subsequent `rotate_z(0)` then re-applied the stale orientation,
+        rotating the world geometry a second time. The fix is to reset
+        `self._orientation` to identity in the same place we reset
+        `self.origin` (i.e. in `fuse`/`cut`/`intersect`/`mirror`/`scale`/`pad`)."""
+        a = SmartSolid(Box(4, 4, 4))
+        a.move(20, 0, 0)
+        a.rotate_z(90)
+        # Overlapping box so OCC fuse returns a single Shape (not ShapeList).
+        a.fuse(SmartSolid(Box(2, 2, 2)).move(0, 20, 0))
+        bbox_before = (a.bound_box.min.Y, a.bound_box.max.Y)
+
+        a.rotate_z(0)  # semantically a no-op
+        bbox_after = (a.bound_box.min.Y, a.bound_box.max.Y)
+
+        self.assertAlmostEqual(bbox_before[0], bbox_after[0], places=4)
+        self.assertAlmostEqual(bbox_before[1], bbox_after[1], places=4)
+
 
 def _build_pencil_cutter() -> SmartSolid:
     """Match the iris / dispenser-bottle-mount decorative outer-edge cutter
