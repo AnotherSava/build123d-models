@@ -28,7 +28,7 @@ class TestIrisDimensions:
         (5.0, 0.5, 4.5),
     ])
     def test_protrusion_thickness_derivation(self, plate_thickness, min_thickness, expected):
-        dim = IrisDimensions(plate_thickness=plate_thickness, min_thickness=min_thickness)
+        dim = IrisDimensions(plate_thickness=plate_thickness, plate_min_thickness=min_thickness)
         assert abs(dim.protrusion_thickness - expected) < 1e-9
 
     @pytest.mark.parametrize("pin_diameter,expected_radius", [(3.64, 1.82), (4.0, 2.0), (5.0, 2.5)])
