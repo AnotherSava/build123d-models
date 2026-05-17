@@ -321,17 +321,25 @@ class Pencil:
     def y_to(self, y_pos: float):
         return self.jump_to((self.location.X, y_pos))
 
-    def up_to(self, y_pos: float):
+    def up_to(self, y_pos: float, angle: float = None):
         assert y_pos > self.location.Y
-        return self.y_to(y_pos)
+        if angle is None:
+            return self.y_to(y_pos)
+        cos_a = cos(radians(angle))
+        assert cos_a > 0, f"up_to with angle {angle}° requires cos(angle) > 0 (+Y component)"
+        return self.draw((y_pos - self.location.Y) / cos_a, angle)
 
     def up(self, length: float = None):
         assert length is None or length > 0
         return self.y_to(0 if length is None else self.location.Y + length)
 
-    def down_to(self, y_pos: float):
+    def down_to(self, y_pos: float, angle: float = None):
         assert y_pos < self.location.Y
-        return self.y_to(y_pos)
+        if angle is None:
+            return self.y_to(y_pos)
+        cos_a = cos(radians(angle))
+        assert cos_a < 0, f"down_to with angle {angle}° requires cos(angle) < 0 (-Y component)"
+        return self.draw((y_pos - self.location.Y) / cos_a, angle)
 
     def down(self, length: float = None):
         assert length is None or length > 0
@@ -340,16 +348,24 @@ class Pencil:
     def x_to(self, x_pos: float):
         return self.jump_to((x_pos, self.location.Y))
 
-    def right_to(self, x_pos: float):
+    def right_to(self, x_pos: float, angle: float = None):
         assert x_pos > self.location.X
-        return self.x_to(x_pos)
+        if angle is None:
+            return self.x_to(x_pos)
+        sin_a = sin(radians(angle))
+        assert sin_a < 0, f"right_to with angle {angle}° requires sin(angle) < 0 (+X component)"
+        return self.draw((self.location.X - x_pos) / sin_a, angle)
 
     def right(self, length: float = None):
         return self.x_to(0 if length is None else self.location.X + length)
 
-    def left_to(self, x_pos: float):
+    def left_to(self, x_pos: float, angle: float = None):
         assert x_pos < self.location.X
-        return self.x_to(x_pos)
+        if angle is None:
+            return self.x_to(x_pos)
+        sin_a = sin(radians(angle))
+        assert sin_a > 0, f"left_to with angle {angle}° requires sin(angle) > 0 (-X component)"
+        return self.draw((self.location.X - x_pos) / sin_a, angle)
 
     def left(self, length: float = None):
         return self.x_to(0 if length is None else self.location.X - length)

@@ -81,6 +81,22 @@ pencil.up_to(10)       # same as y_to but asserts Y increases
 pencil.down_to(-5)     # same as y_to but asserts Y decreases
 ```
 
+Each `_to` method accepts an optional second `angle` (degrees, same convention as
+`draw` — CCW from +Y). When supplied, the move travels along that angle until it
+reaches the target X (for `right_to`/`left_to`) or Y (for `up_to`/`down_to`) — the
+orthogonal coordinate is computed from the angle:
+
+```python
+pencil.right_to(1.2294, -38.7829)  # diagonal until X=1.2294 (ends at ~(1.2294, 1.53))
+pencil.up_to(10, 30)               # diagonal up-left until Y=10
+pencil.left_to(0, 60)              # diagonal up-left until X=0
+pencil.down_to(0, 150)             # diagonal down-left until Y=0
+```
+
+The angle must have a non-zero component along the locked direction (e.g. `right_to`
+needs `sin(angle) < 0` so the +X component is positive), otherwise the target is
+unreachable and the call asserts.
+
 ## `draw` — line at an angle
 
 ```python
