@@ -147,6 +147,11 @@ solid.rotate_x(90)              # shorthand for rotate(Axis.X, 90)
 solid.rotate_y(90)
 solid.rotate_z(90)
 
+# Non-mutating variants return a copy
+solid.rotated_z(45)             # shorthand for rotated(Axis.Z, 45)
+solid.rotated_x(90)
+solid.rotated_y(90)
+
 # Rotate around multiple axes sequentially (fixed axes, incremental)
 solid.rotate_multi((90, 0, 45))
 solid.rotate_multi((90, 0, 45), plane=Plane.XY)

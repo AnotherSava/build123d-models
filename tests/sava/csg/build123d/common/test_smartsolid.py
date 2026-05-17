@@ -1,8 +1,11 @@
 import unittest
 
-from build123d import Box, Sphere, Plane, Axis, Vector
+from build123d import Box, Sphere, Plane, Axis, ShapeList, Vector
 from parameterized import parameterized
 
+from sava.csg.build123d.common.geometry import rotate_vector
+from sava.csg.build123d.common.pencil import Pencil
+from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from tests.sava.csg.build123d.test_utils import assertVectorAlmostEqual
 
@@ -273,43 +276,44 @@ class TestSmartSolidOriginTracking(unittest.TestCase):
         # orient() is rotation-only — origin stays at (10, 0, 0)
         assertVectorAlmostEqual(self, box.origin, (10, 0, 0))
 
-    def test_mirror_xz_tracks_origin(self):
-        """Test that mirror(Plane.XZ) updates origin correctly."""
+    def test_mirror_xz_resets_origin(self):
+        """mirror() produces a fresh OCC shape with location.position == (0, 0, 0);
+        the class invariant requires self.origin to match, so it resets to (0, 0, 0)
+        rather than reflecting the previous value."""
         box = SmartSolid(Box(100, 50, 30))
         box.move(10, 5, 0)
 
-        box.mirror(Plane.XZ)  # Mirror about Y=0 plane
+        box.mirror(Plane.XZ)
 
-        # After mirroring about XZ plane: Y becomes -Y
-        assertVectorAlmostEqual(self, box.origin, (10, -5, 0))
+        assertVectorAlmostEqual(self, box.origin, (0, 0, 0))
 
-    def test_mirror_yz_tracks_origin(self):
-        """Test that mirror(Plane.YZ) updates origin correctly."""
+    def test_mirror_yz_resets_origin(self):
+        """mirror() resets self.origin to (0, 0, 0) (see test_mirror_xz_resets_origin)."""
         box = SmartSolid(Box(100, 50, 30))
         box.move(10, 5, 0)
 
-        box.mirror(Plane.YZ)  # Mirror about X=0 plane
+        box.mirror(Plane.YZ)
 
-        # After mirroring about YZ plane: X becomes -X
-        assertVectorAlmostEqual(self, box.origin, (-10, 5, 0))
+        assertVectorAlmostEqual(self, box.origin, (0, 0, 0))
 
-    def test_scale_tracks_origin(self):
-        """Test that scale() updates origin correctly."""
+    def test_scale_resets_origin(self):
+        """scale() produces a fresh OCC shape with location.position == (0, 0, 0);
+        self.origin resets to match the invariant."""
         box = SmartSolid(Box(100, 50, 30))
         box.move(10, 5, 3)
 
         box.scale(2, 2, 2)
 
-        assertVectorAlmostEqual(self, box.origin, (20, 10, 6))
+        assertVectorAlmostEqual(self, box.origin, (0, 0, 0))
 
-    def test_scale_non_uniform_tracks_origin(self):
-        """Test that non-uniform scale() updates origin correctly."""
+    def test_scale_non_uniform_resets_origin(self):
+        """Non-uniform scale() also resets self.origin to (0, 0, 0)."""
         box = SmartSolid(Box(100, 50, 30))
         box.move(10, 10, 10)
 
         box.scale(2, 3, 4)
 
-        assertVectorAlmostEqual(self, box.origin, (20, 30, 40))
+        assertVectorAlmostEqual(self, box.origin, (0, 0, 0))
 
     def test_rotate_axis_tracks_origin(self):
         """Test that rotate(axis, angle) updates origin correctly."""
@@ -874,6 +878,188 @@ class TestSmartSolidOrientationTracking(unittest.TestCase):
         box = SmartSolid(Box(10, 20, 30))
         box.rotate_multi((45, 30, 60))
         assertVectorAlmostEqual(self, box._orientation, box.solid.orientation)
+
+
+def _offset_axis(axis: Axis) -> Axis:
+    """Axis with the same direction as `axis` but a sub-tolerance positional
+    offset — bypasses the `axis in (Axis.X/Y/Z)` shortcut in `SmartSolid.rotate`
+    while staying on the same axis line within floating-point precision."""
+    if axis == Axis.Z:
+        return Axis((1e-9, 0, 0), (0, 0, 1))
+    if axis == Axis.X:
+        return Axis((0, 1e-9, 0), (1, 0, 0))
+    return Axis((1e-9, 0, 0), (0, 1, 0))  # Axis.Y
+
+
+class TestSmartSolidRotateAroundWorldOrigin(unittest.TestCase):
+    """Cardinal-axis rotation (`Axis.X/Y/Z`) must always pivot at the world axis
+    line, regardless of where `self.solid.location.position` ended up. The fast
+    path goes through `orient()` (which rotates around the shape's
+    location.position) and then applies a compensating translation
+    `R(θ)·pivot − pivot` to re-anchor the result to the world axis.
+
+    Strategy:
+    - For symmetric single boxes, directly verify `bound_box.center()` maps to
+      `R(θ)·original_center` (AABB stays centred on the rotated centroid).
+    - For asymmetric / fused / pencil-built shapes, compare the cardinal-axis
+      result against the OCC branch (an off-axis axis at the same line via
+      `_offset_axis`) — they apply the same rotation through different code
+      paths and must produce identical geometry.
+    """
+
+    # ----- Direct analytic check: single box is symmetric around its centre -----
+
+    @parameterized.expand([
+        (Axis.Z, 30), (Axis.Z, 60), (Axis.Z, 90), (Axis.Z, 180), (Axis.Z, -120),
+        (Axis.X, 45), (Axis.X, 90),
+        (Axis.Y, 60), (Axis.Y, 180),
+    ])
+    def test_translated_box_pivots_at_world_origin(self, axis, angle):
+        box = SmartSolid(Box(4, 4, 4))
+        box.move(20, 5, 3)
+        c_before = box.bound_box.center()
+
+        box.rotate(axis, angle)
+
+        expected = rotate_vector(c_before, axis, angle)
+        assertVectorAlmostEqual(self, box.bound_box.center(), expected)
+
+    # ----- Cardinal vs OCC parity: works for any geometry, any angle -----
+
+    @parameterized.expand([
+        (Axis.Z, 30), (Axis.Z, 60), (Axis.Z, 120),
+        (Axis.X, 45), (Axis.X, 90),
+        (Axis.Y, 60), (Axis.Y, 90),
+    ])
+    def test_after_fuse_matches_offaxis(self, axis, angle):
+        """Regression: `fuse()` resets `location.position` to `(0, 0, 0)` while
+        `self.origin` keeps its tracked value. Old code used `self.origin` as
+        the rotation pivot and translated wrong; the cardinal path must produce
+        identical geometry to the OCC branch around the same axis."""
+        a1 = SmartSolid(Box(4, 4, 4))
+        a1.move(20, 5, 3)
+        a1.fuse(SmartSolid(Box(2, 2, 2)).move(24, 5, 3))
+        a2 = a1.copy()
+
+        a1.rotate(axis, angle)
+        a2.rotate(_offset_axis(axis), angle)
+
+        assertVectorAlmostEqual(self, a1.bound_box.min, a2.bound_box.min)
+        assertVectorAlmostEqual(self, a1.bound_box.max, a2.bound_box.max)
+
+    @parameterized.expand([(30,), (60,), (90,), (120,), (180,), (-60,)])
+    def test_pencil_built_matches_offaxis(self, angle):
+        """Pencil-built solids carry a non-trivial `location.position` from
+        face/extrude construction. The dispenser-bottle-mount polar-pattern
+        bug surfaced here: cardinal Z rotation must match the OCC branch."""
+        a1 = _build_pencil_cutter()
+        a2 = a1.copy()
+
+        a1.rotate(Axis.Z, angle)
+        a2.rotate(_offset_axis(Axis.Z), angle)
+
+        assertVectorAlmostEqual(self, a1.bound_box.min, a2.bound_box.min)
+        assertVectorAlmostEqual(self, a1.bound_box.max, a2.bound_box.max)
+
+    @parameterized.expand([(0,), (60,), (120,), (180,), (240,), (300,)])
+    def test_polar_pattern_via_rotated_z(self, angle):
+        """6-fold polar pattern via `rotated_z(i * 60)` on a pencil-built
+        cutter — regression for the dispenser-bottle-mount failure mode where
+        rotated copies landed at the wrong radii / angles."""
+        cutter = _build_pencil_cutter()
+
+        cardinal = cutter.rotated_z(angle)
+        explicit = cutter.rotated(_offset_axis(Axis.Z), angle)
+
+        assertVectorAlmostEqual(self, cardinal.bound_box.min, explicit.bound_box.min)
+        assertVectorAlmostEqual(self, cardinal.bound_box.max, explicit.bound_box.max)
+
+    # ----- Origin tracking -----
+
+    def test_after_fuse_resets_origin(self):
+        """`fuse()` produces a fresh OCC shape with location.position == (0, 0, 0);
+        the invariant requires self.origin to match, so it resets — the
+        pre-fuse anchor is not preserved. Subsequent rotate around Z then
+        rotates `(0, 0, 0)` to `(0, 0, 0)`."""
+        a = SmartSolid(Box(4, 4, 4))
+        a.move(20, 5, 0)
+        b = SmartSolid(Box(2, 2, 2))
+        b.move(24, 5, 0)
+        a.fuse(b)
+
+        assertVectorAlmostEqual(self, a.origin, (0, 0, 0))
+
+        a.rotate(Axis.Z, 90)
+
+        assertVectorAlmostEqual(self, a.origin, (0, 0, 0))
+
+
+def _build_pencil_cutter() -> SmartSolid:
+    """Match the iris / dispenser-bottle-mount decorative outer-edge cutter
+    silhouette: an arc-and-teardrop face mirrored across Y, then extruded.
+    Asymmetric enough to expose the AABB-vs-centroid mismatch."""
+    pencil = Pencil()
+    pencil.arc_with_radius(30, 180, 15)
+    pencil.jump_to((0, -10))
+    return pencil.extrude_mirrored_y(2)
+
+
+class TestSmartSolidLocationInvariant(unittest.TestCase):
+    """`SmartSolid` maintains the invariant `self.origin == self.solid.location.position`
+    for single-shape solids. These tests pin down that the invariant holds after
+    every operation that could break it — construction (including raw `Box` whose
+    OCC default anchors at the `-X/-Y/-Z` corner), `move`, `rotate`, `mirror`,
+    `scale`, `fuse`, `cut`, `intersect`. `_reanchor()` in `__init__` and the
+    OCC-op wrappers re-syncs `location.position` to `self.origin` without
+    moving world geometry."""
+
+    def _assert_invariant(self, solid: SmartSolid):
+        if solid.solid is None or isinstance(solid.solid, ShapeList):
+            return
+        assertVectorAlmostEqual(self, solid.origin, solid.solid.location.position)
+
+    def test_invariant_after_raw_box_init(self):
+        """Raw `Box(L, W, H)` defaults to a corner anchor; `__init__` must
+        re-sync so the invariant holds from the start."""
+        self._assert_invariant(SmartSolid(Box(4, 4, 4)))
+
+    def test_invariant_after_smartbox_init(self):
+        self._assert_invariant(SmartBox(4, 4, 4))
+
+    def test_invariant_after_pencil_built(self):
+        self._assert_invariant(_build_pencil_cutter())
+
+    def test_invariant_after_move(self):
+        s = SmartSolid(Box(4, 4, 4)).move(20, 5, 3)
+        self._assert_invariant(s)
+
+    @parameterized.expand([(Axis.Z, 30), (Axis.X, 90), (Axis.Y, 45), (Axis.Z, 180)])
+    def test_invariant_after_rotate(self, axis, angle):
+        s = SmartSolid(Box(4, 4, 4)).move(20, 5, 3)
+        s.rotate(axis, angle)
+        self._assert_invariant(s)
+
+    def test_invariant_after_mirror(self):
+        s = SmartSolid(Box(4, 4, 4)).move(10, 5, 0)
+        s.mirror(Plane.XZ)
+        self._assert_invariant(s)
+
+    def test_invariant_after_scale(self):
+        s = SmartSolid(Box(4, 4, 4)).move(10, 5, 3)
+        s.scale(2, 2, 2)
+        self._assert_invariant(s)
+
+    def test_invariant_after_fuse(self):
+        a = SmartSolid(Box(4, 4, 4)).move(20, 5, 3)
+        b = SmartSolid(Box(4, 4, 4)).move(22, 5, 3)  # overlapping → single Shape result
+        a.fuse(b)
+        self._assert_invariant(a)
+
+    def test_invariant_after_cut(self):
+        a = SmartSolid(Box(10, 10, 10)).move(20, 5, 3)
+        b = SmartSolid(Box(2, 2, 2)).move(20, 5, 3)
+        a.cut(b)
+        self._assert_invariant(a)
 
 
 if __name__ == '__main__':

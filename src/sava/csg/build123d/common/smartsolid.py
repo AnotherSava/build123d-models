@@ -1,3 +1,4 @@
+import warnings
 from copy import copy
 from collections.abc import Iterable
 from math import radians
@@ -54,6 +55,23 @@ def fuse(*args):
 
 
 class SmartSolid:
+    """Invariant: `self.origin == self.solid.location.position` for single-shape
+    solids. This is what makes `orient()`'s location-anchored rotation pivot
+    coincide with the user-facing anchor, so `rotate()` around the world axes
+    behaves as expected (rotation around the world axis line, not around some
+    stale construction anchor).
+
+    Construction and operations that produce a fresh OCC shape (`fuse`, `cut`,
+    `intersect`, `mirror`, `scale`) typically leave `location.position` at the
+    OCC default (corner anchor or `(0, 0, 0)` post-boolean). `_reanchor()`
+    re-syncs `location.position` to `self.origin` without moving world geometry,
+    so the invariant holds after every operation.
+
+    For `ShapeList`-valued solids (boolean ops that produced disconnected
+    pieces) there's no single `location` to anchor; `_reanchor()` is a no-op
+    and `rotate()` falls back to rotating a wrapped `Compound` at origin.
+    """
+
     def __init__(self, *args, label: str = None):
         """Create a SmartSolid from one or more solid objects.
 
@@ -66,7 +84,31 @@ class SmartSolid:
         self.origin = Vector(0, 0, 0)
         self._orientation = Vector(0, 0, 0)
         self.bed_orientation: VectorLike | None = None
+        self._reanchor()
         self.assert_valid()
+
+    def _reanchor(self) -> 'SmartSolid':
+        """Sync `self.solid.location.position` to `self.origin` without moving
+        world geometry. Restores the invariant after operations whose OCC
+        primitive resets the location (boolean ops) or anchors it at a
+        non-canonical point (e.g. raw `Box(L, W, H)` corner-anchors at
+        `(-L/2, -W/2, -H/2)`).
+
+        Uses `relocate` — the only build123d API that changes `location.position`
+        without translating world geometry. The deprecation message points at
+        `move/locate`, but those *do* move the geometry, so they don't fit this
+        use case; we accept the warning as a known cost.
+        """
+        if self.solid is None or isinstance(self.solid, ShapeList):
+            return self
+        current = Vector(self.solid.location.position)
+        target = Vector(self.origin)
+        if (current - target).length < 1e-10:
+            return self
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.solid.relocate(Location(target, self.solid.location.orientation))
+        return self
 
     @property
     def bound_box(self) -> BoundBox:
@@ -233,30 +275,22 @@ class SmartSolid:
         For the three world axes through the origin (`Axis.X`, `Axis.Y`, `Axis.Z`),
         the rotation goes through `orient()` so subclass overrides (`SmartLoft`,
         `SweepSolid`) can keep their subsidiary profiles/paths in sync.
+        `orient()` rotates the geometry around `self.solid.location.position`;
+        the class invariant `self.origin == self.solid.location.position`
+        guarantees that pivot equals `self.origin`, so `R(θ)·old_origin − old_origin`
+        is exactly the translation needed to re-anchor the rotation to the world
+        axis line.
 
         For any other axis (including off-origin parallel axes like the polar
         pivot used by N-fold patterns), the rotation is applied directly via
-        an OCP `gp_Trsf` — `orient()` only knows how to rotate around the
-        solid's construction origin, so it can't handle off-origin axes.
-        Subsidiary objects in subclasses won't follow the rotation in that
-        case; the use of off-origin rotation on lofts/sweeps is rare enough
-        that it hasn't been needed.
+        an OCP `gp_Trsf`. Subsidiary objects in subclasses won't follow the
+        rotation in that case; the use of off-origin rotation on lofts/sweeps
+        is rare enough that it hasn't been needed.
         """
         old_origin = Vector(self.origin)
-        if axis == Axis.X:
-            new_orient = rotate_orientation(self._orientation, (angle, 0, 0), Plane.XY)
-            self.orient(new_orient)
-            delta = rotate_vector(old_origin, axis, angle) - old_origin
-            if delta.length > 1e-10:
-                self.solid = self.solid.moved(Location(tuple(delta)))
-        elif axis == Axis.Y:
-            new_orient = rotate_orientation(self._orientation, (0, angle, 0), Plane.XY)
-            self.orient(new_orient)
-            delta = rotate_vector(old_origin, axis, angle) - old_origin
-            if delta.length > 1e-10:
-                self.solid = self.solid.moved(Location(tuple(delta)))
-        elif axis == Axis.Z:
-            new_orient = rotate_orientation(self._orientation, (0, 0, angle), Plane.XY)
+        if axis in (Axis.X, Axis.Y, Axis.Z):
+            rotations = (angle, 0, 0) if axis == Axis.X else (0, angle, 0) if axis == Axis.Y else (0, 0, angle)
+            new_orient = rotate_orientation(self._orientation, rotations, Plane.XY)
             self.orient(new_orient)
             delta = rotate_vector(old_origin, axis, angle) - old_origin
             if delta.length > 1e-10:
@@ -291,6 +325,15 @@ class SmartSolid:
 
     def rotate_z(self, angle: float) -> 'SmartSolid':
         return self.rotate(Axis.Z, angle)
+
+    def rotated_x(self, angle: float) -> 'SmartSolid':
+        return self.rotated(Axis.X, angle)
+
+    def rotated_y(self, angle: float) -> 'SmartSolid':
+        return self.rotated(Axis.Y, angle)
+
+    def rotated_z(self, angle: float) -> 'SmartSolid':
+        return self.rotated(Axis.Z, angle)
 
     # Orientation in build123d works a bit weird:
     # (a, b, c) input does rotate "a" degrees around axis X, then "b" degrees around axis Y, then "c" degrees around axis Z.
@@ -355,6 +398,8 @@ class SmartSolid:
         if not self.wrap_solid().is_valid:
             with SkipClean():
                 self.solid = wrap(original) - cutter
+        self.origin = Vector(0, 0, 0)
+        self._reanchor()
         self.assert_valid()
         return self
 
@@ -363,6 +408,8 @@ class SmartSolid:
 
     def fuse(self, *args) -> 'SmartSolid':
         self.solid = fuse(self.solid, *args)
+        self.origin = Vector(0, 0, 0)
+        self._reanchor()
         self.assert_valid()
         return self
 
@@ -547,6 +594,8 @@ class SmartSolid:
         if self.solid is not None and not self.wrap_solid().is_valid:
             with SkipClean():
                 self.solid = original & other
+        self.origin = Vector(0, 0, 0)
+        self._reanchor()
         self.assert_valid()
         return self
 
@@ -583,7 +632,6 @@ class SmartSolid:
     def _scale_solid(self, factor_x: float, factor_y: float, factor_z: float):
         factor_y = factor_y or factor_x
         factor_z = factor_z or factor_y or factor_x
-        self.origin = Vector(self.origin.X * factor_x, self.origin.Y * factor_y, self.origin.Z * factor_z)
         return scale(self.solid, (factor_x, factor_y, factor_z))
 
     def pad(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None):
@@ -591,6 +639,8 @@ class SmartSolid:
         pad_z = pad_x if pad_z is None else pad_z
 
         self.solid = self._scale_solid(1 + pad_x / self.x_size, 1 + pad_y / self.y_size, 1 + pad_z / self.z_size)
+        self.origin = Vector(0, 0, 0)
+        self._reanchor()
         return self
 
     def padded(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None, label: str = None):
@@ -598,6 +648,8 @@ class SmartSolid:
 
     def scale(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None):
         self.solid = self._scale_solid(factor_x, factor_y, factor_z)
+        self.origin = Vector(0, 0, 0)
+        self._reanchor()
         return self
 
     def scaled(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None, label: str = None):
@@ -605,12 +657,8 @@ class SmartSolid:
 
     def mirror(self, about: Plane = Plane.XZ) -> 'SmartSolid':
         self.solid = mirror(self.solid, about)
-        # Mirror the origin point about the same plane
-        # Reflect origin across the plane: p' = p - 2 * (p - o).dot(n) * n
-        # where o is plane origin, n is plane normal
-        relative = self.origin - about.origin
-        distance = relative.dot(about.z_dir)
-        self.origin = self.origin - about.z_dir * (2 * distance)
+        self.origin = Vector(0, 0, 0)
+        self._reanchor()
         return self
 
     def mirrored(self, about: Plane = Plane.XZ, label: str = None) -> 'SmartSolid':
