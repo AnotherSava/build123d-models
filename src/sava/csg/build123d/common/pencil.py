@@ -67,6 +67,19 @@ class Pencil:
         start = to_vector(start)
         self.plane = Plane(plane.origin + plane.x_dir * start.X + plane.y_dir * start.Y, x_dir=plane.x_dir, z_dir=plane.z_dir)
 
+    @classmethod
+    def from_points(cls, points: list[VectorLike], plane: Plane = Plane.XY) -> 'Pencil':
+        """Build a Pencil whose path is straight line segments connecting `points`
+        in order. The pencil starts at `points[0]` (plane origin is shifted there)
+        and one `Line` segment is added per subsequent point. The polygon auto-closes
+        back to `points[0]` when `create_face` / `extrude` is called."""
+        assert len(points) >= 2, "from_points requires at least 2 points"
+        origin = to_vector(points[0])
+        pencil = cls(plane=plane, start=origin)
+        for p in points[1:]:
+            pencil.jump_to(to_vector(p) - origin)
+        return pencil
+
     def process_vector_input(self, vector: VectorLike) -> Vector:
         vector = to_vector(vector)
         vector = Vector(snap_to(vector.X, 0), snap_to(vector.Y, 0), snap_to(vector.Z, 0))

@@ -54,6 +54,16 @@ pencil = Pencil(start=(20, 0))
 pencil = Pencil(pipe.create_path_plane(), (-radius, 0))
 ```
 
+### `from_points` — Pencil from a vertex list
+
+When you already have the polygon's vertices, skip the per-segment `draw`/`jump_to` calls:
+
+```python
+Pencil.from_points([(0, 0), (10, 0), (10, 5), (0, 5)], plane=Plane.XY)
+```
+
+The pencil starts at `points[0]` (the plane origin is shifted there) and adds one straight `Line` segment per subsequent point. The polygon auto-closes back to `points[0]` when you call `create_face` / `extrude`. Requires at least 2 points.
+
 ## Cardinal direction drawing
 
 Move in straight lines along the local X/Y axes. Called without arguments, they return to 0 on that axis.
