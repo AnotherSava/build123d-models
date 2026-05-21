@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from build123d import Axis
 
 from sava.csg.build123d.common.exporter import export_3mf, export_stl
-from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.geometry import Alignment, create_vector
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone, InnerMode
@@ -14,9 +14,9 @@ from sava.csg.build123d.common.smartsolid import SmartSolid
 @dataclass(frozen=True)
 class DispenserBottleMountDimensions:
     # --- Dispenser housing ---
-    dispenser_inner_diameter_min: float = 71
-    dispenser_inner_diameter_max: float = 71.5
-    dispenser_outer_diameter: float = 76
+    dispenser_inner_diameter_min: float = 70.7
+    dispenser_inner_diameter_max: float = 71.2
+    dispenser_outer_diameter: float = 75.8
     thickness_wall: float = 2
 
     # --- Dispenser support wedges + cut_holder tolerances ---
@@ -24,17 +24,16 @@ class DispenserBottleMountDimensions:
     tight_padding: float = 0.0          # radial shrink applied to cut_length for the supports / cut_holder
     support_bottom_angle: float = 20    # angular full-width of each support_bottom wedge
     support_bottom_height: float = 3.0
-    support_middle_angle: float = 30    # angular full-width of each support_middle wedge
     support_top_height: float = 3.0
+    support_gear_count: float = 96
 
-    # --- Iris diaphragm (the dispenser's bottle-slot mechanism) ---
+    # --- Iris diaphragm (plate + blades that form the bottle-slot mechanism) ---
     blade_thickness: float = 20.0    # blade main body (Z extrusion of the petal silhouette)
     plate_thickness: float = 3.0  # diaphragm plate disc
     plate_min_thickness: float = 0.0      # minimum floor left under the plate slot pocket (can be 0)
     plate_cut_through: bool = True # extend slots all the way to the side
     plate_slot_length_coefficient: float = 0.7 # length of the slot coefficient (1 for full possible length)
     plate_slot_width: float = 2.5   # Y-extent of the plate's slot pockets the blade protrusion rides in
-    cover_thickness: float = 2.0    # front cover disc
     pin_diameter: float = 3      # blade pivot pin
     pin_height: float = 4.0         # blade pivot pin
     pin_padding: float = 0.25       # radial clearance between pin and cover stadium walls
@@ -42,32 +41,51 @@ class DispenserBottleMountDimensions:
     cut_length: float = 5.0         # radial depth of the six decorative cuts on the plate's outer edge
     cut_angle: float = 10.0         # angular full-width (deg) of each decorative outer-edge cut
     cut_angle_shift: float = 15     # angular offset of decorative notches relative to the slot polar pattern (puts them between adjacent slots)
-    wall_padding: float = 0.1           # radial clearance between iris outer rim (plate, cover ring) and dispenser inner wall
+    wall_padding: float = 0.1           # radial clearance between plate and dispenser inner wall
     blade_vertical_padding: float = 0.5 # vertical clearance between blade body and support_middle top
     above_dispenser_height: float = 10  # Z extent of the iris stack that protrudes above the dispenser top
 
-    # --- Derived ---
+    # --- Cover (front cap with stadium slots + decorative gear rim) ---
+    cover_thickness: float = 2.0    # front cover disc
+    cover_wall_padding: float = -0.05           # radial clearance between cover ring and dispenser inner wall
+    cover_gear_count: float = 48
+    cover_gear_radius_extra: float = 1   # radial extent of the gear tip past `dispenser_outer_radius`
+    cover_gear_sharpness: float = 0.3    # fraction of each gear angle spent on the inward-leaning side (0 = blunt, 1 = pointed)
+    cover_gear_fillet_radius: float = 0.3 # fillet radius at the gear's outer corners
+
+    # --- Derived: dispenser housing ---
+
     @property
     def dispenser_outer_radius(self) -> float:
         return self.dispenser_outer_diameter / 2
 
     @property
-    def dispenser_inner_diameter_min_radius(self) -> float:
+    def dispenser_inner_radius_min(self) -> float:
         return self.dispenser_inner_diameter_min / 2
 
     @property
+    def dispenser_inner_radius_max(self) -> float:
+        return self.dispenser_inner_diameter_max / 2
+
+    # --- Derived: dispenser support ---
+
+    @property
     def support_middle_height(self) -> float:
-        """Height of each support_middle wedge — covers the portion of the
-        blade that sits below the dispenser top (`blade_thickness − above_dispenser_height`)
-        plus the top-wall thickness and a vertical clearance over the blade."""
-        return self.blade_thickness - self.above_dispenser_height + self.thickness_wall + self.blade_vertical_padding
+        """Combined height of the support_middle + support_top stack —
+        covers the portion of the blade that sits below the dispenser top
+        (`blade_thickness − above_dispenser_height`), plus the top-wall
+        thickness, a vertical clearance over the blade, and the
+        support_top wedge that caps the stack."""
+        return self.blade_thickness - self.above_dispenser_height + self.thickness_wall + self.blade_vertical_padding + self.support_top_height
 
     @property
     def cut_holder_height(self) -> float:
         """Total Z extent of the cut_holder teardrop — spans support_middle,
         support_top, and the bottom wall thickness so it reaches from below
         the bottom of support_bottom up to the top of support_top."""
-        return self.support_middle_height + self.support_top_height + self.thickness_wall
+        return self.support_middle_height + self.thickness_wall
+
+    # --- Derived: iris diaphragm ---
 
     @property
     def protrusion_thickness(self) -> float:
@@ -89,7 +107,13 @@ class DispenserBottleMountDimensions:
         """Iris outer disc radius, sized to fit inside the dispenser inner
         wall with `wall_padding` radial clearance (so the iris doesn't bind
         against the dispenser housing)."""
-        return self.dispenser_inner_diameter_min_radius - self.thickness_wall - self.wall_padding
+        return self.dispenser_inner_radius_min - self.thickness_wall - self.wall_padding
+
+    # --- Derived: cover ---
+
+    @property
+    def cover_radius(self) -> float:
+        return self.dispenser_outer_radius - self.thickness_wall
 
     @property
     def cover_slot_width(self) -> float:
@@ -103,10 +127,10 @@ class DispenserBottleMount:
     # along +X by construction; the anchor is rotated by -12.928° from the raw
     # source-mesh (28.999, -5.305) so slot 0 aligns with +X while preserving the
     # 23.295° tilt of the slot relative to its radial direction, then scaled by
-    # 0.9 to match the rest of the model's XY shrink. The actual centre used by
-    # `_cover_stadium_center` is shifted along the long axis (+X) so the pin
-    # travel is symmetric around it.
-    _COVER_STADIUM_ANCHOR = (24.3702, -10.4949)
+    # 0.9 to match the rest of the model's XY shrink. `_cover_stadium_center`
+    # returns this anchor unchanged; the slot length in `create_cover` is sized
+    # to fit the (asymmetric) pin travel around it.
+    _COVER_STADIUM_ANCHOR = (24.3702, 10.4949)
 
     def __init__(self, dim: DispenserBottleMountDimensions):
         self.dim = dim
@@ -134,7 +158,7 @@ class DispenserBottleMount:
 
         The XY footprint is a right trapezoid: `length_base` long along +X, `width`
         deep along -Y, with the trailing edge canted at `angle` so it tracks the
-        body's B-C edge (28.78° off the Y axis). `thickness` is the Z extrusion.
+        body's A-B edge (38.78° off the Y axis). `thickness` is the Z extrusion.
 
         Alignment is x(LR) y(LR) z(LL): the slab's left-X and low-Y line up with
         `align_to`'s left-X and low-Y, and its top-Z sits at `align_to`'s bottom-Z
@@ -264,26 +288,40 @@ class DispenserBottleMount:
 
     def _pin_axis_in_iris_frame(self, slot_position: float) -> tuple[float, float]:
         """Iris-frame XY of the blade 0 pivot pin axis for `slot_position`.
-        Derived from `create_blade`'s placement chain: pin centred on body X mid,
-        flush with body's back edge in Y, then blade rotated 180° and aligned to
-        the plate slot — yielding a 19.8 mm slide in X and a constant Y."""
-        return (0.5535 - 19.8 * slot_position, 24.7221 - self.dim.pin_radius)
+
+        Derived from `create_blade`'s placement chain. The body Pencil polygon
+        spans `x ∈ [-14.07, 6.17]` (mid = -3.95). The pin's
+        `align(blade).y(LR).z(RR)` chain silently re-centres x onto the blade
+        midpoint (= body mid before pin fuse). After the 180° Z rotation the
+        pin's x flips to +3.95 and blade `x_max` becomes +14.07; the
+        `align(slot)` step then shifts the blade so its `x_max` meets
+        `slot.x_max` (plus a `slot_position`-proportional shift along the slot
+        length). Y is anchored to `slot.y_max − pin_radius`.
+        """
+        BODY_X_MID_AFTER_ROTATION = 3.95
+        BODY_X_MAX_AFTER_ROTATION = 14.07
+        BACK_PROTRUSION_BASE = 14.07           # length_base in `_create_protrusion`'s Pencil
+        BACK_PROTRUSION_RAMP_PER_WIDTH = 0.803 # cot(38.78°) — Pencil up_to ramp ratio
+        dim = self.dim
+        slot = self._slot
+        protrusion_width = dim.plate_slot_width - 2 * dim.pin_padding
+        back_protrusion_x_size = BACK_PROTRUSION_BASE + BACK_PROTRUSION_RAMP_PER_WIDTH * protrusion_width
+        pin_x = BODY_X_MID_AFTER_ROTATION + slot.x_max - BODY_X_MAX_AFTER_ROTATION + slot_position * (back_protrusion_x_size - slot.x_size)
+        pin_y = slot.y_max - dim.pin_radius
+        return (pin_x, pin_y)
 
     def _cover_stadium_center(self) -> tuple[float, float]:
-        """Stadium 0 centre in cover-local frame, shifted along the long axis so
-        the pin travel between sp=0 and sp=1 is symmetric around it (equal
-        clearance at both stadium ends). The shift preserves perpendicular
-        distance to the long axis, so the cover rotation is unaffected."""
-        _, sc_y = self._COVER_STADIUM_ANCHOR
-        px0, pin_y = self._pin_axis_in_iris_frame(0.0)
-        px1, _ = self._pin_axis_in_iris_frame(1.0)
-        perp_sq = pin_y ** 2 - sc_y ** 2
-        sc_x = (math.sqrt(px0 ** 2 + perp_sq) + math.sqrt(px1 ** 2 + perp_sq)) / 2
-        return (sc_x, sc_y)
+        """Stadium 0 centre in cover-local frame, fixed to the source-mesh
+        anchor. Pin travel between sp=0 and sp=1 is NOT symmetric around this
+        centre — `create_cover` sizes the slot to cover the larger of the two
+        signed distances so both extremes still fit."""
+        return self._COVER_STADIUM_ANCHOR
 
     def _pin_along_stadium_axis(self, slot_position: float) -> float:
         """Signed distance from stadium 0 centre to the pivot pin axis along the
-        (rotated) stadium long axis. Symmetric: `(0) == -(1)`."""
+        (rotated) stadium long axis. Asymmetric: `abs((0)) < abs((1))` for the
+        current geometry, since the slot is anchored to the source-mesh position
+        rather than the midpoint of pin travel."""
         pin_x, pin_y = self._pin_axis_in_iris_frame(slot_position)
         sc_x, sc_y = self._cover_stadium_center()
         return math.sqrt(pin_x ** 2 + pin_y ** 2 - sc_y ** 2) - sc_x
@@ -292,44 +330,71 @@ class DispenserBottleMount:
         """Degrees to rotate the cover around iris Z so each blade's pivot pin
         lies on the long axis of its corresponding stadium hole.
 
-        The stadium long axis in cover-local frame is the line y=sc_y; its
-        perpendicular distance |sc_y| from the cover origin is preserved under
-        rotation. Solving for R such that the pin at iris-frame polar
-        (pin_r, pin_polar) lies on the rotated line gives
-        `R = pin_polar + asin(|sc_y| / pin_r)`.
+        The stadium long axis in cover-local frame is the line y=sc_y. Solving
+        for R such that the pin at iris-frame polar (pin_r, pin_polar), rotated
+        by -R, lands on y=sc_y in cover frame gives
+        `R = pin_polar + asin(-sc_y / pin_r)`.
         """
         pin_x, pin_y = self._pin_axis_in_iris_frame(slot_position)
         pin_r = math.hypot(pin_x, pin_y)
         _, sc_y = self._COVER_STADIUM_ANCHOR
         return math.degrees(math.atan2(pin_y, pin_x) + math.asin(-sc_y / pin_r))
 
-    def create_cover(self) -> SmartSolid:
-        """Iris front cover — the cone-stack that caps the housing above the blades.
+    def create_gear(self, gear_count: float, thickness: float, radius: float) -> SmartSolid:
+        """Build a flat gear-toothed ring of `gear_count` teeth around the Z axis,
+        with base at `radius` and tips at `radius + dim.cover_gear_radius_extra`,
+        extruded `thickness` along Z. Tooth side angles are controlled by
+        `dim.cover_gear_sharpness` (fraction of each tooth angle spent on the
+        leaning side; smaller = blunter), and outer corners are filleted by
+        `dim.cover_gear_fillet_radius`.
+        """
+        dim = self.dim
+        angle = 360 / gear_count
+        gear_side_angle = angle * dim.cover_gear_sharpness / 2
 
-        Two-stage profile along +Z:
-          1. Inner ring (radius = `dim.dispenser_outer_radius − thickness_wall − wall_padding`,
-             inner = `dispenser_inner_diameter_max/2 − thickness_wall`) of height
-             `above_dispenser_height − thickness_wall − cover_thickness` — fits inside the
-             dispenser support's top opening.
-          2. Top disc that flares out to `dim.dispenser_outer_radius` and drops the inner
-             radius to `dim.bore_radius`, extruded by `dim.cover_thickness`.
+        points = []
+        for i in range(gear_count):
+            angle_from = angle * i
+            points.append(create_vector(radius, angle_from))
+            points.append(create_vector(radius + dim.cover_gear_radius_extra, angle_from + gear_side_angle))
+            points.append(create_vector(radius + dim.cover_gear_radius_extra, angle_from + angle - gear_side_angle))
+
+        return Pencil.from_points(points).extrude(thickness).fillet_z(dim.cover_gear_fillet_radius)
+
+
+    def create_cover(self) -> SmartSolid:
+        """Iris front cover — the piece that caps the housing above the blades.
+
+        Z layout (built in two pieces, then fused):
+          1. Inner ring of radius `dim.cover_radius` (= `dispenser_outer_radius −
+             thickness_wall`), inner = `dispenser_inner_radius_max − thickness_wall`,
+             height = `above_dispenser_height − thickness_wall − cover_thickness`.
+             Fits inside the dispenser support's top opening.
+          2. A decorative gear-toothed top disc (`create_gear`) of `cover_thickness`
+             height, centred on the iris axis, fused on top of the inner ring and
+             bored through by `dim.bore_radius`.
 
         Six stadium clearance slots are cut into the top disc in a 6-fold polar pattern.
-        Stadium centre and length come from `_cover_stadium_center` /
-        `_pin_along_stadium_axis` so each slot fits the pin's sp=0..1 travel with exactly
-        `dim.pin_padding` clearance at each end. Caller is expected to follow up with
-        `cover.rotate_z(mount._aligned_cover_rotation(slot_position))` so each stadium
-        follows its blade's pivot pin.
+        Stadium centre comes from `_cover_stadium_center` (fixed to the source-mesh
+        anchor). The slot is sized to cover the larger-magnitude pin offset along
+        the stadium axis at sp=0 vs sp=1, so both extremes fit. Caller is expected
+        to follow up with `cover.rotate_z(mount._aligned_cover_rotation(slot_position))`
+        so each stadium follows its blade's pivot pin.
         """
         dim = self.dim
 
-        cover = SmarterCone.base(dim.dispenser_outer_radius - dim.thickness_wall - dim.wall_padding, label='cover').inner(dim.dispenser_inner_diameter_max / 2 - dim.thickness_wall)
+        cover = SmarterCone.base(dim.cover_radius, label='cover')
+        cover.inner(dim.dispenser_inner_radius_max - dim.thickness_wall)
         cover.extend(height=dim.above_dispenser_height - dim.thickness_wall - dim.cover_thickness)
 
-        cover.extend(radius=dim.dispenser_outer_radius).inner(dim.bore_radius)
-        cover.extend(height=dim.cover_thickness)
+        gear = self.create_gear(dim.cover_gear_count, dim.cover_thickness, dim.dispenser_outer_radius)
+        gear.align(cover).z(Alignment.RR)
+        bore = SmarterCone.cylinder(dim.bore_radius, dim.cover_thickness)
+        bore.align(gear)
+        cover.fuse(gear).cut(bore)
 
-        slot_length = 2 * abs(self._pin_along_stadium_axis(0.0)) + dim.cover_slot_width
+        half_span = max(abs(self._pin_along_stadium_axis(0.0)), abs(self._pin_along_stadium_axis(1.0)))
+        slot_length = 2 * half_span + dim.cover_slot_width
         # Fillet at width/2 minus epsilon (OCCT refuses fillet at exactly half-width).
         slot = SmartBox(slot_length, dim.cover_slot_width, dim.cover_thickness).fillet_z(dim.cover_slot_width / 2 - 0.0001)
         slot.move(*self._cover_stadium_center(), 0)
@@ -344,13 +409,17 @@ class DispenserBottleMount:
     # ------------------------------------------------------------------------
 
     def create_diaphragm_support(self) -> SmartSolid:
-        """Dispenser-side housing that the iris diaphragm sits in. Stacks
-        three Z layers fused in a 6-fold polar pattern:
-          1. `support_bottom` — short wedge that captures the plate's outer rim.
-          2. `support_middle` — taller wedge that runs alongside the blade body.
-          3. `support_top` — full ring that flares out to `dispenser_outer_diameter`,
-             extrudes the top wall thickness, and continues as an inner-only ring
-             up to `above_dispenser_height` to receive the cover.
+        """Dispenser-side housing that the iris diaphragm sits in.
+
+        Built from two Z layers:
+          1. `support_bottom` — short wedge (6-fold polar pattern) that captures
+             the plate's outer rim.
+          2. `support_top` — full ring built from `dispenser_inner_radius_min`
+             flaring out to `dispenser_outer_radius`. Its inner profile follows
+             the blade's vertical envelope (`support_middle_height +
+             support_bottom_height`), and a gear-toothed lip sized by
+             `dim.support_gear_count` is fused to its outer rim with a press-fit
+             pocket for the cover (`cover_radius + cover_wall_padding`).
 
         Six `cut_holder` teardrops (the same outer-edge cutter shape used for the
         plate's decorative notches, but used here as positive geometry) hug the
@@ -361,33 +430,31 @@ class DispenserBottleMount:
         dim = self.dim
         cut_length = dim.cut_length - dim.tight_padding
 
-        support_bottom = SmarterCone.base(dim.dispenser_inner_diameter_min_radius, angle=dim.support_bottom_angle)
-        support_bottom.inner(dim.dispenser_inner_diameter_min_radius - dim.thickness_wall - cut_length)
+        support_bottom = SmarterCone.base(dim.dispenser_inner_radius_min, angle=dim.support_bottom_angle)
+        support_bottom.inner(dim.dispenser_inner_radius_min - dim.thickness_wall - cut_length)
         support_bottom.extend(height=dim.support_bottom_height)
         support_bottom.rotate_z(-dim.support_bottom_angle / 2 + 90)
 
-        support_middle = SmarterCone.base(dim.dispenser_inner_diameter_min_radius, angle=dim.support_middle_angle).inner(dim.dispenser_inner_diameter_min_radius - dim.thickness_wall)
-        support_middle.extend(height=dim.support_middle_height)
-        support_middle.rotate_z(-dim.support_middle_angle / 2 + 90)
-        support_middle.align_z(support_bottom, Alignment.RR)
-
-        support_top = SmarterCone.base(dim.dispenser_inner_diameter_min_radius, label="support").inner(dim.dispenser_inner_diameter_min_radius - dim.thickness_wall, mode=InnerMode.RADIUS)
-        support_top.extend(height=dim.support_top_height, radius=dim.dispenser_inner_diameter_max / 2)
+        support_top = SmarterCone.base(dim.dispenser_inner_radius_min, label="support")
+        support_top.inner(dim.dispenser_inner_radius_min - dim.thickness_wall, mode=InnerMode.RADIUS)
+        support_top.extend(height=dim.support_middle_height + dim.support_bottom_height, radius=dim.dispenser_inner_radius_max)
 
         support_top.extend(radius=dim.dispenser_outer_radius)
         support_top.extend(height=dim.thickness_wall)
 
-        support_top.extend().inner(dim.dispenser_outer_radius - dim.thickness_wall)
-        support_top.extend(height=dim.above_dispenser_height - dim.thickness_wall - dim.cover_thickness)
+        support_top.align_z(support_bottom, Alignment.LR)
 
-        support_top.align_z(support_middle, Alignment.RR)
+        gear = self.create_gear(dim.support_gear_count, dim.above_dispenser_height - dim.cover_thickness, dim.dispenser_outer_radius - dim.cover_gear_radius_extra / 2)
+        gear.align(support_top).z(Alignment.RR, -dim.thickness_wall)
+        cylinder = SmarterCone.cylinder(dim.cover_radius + dim.cover_wall_padding, gear.z_size)
+        cylinder.align(gear)
+        support_top.fuse(gear.cut(cylinder))
 
-        cut_holder = self._create_outer_edge_cutter(dim.dispenser_inner_diameter_min_radius, dim.cut_angle - dim.angle_padding, cut_length, dim.cut_holder_height)
+        cut_holder = self._create_outer_edge_cutter(dim.dispenser_inner_radius_min, dim.cut_angle - dim.angle_padding, cut_length, dim.cut_holder_height)
         cut_holder.align(support_bottom).y(Alignment.RL, -dim.thickness_wall).z(Alignment.RR)
 
         for i in range(6):
             support_top.fuse(support_bottom.rotated_z(i * 60))
-            support_top.fuse(support_middle.rotated_z(i * 60))
             support_top.fuse(cut_holder.rotated_z(i * 60))
 
         return support_top.rotate_z(dim.cut_angle_shift)
@@ -402,7 +469,7 @@ if __name__ == "__main__":
     diaphragm_plate = mount.create_diaphragm_plate()
     blades = mount.create_blades(slot_position=slot_position)
 
-    # Dispenser housing on top of the iris
+    # Dispenser housing — wraps around and below the iris
     diaphragm_support = mount.create_diaphragm_support()
     diaphragm_support.align_z(diaphragm_plate, Alignment.LR, -dim.support_bottom_height)
 
@@ -412,6 +479,6 @@ if __name__ == "__main__":
     cover.rotate_z(mount._aligned_cover_rotation(slot_position))
     cover.align_z(diaphragm_support, Alignment.RL, dim.cover_thickness)
 
-
-    export_3mf("models/other/dispenser_bottle_mount/export.3mf", diaphragm_plate, *blades, cover, diaphragm_support)
+    # export_3mf("models/other/dispenser_bottle_mount/export.3mf", diaphragm_plate, *blades, cover, diaphragm_support)
+    export_3mf("models/other/dispenser_bottle_mount/export.3mf", diaphragm_support)
     export_stl("models/other/dispenser_bottle_mount/stl", diaphragm_plate, blades[0], cover, diaphragm_support)
