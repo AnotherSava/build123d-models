@@ -412,13 +412,14 @@ def _upload_step3_model_info(page: Page, name: str, description: str, tags: list
                 file_input.set_input_files(str(photo))
                 page.wait_for_timeout(3000)
 
-    # Fill Model Name (max 50 chars)
+    # Fill Model Name (MakerWorld silently rejects > 50-char names).
+    if len(name) > 50:
+        raise SystemExit(f"Name is {len(name)} chars; MakerWorld limit is 50. Shorten the Name: line and re-run.")
     title_input = page.query_selector("input[name='title']")
     if title_input:
-        truncated_name = name[:50]
-        print(f"Setting model name: {truncated_name}")
+        print(f"Setting model name: {name}")
         title_input.click()
-        title_input.fill(truncated_name)
+        title_input.fill(name)
         page.wait_for_timeout(500)
 
     # Fill Category — format is "Category > Subcategory", type the subcategory for a more specific match
@@ -498,45 +499,64 @@ def _upload_step3_model_info(page: Page, name: str, description: str, tags: list
 
 
 def _markdown_to_simple_html(md: str) -> str:
-    """Convert simple markdown to HTML for CKEditor."""
+    """Convert simple markdown to HTML for CKEditor.
+
+    Supports: **bold headers** (h3), - / * bullets (ul), 1. 2. numbered items
+    (ol), *italic* lines, and inline **bold** / *italic* within paragraphs and
+    list items.
+    """
     import re
     lines = md.split("\n")
     html_lines = []
-    in_list = False
+    list_type: str | None = None  # None, "ul", or "ol"
+
+    def close_list():
+        nonlocal list_type
+        if list_type:
+            html_lines.append(f"</{list_type}>")
+            list_type = None
+
+    def open_list(kind: str):
+        nonlocal list_type
+        if list_type != kind:
+            close_list()
+            html_lines.append(f"<{kind}>")
+            list_type = kind
+
+    def inline_format(text: str) -> str:
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+        text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+        return text
 
     for line in lines:
         stripped = line.strip()
         if not stripped:
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
+            close_list()
             html_lines.append("<p>&nbsp;</p>")
             continue
 
         # Bold headers: **text** on its own line → <h3>
         if re.match(r'^\*\*(.+)\*\*$', stripped):
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
+            close_list()
             inner = re.match(r'^\*\*(.+)\*\*$', stripped).group(1)
             html_lines.append(f"<h3>{inner}</h3>")
             continue
 
-        # Bullet points: - text or * text
-        if re.match(r'^[-*]\s+', stripped):
-            if not in_list:
-                html_lines.append("<ul>")
-                in_list = True
-            item = re.sub(r'^[-*]\s+', '', stripped)
-            # Handle inline bold and italic
-            item = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', item)
-            item = re.sub(r'\*(.+?)\*', r'<em>\1</em>', item)
-            html_lines.append(f"<li>{item}</li>")
+        # Numbered items: 1. text, 2. text, ... → <ol><li>
+        ol_match = re.match(r'^\d+\.\s+(.+)$', stripped)
+        if ol_match:
+            open_list("ol")
+            html_lines.append(f"<li>{inline_format(ol_match.group(1))}</li>")
             continue
 
-        if in_list:
-            html_lines.append("</ul>")
-            in_list = False
+        # Bullet points: - text or * text → <ul><li>
+        if re.match(r'^[-*]\s+', stripped):
+            open_list("ul")
+            item = re.sub(r'^[-*]\s+', '', stripped)
+            html_lines.append(f"<li>{inline_format(item)}</li>")
+            continue
+
+        close_list()
 
         # Italic line: *text*
         if re.match(r'^\*(.+)\*$', stripped):
@@ -545,14 +565,9 @@ def _markdown_to_simple_html(md: str) -> str:
             continue
 
         # Regular paragraph with inline formatting
-        text = stripped
-        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-        text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
-        html_lines.append(f"<p>{text}</p>")
+        html_lines.append(f"<p>{inline_format(stripped)}</p>")
 
-    if in_list:
-        html_lines.append("</ul>")
-
+    close_list()
     return "\n".join(html_lines)
 
 
@@ -679,6 +694,114 @@ def create_draft(description_dir: str, photo_dir: str | None = None, files: list
         ctx.close()
 
 
+def update_draft(draft_id: str, description_dir: str) -> None:
+    """Update an existing MakerWorld draft's text content (name + description).
+
+    Re-reads the description file, navigates to the draft's edit URL, and
+    overwrites the name field and the CKEditor description, then saves. Photos,
+    files, category, and tags are NOT touched — for tag/category edits, edit
+    those manually in the browser. (Tags would require removing existing chips
+    to avoid duplicates, which the page UI doesn't expose cleanly.)
+    """
+    desc_path = Path(description_dir)
+    md_file = desc_path / "makerworld.md"
+    if not md_file.exists():
+        md_file = desc_path / "thingiverse.md"
+    if not md_file.exists():
+        raise FileNotFoundError(f"Missing description file in {desc_path}")
+
+    parsed = _parse_description_file(md_file)
+    name = parsed["name"]
+    description = parsed["description"]
+    edit_url = f"https://makerworld.com/en/my/models/drafts/{draft_id}/edit"
+
+    # MakerWorld silently rejects > 50-char names (the save reports success but
+    # the change is dropped). Refuse rather than silently truncate.
+    MAX_NAME = 50
+    if len(name) > MAX_NAME:
+        raise SystemExit(f"Name is {len(name)} chars; MakerWorld limit is {MAX_NAME}. Shorten the Name: line in {md_file} and re-run.")
+
+    print(f"Updating draft: {edit_url}")
+    print(f"Model name: {name}")
+
+    with sync_playwright() as p:
+        ctx = _open_context(p)
+        page = ctx.new_page()
+        page.goto(edit_url, wait_until="domcontentloaded")
+        page.wait_for_timeout(3000)
+
+        if not _wait_for_cloudflare(page):
+            ctx.close()
+            return
+
+        _dismiss_cookie_banner(page)
+        # Wait for the editor + name input to appear (load can take a few seconds)
+        try:
+            page.wait_for_selector("input[name='title']", timeout=30000)
+            page.wait_for_selector("div.ck-content[role='textbox']", timeout=30000)
+        except Exception as e:
+            print(f"Edit form did not load: {e}")
+            ctx.close()
+            return
+        # The MUI form remounts inputs after data loads — let it settle before
+        # query_selector, otherwise the title element disappears between calls.
+        page.wait_for_timeout(3000)
+
+        # Update name. Playwright's `fill()` doesn't always trigger MUI's
+        # controlled-input change handler — its state snapshot ends up with the
+        # stale value and the save discards the new one. Use the native value
+        # setter and dispatch React-tracked events instead.
+        print(f"Setting model name: {name}")
+        name_set = page.evaluate("""(newName) => {
+            const el = document.querySelector("input[name='title']");
+            if (!el) return false;
+            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            nativeSetter.call(el, newName);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return el.value === newName;
+        }""", name)
+        if not name_set:
+            print("Warning: title input not found or did not accept new value.")
+        page.wait_for_timeout(500)
+
+        # Update description via CKEditor
+        editor = page.query_selector("div.ck-content[role='textbox']")
+        if editor:
+            print("Setting description...")
+            html_desc = _markdown_to_simple_html(description)
+            success = page.evaluate("""(html) => {
+                const editorEl = document.querySelector('.ck-content[role="textbox"]');
+                if (!editorEl) return false;
+                if (editorEl.ckeditorInstance) {
+                    editorEl.ckeditorInstance.setData(html);
+                    return true;
+                }
+                editorEl.focus();
+                editorEl.innerHTML = html;
+                editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+                return false;
+            }""", html_desc)
+            print("Description set via CKEditor API." if success else "Warning: CKEditor instance not found, used innerHTML fallback.")
+            page.wait_for_timeout(1000)
+        else:
+            print("CKEditor textbox not found — aborting save.")
+            ctx.close()
+            return
+
+        # Save
+        save_btn = page.query_selector("button:has-text('Save to draft')")
+        if save_btn:
+            print("Saving draft...")
+            save_btn.click()
+            page.wait_for_timeout(5000)
+            print(f"Saved: {page.url}")
+        else:
+            print("'Save to draft' button not found.")
+
+        ctx.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Publish 3D models to MakerWorld as drafts")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -691,12 +814,18 @@ def main() -> None:
     draft_parser.add_argument("--photo-dir", help="Path to photo directory")
     draft_parser.add_argument("--files", nargs="+", help="Model files to upload")
 
+    update_parser = subparsers.add_parser("update", help="Update name + description of an existing draft")
+    update_parser.add_argument("draft_id", help="Numeric draft ID (from the edit URL: .../drafts/<id>/edit)")
+    update_parser.add_argument("description_dir", help="Path to description directory")
+
     args = parser.parse_args()
 
     if args.command == "login":
         login()
     elif args.command == "inspect":
         inspect_upload_page()
+    elif args.command == "update":
+        update_draft(args.draft_id, args.description_dir)
     elif args.command == "draft":
         create_draft(args.description_dir, getattr(args, "photo_dir", None), getattr(args, "files", None))
 
