@@ -41,8 +41,9 @@ See `docs/code/reconstruct/` for the algorithm, findings, and the public Python 
 ### Other
 
 - **Cable Holder** - Wall-mounted holder with split ball cable organizers ([Thingiverse](https://www.thingiverse.com/thing:7290467), [MakerWorld](https://makerworld.com/en/models/2367034)).
-- **Marker Holder** - Wall-mounted marker holder ([Thingiverse](https://www.thingiverse.com/thing:7294115), [MakerWorld](https://makerworld.com/en/models/2390507)).
 - **Cable Storage** - Wall-mounted cable organizer with railings *(work in progress)*.
+- **Dispenser Bottle Mount** - Inverted-bottle refill mount with iris grip for simplehuman wall pump dispensers ([Thingiverse](https://www.thingiverse.com/thing:7356658), [MakerWorld](https://makerworld.com/en/models/2827942)).
+- **Marker Holder** - Wall-mounted marker holder ([Thingiverse](https://www.thingiverse.com/thing:7294115), [MakerWorld](https://makerworld.com/en/models/2390507)).
 - **Power Adapters** - Travel power adapter storage box for 12 international socket types ([Thingiverse](https://www.thingiverse.com/thing:7297385), [MakerWorld](https://makerworld.com/en/models/2409726)).
 
 ## Claude Code Skills
