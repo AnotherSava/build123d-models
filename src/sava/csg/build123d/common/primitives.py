@@ -1,10 +1,63 @@
+from dataclasses import dataclass
 from math import tan, radians
 
 from build123d import Location, fillet, Wire, Solid, VectorLike, Axis, Vector, Edge, Face
 
 from sava.csg.build123d.common.geometry import to_vector, rotate_vector, get_angle, create_vector
+from sava.csg.build123d.common.pencil import Pencil
+from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartloft import SmartLoft
 from sava.csg.build123d.common.smartsolid import SmartSolid
+
+
+@dataclass
+class GearDimensions:
+    """Parameters for `create_gear`'s polar-pattern toothed ring.
+
+    `radius_outer` is the tooth-root circle; tips extend outward to
+    `radius_outer + radius_outer_extra`. `radius_inner > 0` cuts a central
+    cylindrical bore of that radius through the ring. `sharpness` is the
+    fraction of each tooth's angular slot spent on the leaning sides
+    (0 = blunt rectangle, 1 = pointed). `spacing` is the angular fraction of
+    the tooth pitch left as a gap between adjacent teeth (0 = teeth touch,
+    1 = no teeth). All fields are required by design — callers should make
+    every gear parameter explicit at the construction site.
+    """
+    gear_count: int
+    thickness: float
+    radius_outer: float
+    radius_outer_extra: float
+    radius_inner: float
+    sharpness: float
+    spacing: float
+    fillet_radius: float
+
+
+def create_gear(gear: GearDimensions) -> SmartSolid:
+    """Build a flat gear-toothed ring around the Z axis from a `GearDimensions`
+    spec — see `GearDimensions` for the field semantics. If `radius_inner > 0`,
+    a central cylindrical bore of that radius is cut through the ring."""
+    angle_total = 360 / gear.gear_count
+    angle_spacing = angle_total * gear.spacing
+    angle_gear = angle_total - angle_spacing
+    gear_side_angle = angle_gear * gear.sharpness / 2
+
+    points = []
+    for i in range(gear.gear_count):
+        angle_from = angle_total * i
+        points.append(create_vector(gear.radius_outer, angle_from))
+        if angle_spacing > 0:
+            points.append(create_vector(gear.radius_outer, angle_from + angle_spacing))
+        points.append(create_vector(gear.radius_outer + gear.radius_outer_extra, angle_from + angle_spacing + gear_side_angle))
+        points.append(create_vector(gear.radius_outer + gear.radius_outer_extra, angle_from + angle_total - gear_side_angle))
+
+    result = Pencil.from_points(points).extrude(gear.thickness).fillet_z(gear.fillet_radius)
+
+    if gear.radius_inner:
+        cylinder = SmarterCone.cylinder(gear.radius_inner, gear.thickness)
+        result.cut(cylinder.align(result))
+
+    return result
 
 
 def create_handle_wire(radius: float, arc_angle: float, width: float, centre: VectorLike = (0, 0, 0)) -> Wire:
