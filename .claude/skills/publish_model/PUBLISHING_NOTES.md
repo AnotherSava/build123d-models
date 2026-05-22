@@ -47,16 +47,19 @@ Category is included for all platforms (MakerWorld, Printables, Thingiverse).
   2. Upload Bambu 3MF (first `input[type='file']`) + raw model files (second `input[type='file']`) → Next
   3. Model Information form → Save to draft
 - **Step 3 form selectors**:
-  - Title: `input[name='title']` (max 50 chars)
+  - Title: `input[name='title']` (max 50 chars — see "Title 50-char silent drop" below)
   - Category: `.modelCategory input[role='combobox']` — MUI Autocomplete, type subcategory to search, select from `[role='listbox'] [role='option']`
   - Tags: `.modelTags input[role='combobox']` — type each tag and press Enter
   - Description: `div.ck-content[role='textbox']` — CKEditor 5
   - Cover 4:3: `div.dropzone:has-text('4:3 Cover')` → child `input[type='file']`
   - Cover 3:4: `div.dropzone:has-text('3:4 Cover')` → child `input[type='file']`
   - Save: `button:has-text('Save to draft')`
+- **Title 50-char silent drop**: If the title exceeds 50 chars, the form accepts the value, Save reports success, but the title is silently dropped on the server side (reloading the page shows the previous value unchanged). `makerworld.py` now refuses names > 50 chars with `SystemExit`. Always confirm the live title after `update` by re-querying the page (Save success ≠ field persisted).
+- **Title input is a controlled MUI component**: On the *edit* page (`/drafts/<id>/edit`), Playwright's `locator.fill()` doesn't reliably commit to React state — the visible value updates but Save persists the old value. Use the native value setter + `input` event pattern (see `update_draft` in `makerworld.py`, or `~/.claude/learnings/playwright-mui-react.md`). CKEditor's description field has the same problem and is solved separately via `ckeditorInstance.setData(html)`.
 - **CKEditor 5**: Must use `editorEl.ckeditorInstance.setData(html)` to set description. Setting `innerHTML` directly does NOT update CKEditor's internal data model — the description appears empty on save.
 - **Cropper dialog**: Cover image uploads trigger a crop dialog (`MuiDialog-root` with cropper). Must dismiss via Confirm/Save/OK button before continuing to the next field.
 - **Category autocomplete**: Search by subcategory only (e.g., type "Office" not "Household > Office") for a precise dropdown match.
+- **Iterating on an existing draft**: `makerworld.py update <draft_id> <description_dir>` re-applies name + description to an existing draft via Playwright. Photos/files/category/tags are intentionally left alone — they'd need duplicate-detection logic that the page UI doesn't expose. Title and description are sufficient for most copy iteration after the initial upload.
 
 ## Web Search (`web_search.py`)
 
