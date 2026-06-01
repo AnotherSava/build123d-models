@@ -282,8 +282,8 @@ class SmarterCone(SmartSolid):
         return cls([ConeSection(radius)], plane, angle, label)
 
     @classmethod
-    def cylinder(cls, radius: float, height: float, *, plane: Plane = Plane.XY, angle: float = 360, label: str = None) -> 'SmarterCone':
-        return cls([ConeSection(radius), ConeSection(radius, height)], plane, angle, label)
+    def cylinder(cls, radius: float, height: float, *, inner_radius: float = None, plane: Plane = Plane.XY, angle: float = 360, label: str = None) -> 'SmarterCone':
+        return cls([ConeSection(radius, inner_radius=inner_radius), ConeSection(radius, height, inner_radius=inner_radius)], plane, angle, label)
 
     def inner(self, radius: float = None, *, shift_x: float = None, shift_y: float = None, mode: InnerMode = None) -> 'SmarterCone':
         assert radius is not None or mode is not None, "inner() requires at least radius or mode"

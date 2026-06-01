@@ -231,6 +231,13 @@ class TestSmarterConeInnerRadius(unittest.TestCase):
         self.assertAlmostEqual(cone.sections[1].inner_radius, 40)
         self.assertTrue(cone.has_inner)
 
+    def test_cylinder_inner_radius_kwarg(self):
+        """Test that cylinder(inner_radius=...) creates a hollow cylinder directly"""
+        cone = SmarterCone.cylinder(50, 100, inner_radius=40)
+        self.assertAlmostEqual(cone.sections[0].inner_radius, 40)
+        self.assertAlmostEqual(cone.sections[1].inner_radius, 40)
+        self.assertTrue(cone.has_inner)
+
     def test_extend_auto_propagates_inner_radius(self):
         """Test that extend auto-propagates inner_radius maintaining wall thickness"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100)

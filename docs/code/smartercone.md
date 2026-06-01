@@ -24,6 +24,7 @@ SmarterCone.base(radius)              # base section at height 0
 SmarterCone.base(radius, plane=...)   # build on a custom plane (default: XY)
 SmarterCone.base(radius, angle=...)   # partial sector, e.g. angle=180 for half-cone
 SmarterCone.cylinder(radius, height)  # shortcut for base + extend with same radius
+SmarterCone.cylinder(radius, height, inner_radius=...)  # hollow cylinder (tube)
 ```
 
 ## Extending with `.extend()`
