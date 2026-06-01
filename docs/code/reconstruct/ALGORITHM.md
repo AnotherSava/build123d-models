@@ -10,12 +10,12 @@ STL/OFF
    │  planes.cluster()
    ▼
 plane clusters                                  ← coplanar triangle groups
-   │  extrusion.pick_axis()
+   │  extrusion.candidate_axes()
    ▼
-candidate axis  ←  largest plane's normal
-   │  extrusion.classify()
+candidate axes  ←  unique normal directions, sorted by descending area
+   │  extrusion.classify() (looped)
    ▼
-(caps, side_walls)                              ← if any "other" → abort: not 2.5D
+(caps, side_walls)                              ← first axis with no "other"; if none → abort: not 2.5D
    │  datum.pick()
    ▼
 datum plane  ←  largest side-wall by area
@@ -58,13 +58,13 @@ When matched, update the cluster's `(n, d)` as an area-weighted running average 
 
 Output: `list[PlaneCluster]` with fields `normal, d, area, tri_indices, vertex_set`.
 
-### 3. Candidate extrusion axis — `extrusion.pick_axis(planes)`
+### 3. Candidate extrusion axis — `extrusion.candidate_axes(planes)` + step-4 loop
 
-Sort planes by area descending. Take the largest plane's normal as the candidate extrusion axis.
+Build the candidate list: unique normal directions present in the significant planes, sign-canonicalized and area-grouped, sorted by descending total area. Each candidate is tested in turn against step 4; the first one that classifies every plane as cap-or-side wins.
 
-**Why this works**: in a 2.5D-extrudable part, the front and back caps are the largest planar faces because they cover the full silhouette. The side walls have areas bounded by `(silhouette_edge_length) × (depth_range)`, which is smaller. So "largest plane" reliably picks a cap face, whose normal IS the extrusion axis.
+**Why a list, not just the largest**: in a 2.5D-extrudable part, the front and back caps are usually the largest planar faces (they cover the full silhouette), so the largest plane's normal is *typically* the extrusion axis. But for parts whose extrusion direction is along the long dimension (cable channels, profiles), a side wall can outweigh the caps. Iterating through candidates by area handles both cases without changing the happy-path performance — the iris-blade case still picks the largest cap on the first try.
 
-For non-2.5D parts this guess will fail step 4, which is fine — we abort.
+If no candidate classifies cleanly, the part is genuinely non-2.5D (has truly tilted faces in every reference frame) — abort. The error message reports the best-attempt tilted-plane count for diagnostics.
 
 ### 4. Plane classification — `extrusion.classify(planes, axis, tol_deg=3.0)`
 

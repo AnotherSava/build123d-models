@@ -84,7 +84,7 @@ Two of RANSAC's 3 cylinders are likely spurious (the r=0.89 and r=5.98 fits), bu
 
 3. **Pencil's `start` parameter shifts the plane origin, doesn't just set the initial pen position.** After `Pencil(plane, start=(a, b))`, the pencil is at local `(0, 0)` in a shifted frame — all subsequent moves are relative to `(a, b)`. The closing `create_face(enclose=True)` returns to `(0, 0)` in the shifted frame = `(a, b)` in the original.
 
-4. **The largest plane is not always a cap — but it usually is.** For 2.5D parts the front/back face is biggest; works by inspection of plane-area distributions. Worth adding a sanity check: if the chosen axis fails step 4 (any "other" planes), try the next-largest plane's normal before giving up.
+4. **The largest plane is not always a cap.** For most 2.5D parts the front/back face is biggest, but elongated profiles (cable channels, extruded bars) put more area on the side walls along the long axis. The algorithm now iterates through candidate axes by descending total per-direction area (see step 3), so this case recovers automatically — the cable-channel STL classifies cleanly on the second-largest direction (+Y, the channel length).
 
 5. **The datum heuristic gives different answers based on metric.** Edge-contact-length picks `Plane 4` (the top-left bevel, 46 mm of contact edge across silhouettes) as datum. Plane area picks `Plane 3` (the floor, 74.87 mm²). The floor is the intuitive answer; plane area is the right metric.
 
@@ -108,11 +108,9 @@ What this algorithm does NOT handle:
 
 3. **Verification harness.** After emitting code: execute it in build123d, export STL, compute Hausdorff distance against source. Make this a CI requirement: a reconstruction is "accepted" only if Hausdorff < `eps`.
 
-4. **Multi-strategy axis search.** If the largest plane's normal fails step 4, try the next-largest, then the cross product of the top two, then the smallest distinct plane normal in the set, etc. Cheaply expands the algorithm's coverage.
+4. **Robust to mesh noise.** Use surface-fit RANSAC for plane detection instead of triangle coplanarity clustering. Slower but tolerates uneven tessellation.
 
-5. **Robust to mesh noise.** Use surface-fit RANSAC for plane detection instead of triangle coplanarity clustering. Slower but tolerates uneven tessellation.
-
-6. **Authored-shape recovery (Tier 3).** When the 2D silhouette has obvious 2D-CAD structure (a rectangle plus a fillet plus a rounded corner), emit `Pencil` with `fillet()` calls instead of a raw polygon. Captures user intent, not just the mesh.
+5. **Authored-shape recovery (Tier 3).** When the 2D silhouette has obvious 2D-CAD structure (a rectangle plus a fillet plus a rounded corner), emit `Pencil` with `fillet()` calls instead of a raw polygon. Captures user intent, not just the mesh.
 
 ## Pedagogical artifacts
 

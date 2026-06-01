@@ -7,7 +7,7 @@ from build123d import Vector
 from ._vec import Vec, vadd, vcross, vdot, vmul, vnorm
 from .boundary import boundary_polygons, simplify_collinear
 from .datum import build_datum_frame, make_frame, pick_datum, shift_origin_to_first_quadrant, to_local
-from .extrusion import cap_depth_in_frame, classify_planes_vs_axis, pick_axis
+from .extrusion import cap_depth_in_frame, candidate_axes, classify_planes_vs_axis
 from .mesh_io import read_mesh
 from .numbers import fmt
 from .pencil_emit import Point2D, _signed_area, emit_pencil_for, find_shared_start
@@ -605,13 +605,24 @@ def reconstruct(path: str, sig_area_frac: float = 0.005) -> ReconstructionResult
     total_area = sum(p.area for p in planes)
     sig = [p for p in planes if p.area / total_area >= sig_area_frac]
 
-    extrusion_axis = pick_axis(sig)
-    buckets = classify_planes_vs_axis(sig, extrusion_axis)
-    if buckets.other:
+    extrusion_axis = None
+    buckets = None
+    best_attempt: tuple[Vec, int] | None = None  # (axis, tilted_count) — for diagnostic when no axis works
+    for candidate in candidate_axes(sig):
+        attempt = classify_planes_vs_axis(sig, candidate)
+        if not attempt.other:
+            extrusion_axis = candidate
+            buckets = attempt
+            break
+        n_other = len(attempt.other)
+        if best_attempt is None or n_other < best_attempt[1]:
+            best_attempt = (candidate, n_other)
+    if extrusion_axis is None:
+        axis, n_other = best_attempt
         return ReconstructionResult(
             is_2d5_extrudable=False,
-            extrusion_axis=Vector(*extrusion_axis),
-            error=f'Found {len(buckets.other)} tilted plane(s); part is not 2.5D-extrudable',
+            extrusion_axis=Vector(*axis),
+            error=f'No candidate axis classifies all planes cleanly; best had {n_other} tilted plane(s) out of {len(sig)} significant planes — part is not 2.5D-extrudable',
         )
 
     cap_planes = [p for _, p in buckets.cap]
@@ -1302,6 +1313,14 @@ def _emit_code(cross_origin: Vec, x_dir: Vec, y_dir: Vec, z_dir: Vec,
         if L.name in ('front', 'back'):
             continue
         cap_thickness = abs(L.depth - (body_min_depth if L.name == 'back_protrusion' else body_max_depth))
+        # Pockets can open from either body face; pick the closer end and cut
+        # only that distance. The previous "always cut from body_max_depth"
+        # assumption produced wrong geometry for back-opening pockets.
+        if L.name == 'pocket':
+            dist_to_min = L.depth - body_min_depth
+            dist_to_max = body_max_depth - L.depth
+            cap_thickness = min(dist_to_min, dist_to_max)
+            pocket_opens_from_min = dist_to_min <= dist_to_max
         if L.name == 'back_protrusion':
             thickness = cap_thickness
             shift_z = -cap_thickness
@@ -1364,9 +1383,14 @@ def _emit_code(cross_origin: Vec, x_dir: Vec, y_dir: Vec, z_dir: Vec,
             op_hole = 'cut'
         else:  # pocket
             thickness = cap_thickness
-            shift_z = L.depth - body_min_depth
-            comment_head = (f'# Pocket at local z={fmt(shift_z)} ({fmt(cap_thickness)} mm deep), '
-                            f'cut from body')
+            if pocket_opens_from_min:
+                shift_z = 0.0
+                comment_head = (f'# Pocket at local z=0 ({fmt(cap_thickness)} mm deep), '
+                                f'cut from body (opens at back face)')
+            else:
+                shift_z = L.depth - body_min_depth
+                comment_head = (f'# Pocket at local z={fmt(shift_z)} ({fmt(cap_thickness)} mm deep), '
+                                f'cut from body (opens at front face)')
             op_outer = 'cut'
             op_hole = 'fuse'
 
