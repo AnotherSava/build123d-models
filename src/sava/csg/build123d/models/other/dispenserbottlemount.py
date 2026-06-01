@@ -49,7 +49,8 @@ class DispenserBottleMountDimensions:
     above_dispenser_height: float = 15  # Z extent of the iris stack that protrudes above the dispenser top
 
     # --- Cover (front cap with stadium slots + decorative gear rim) ---
-    cover_wall_padding_bottom: float = 0.2           # radial clearance between bottom of the cover ring and support inner wall
+    cover_wall_padding_bottom: float = 0.1           # radial clearance between bottom of the cover ring and support inner wall
+    cover_wall_padding_top: float = -0.1           # radial clearance between top of the cover ring and support inner wall
     # Default cover gear is built in __post_init__ (8 chunky teeth, hardcoded
     # thickness/extra/fillet; outer radius = dispenser_outer_radius, inner
     # radius = dispenser_inner_radius_min − thickness_wall). Pass a
@@ -390,7 +391,7 @@ class DispenserBottleMount:
 
         cover = SmarterCone.base(dim.support_gear.radius_inner - dim.cover_wall_padding_bottom, label='cover')
         cover.inner(dim.support_gear.radius_inner - dim.thickness_wall)
-        cover.extend(height=dim.above_dispenser_height - dim.thickness_wall * 2, radius=dim.support_gear.radius_inner)
+        cover.extend(height=dim.above_dispenser_height - dim.thickness_wall * 2, radius=dim.support_gear.radius_inner - dim.cover_wall_padding_top)
         cover.extend().inner(dim.bore_radius)
         cover.extend(height=dim.thickness_wall)
 
