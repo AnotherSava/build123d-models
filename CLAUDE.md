@@ -177,6 +177,12 @@ When building models, prefer the project's high-level classes (SmartBox, Smarter
 
 Use `.align()` and alignment operations (`align_x`, `align_y`, `align_z`) for positioning objects relative to each other. Avoid manual coordinate math — the alignment system handles bounding-box-relative positioning cleanly. See `docs/code/smartsolid.md` for full alignment documentation.
 
+### Build in print orientation
+
+Each `create_*` method should return its part in the orientation that prints easiest on an FDM printer (flat face on the bed, no overhangs that need supports, no internal cavities that bridge across a wide span). That natural state is what flows into the STL — so the exported STL drops straight into a slicer without manual reorientation.
+
+Achieve the print orientation natively in the Pencil trace (choose the start point and direction so the geometry comes out the right way up) — don't extrude in some other orientation and then `rotate_x`/`move` it after. The reorienting/translating transforms for assembled-view visualization belong in the caller, after `create_*` returns.
+
 ## Code Style
 
 ### Model Dimensions
