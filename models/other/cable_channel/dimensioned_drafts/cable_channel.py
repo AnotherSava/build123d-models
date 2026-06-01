@@ -17,15 +17,15 @@ from draft_lib import Drawing, View
 # model's Pencil trace (full polygon — mirror not applied).
 PROFILE = [
     (0, 0), (20, 0),
-    (20, 9.5), (18.5, 9.5),
-    (17.826, 11.25), (18.5, 11.6),
-    (18.5, 12.9), (17, 12.9),
-    (17, 10.5), (18.5, 4.5),
+    (20, 9.5), (18.837, 9.5),
+    (18.163, 11.25), (18.837, 11.924),
+    (18.837, 12.9), (17, 12.9),
+    (17, 10.5), (18.5, 6.6053),
     (18.5, 1.5), (1.5, 1.5),
-    (1.5, 4.5), (3, 10.5),
-    (3, 12.9), (1.5, 12.9),
-    (1.5, 11.6), (2.174, 11.25),
-    (1.5, 9.5), (0, 9.5),
+    (1.5, 6.6053), (3, 10.5),
+    (3, 12.9), (1.163, 12.9),
+    (1.163, 11.924), (1.837, 11.25),
+    (1.163, 9.5), (0, 9.5),
 ]
 
 
@@ -42,15 +42,24 @@ def build() -> Drawing:
     cs.line((19, 1.5), (18.5, 3), stroke='#c0392b', stroke_width=0.9, dasharray='4,3')
     cs.text('cavity slope (at Y-ends only)', (10, 0.7), size=9, color='#c0392b')
 
+    # Vertex labels (right side only — left mirrors are symmetric). Each letter
+    # sits 0.3 mm from the vertex along the bisector of the wider angle (the
+    # interior side at concave vertices A/B/G/H, the exterior side at convex
+    # vertices C/D/E/F). Referenced from the Pencil traces in cablechannel.py.
+    for label, pos in [('A', (18.667, 9.253)), ('B', (17.870, 11.312)), ('C', (19.114, 11.809)),
+                       ('D', (19.049, 13.112)), ('E', (16.788, 13.112)), ('F', (16.705, 10.445)),
+                       ('G', (18.795, 6.660)), ('H', (18.712, 1.288))]:
+        cs.text(label, pos, size=6, color='#1f6feb', anchor='middle', baseline='central')
+
     # Top: width sub-segments + overall
-    for u1, u2, label in [(0, 1.5, '1.5'), (1.5, 3, '1.5'), (3, 17, '14'), (17, 18.5, '1.5'), (18.5, 20, '1.5')]:
+    for u1, u2, label in [(0, 1.163, '1.163'), (1.163, 3, '1.837'), (3, 17, '14'), (17, 18.837, '1.837'), (18.837, 20, '1.163')]:
         cs.dim_h(v_at=12.9, u1=u1, u2=u2, label=label, side='above', offset_px=16)
     cs.dim_h(v_at=12.9, u1=0, u2=20, label='20', side='above', offset_px=40)
 
     # Left: major Z transitions (rim sub-features go in the rim detail callout)
     cs.dim_v(u_at=0, v1=0, v2=1.5, label='1.5', side='left', offset_px=20)
-    cs.dim_v(u_at=0, v1=1.5, v2=4.5, label='3', side='left', offset_px=20)
-    cs.dim_v(u_at=0, v1=4.5, v2=9.5, label='5', side='left', offset_px=20)
+    cs.dim_v(u_at=0, v1=1.5, v2=6.6053, label='5.105', side='left', offset_px=20)
+    cs.dim_v(u_at=0, v1=6.6053, v2=9.5, label='2.895', side='left', offset_px=20)
     cs.dim_v(u_at=0, v1=9.5, v2=10.5, label='1', side='left', offset_px=20)
     cs.dim_v(u_at=0, v1=10.5, v2=12.9, label='2.4', side='left', offset_px=20)
     cs.dim_v(u_at=0, v1=1.5, v2=9.5, label='8', side='left', offset_px=50)
@@ -82,16 +91,16 @@ def build() -> Drawing:
     rim = d.add_view(View(origin=(-480, 1330), scale=60, title='Top rim detail (right side)',
                           title_pos=(500, 510), axis_labels=('Y', 'Z')))
     rim.path([
-        (20, 9.5), (18.5, 9.5), (17.826, 11.25), (18.5, 11.6),
-        (18.5, 12.9), (17, 12.9), (17, 10.5), (17.25, 9.5),
+        (20, 9.5), (18.837, 9.5), (18.163, 11.25), (18.837, 11.924),
+        (18.837, 12.9), (17, 12.9), (17, 10.5), (17.385, 9.5),
     ])
     rim.dim_v(u_at=20, v1=9.5, v2=10.5, label='1', side='right', offset_px=14)
     rim.dim_v(u_at=20, v1=10.5, v2=11.25, label='0.75', side='right', offset_px=14)
-    rim.dim_v(u_at=20, v1=11.25, v2=11.6, label='0.35', side='right', offset_px=14)
-    rim.dim_v(u_at=20, v1=11.6, v2=12.9, label='1.3', side='right', offset_px=14)
+    rim.dim_v(u_at=20, v1=11.25, v2=11.924, label='0.674', side='right', offset_px=14)
+    rim.dim_v(u_at=20, v1=11.924, v2=12.9, label='0.976', side='right', offset_px=14)
     rim.dim_v(u_at=20, v1=9.5, v2=12.9, label='3.4', side='right', offset_px=45)
-    rim.dim_h(v_at=12.9, u1=17, u2=18.5, label='1.5', side='above', offset_px=14)
-    rim.dim_h(v_at=9.5, u1=17.826, u2=18.5, label='0.674', side='below', offset_px=14)
+    rim.dim_h(v_at=12.9, u1=17, u2=18.837, label='1.837', side='above', offset_px=14)
+    rim.dim_h(v_at=9.5, u1=18.163, u2=18.837, label='0.674', side='below', offset_px=14)
 
     # --- Side view (X-Z) ---
     sv = d.add_view(View(origin=(80, 730), scale=4, title='Side view',
