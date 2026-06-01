@@ -69,10 +69,11 @@ class View:
         self.elements.append(f'<rect x="{x:.2f}" y="{y:.2f}" width="{w:.2f}" height="{h:.2f}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}"{dash}/>')
 
     def text(self, text: str, pos_mm: tuple[float, float], *,
-             anchor: str = 'middle', size: float = 11, color: str = '#222',
+             anchor: str = 'middle', baseline: str | None = None, size: float = 11, color: str = '#222',
              dx: float = 0, dy: float = 0) -> None:
         x, y = self._pt(*pos_mm)
-        self.elements.append(f'<text x="{x + dx:.2f}" y="{y + dy:.2f}" text-anchor="{anchor}" font-size="{size}" fill="{color}">{text}</text>')
+        baseline_attr = f' dominant-baseline="{baseline}"' if baseline else ''
+        self.elements.append(f'<text x="{x + dx:.2f}" y="{y + dy:.2f}" text-anchor="{anchor}"{baseline_attr} font-size="{size}" fill="{color}">{text}</text>')
 
     def dim_h(self, v_at: float, u1: float, u2: float, label: str, *,
               side: str = 'above', offset_px: float = 14) -> None:

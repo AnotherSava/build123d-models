@@ -66,6 +66,7 @@ For a single overview drawing, `<draft_name>` matches the model directory name (
    - Dimension line: `#222`, 0.8 px with arrows at both ends
    - Sub-dimensions stack at `offset_px=14..16`; overall dimensions at `offset_px=36..60`
    - Title above each view in 14 pt bold; main title 20 pt; subtitle `all dimensions in mm`
+   - Vertex letter labels (A, B, C, …) — when tagging polygon corners so model code can reference them: place each letter along the bisector of the **wider** angle at that vertex. For a CCW polygon, that's the **exterior** bisector at convex vertices (interior < 180°, polygon "bumps out") and the **interior** bisector at concave vertices (interior > 180°, polygon "indents"). Offset ~0.3 mm out from the corner, size ~6 pt, and pass `baseline='central'` to `view.text()` so the letter's geometric centre sits on the bisector point (not its alphabetic baseline). The interior-bisector direction at vertex P is `unit(perp_left(e_in) + perp_left(e_out))` where `perp_left((a,b)) = (-b, a)`; concave uses it, convex uses its negation. Worked example: cable-channel cross-section labels A–H.
 
 6. **Render SVG and review.** Run the script (`venv/Scripts/python.exe models/<group>/<model_name>/dimensioned_drafts/<draft_name>.py`); it writes the SVG next to the script. Open the SVG in IntelliJ, a browser, or any SVG viewer. Common issues:
    - Title overlap with topmost dimension labels (fix with `title_pos` overrides)
