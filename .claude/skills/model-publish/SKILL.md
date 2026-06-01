@@ -1,11 +1,11 @@
 ---
-name: publish_model
+name: model-publish
 description: Create model description and publish to Thingiverse and MakerWorld
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
 ---
 
-**Reference**: See `.claude/skills/publish_model/PUBLISHING_NOTES.md` for platform-specific technical details (selectors, API quirks, file formats, folder structure).
+**Reference**: See `.claude/skills/model-publish/PUBLISHING_NOTES.md` for platform-specific technical details (selectors, API quirks, file formats, folder structure).
 
 1. **Identify model and read source code**
    - Ask what model to describe if not provided as input
@@ -24,8 +24,8 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
 
 4. **Research similar models**
    - First, use WebFetch to read descriptions and tags from models already published in this project (Thingiverse/MakerWorld links in `README.md`) - these are the primary reference for style and formatting
-   - Then search for similar models by other authors using `.claude/skills/publish_model/scripts/web_search.py`:
-     - `./venv/Scripts/python.exe .claude/skills/publish_model/scripts/web_search.py search "<keywords>" --platform both --max 5`
+   - Then search for similar models by other authors using `.claude/skills/model-publish/scripts/web_search.py`:
+     - `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/web_search.py search "<keywords>" --platform both --max 5`
      - Note: this launches a visible browser (headless=False) to bypass Cloudflare — this is expected
      - Categories are scraped automatically from each model page in `Category > Subcategory` format (all platforms)
    - Use WebFetch to read 3-5 top external results from each platform, focusing on:
@@ -84,9 +84,9 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
      - Photos: `cover_4x3.*` and all `photo_*` files from the `photo/` subfolder
      - Model files: `bambu.3mf` from the model output folder and all `.stl` files from `stl/`
    - Present the full file list (photos + model files) to the user and ask for confirmation before uploading
-   - Use `.claude/skills/publish_model/scripts/thingiverse.py` to create a draft:
-     - `./venv/Scripts/python.exe .claude/skills/publish_model/scripts/thingiverse.py draft <description_dir> --photo-dir <photo_dir> --files <file1> <file2> ...`
-     - Example: `./venv/Scripts/python.exe .claude/skills/publish_model/scripts/thingiverse.py draft models/other/marker_holder/description --photo-dir models/other/marker_holder/photo --files models/other/marker_holder/bambu.3mf models/other/marker_holder/stl/marker_holder.stl`
+   - Use `.claude/skills/model-publish/scripts/thingiverse.py` to create a draft:
+     - `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/thingiverse.py draft <description_dir> --photo-dir <photo_dir> --files <file1> <file2> ...`
+     - Example: `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/thingiverse.py draft models/other/marker_holder/description --photo-dir models/other/marker_holder/photo --files models/other/marker_holder/bambu.3mf models/other/marker_holder/stl/marker_holder.stl`
    - Photos are uploaded first (cover_4x3 first to become the cover image at rank 0, then additional photos in order)
    - Reads Name, Tags, and description body from `thingiverse.md`
    - Creates as unpublished draft — not publicly visible until manually published
@@ -95,15 +95,15 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
 
 9. **Publish draft to MakerWorld**
    - Use the same file list from step 8
-   - Use `.claude/skills/publish_model/scripts/makerworld.py` to create a draft:
-     - `./venv/Scripts/python.exe .claude/skills/publish_model/scripts/makerworld.py draft <description_dir> --photo-dir <photo_dir> --files <file1> <file2> ...`
-     - Example: `./venv/Scripts/python.exe .claude/skills/publish_model/scripts/makerworld.py draft models/other/marker_holder/description --photo-dir models/other/marker_holder/photo --files models/other/marker_holder/bambu.3mf models/other/marker_holder/stl/marker_holder.stl`
+   - Use `.claude/skills/model-publish/scripts/makerworld.py` to create a draft:
+     - `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/makerworld.py draft <description_dir> --photo-dir <photo_dir> --files <file1> <file2> ...`
+     - Example: `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/makerworld.py draft models/other/marker_holder/description --photo-dir models/other/marker_holder/photo --files models/other/marker_holder/bambu.3mf models/other/marker_holder/stl/marker_holder.stl`
    - Uses Playwright browser automation with a real Chrome profile (bypasses Cloudflare)
    - Reads Name, Category, Tags, and description body from `makerworld.md` (falls back to `thingiverse.md`)
    - Types category subcategory into the autocomplete and selects the first match
    - Uploads cover images (4:3 and 3:4), additional photos, Bambu 3MF, and STL files
    - Creates as draft — not publicly visible until manually published
-   - Prerequisites: run `./venv/Scripts/python.exe .claude/skills/publish_model/scripts/makerworld.py login` first to authenticate (session persists in `.chrome_mw_profile/`)
+   - Prerequisites: run `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/makerworld.py login` first to authenticate (session persists in `.chrome_mw_profile/`)
 
 10. **Update project README and description files**
     - Add or update the model entry in `README.md` under the appropriate section

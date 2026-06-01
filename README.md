@@ -48,8 +48,10 @@ See `docs/code/reconstruct/` for the algorithm, findings, and the public Python 
 
 ## Claude Code Skills
 
-- `/create_model` — Create new model based on build123d framework
-- `/publish_model` — Create model description and publish to Thingiverse and MakerWorld
+- `/model-create` — Create new model based on build123d framework
+- `/model-publish` — Create model description and publish to Thingiverse and MakerWorld
+- `/model-reconstruct` — Reconstruct a 2.5D mesh (STL/OFF) into parametric build123d code and integrate it into a model
+- `/model-dimensioned-draft` — Generate a dimensioned technical drawing (SVG) of a model
 
 ## Installation
 
