@@ -167,6 +167,31 @@ solid.orient((90, 0, 0))        # set orientation to 90° around X
 
 **Key difference:** `rotate()` uses fixed global axes and is incremental. `orient()` uses object-attached axes and sets absolute orientation.
 
+### Print orientation (`bed_orientation`)
+
+Build parts in **scene (visualization) orientation** — how they sit in the assembled model. When a part prints better in a different pose, set its `bed_orientation` rotation; export applies it **only when writing STL**, so the part still visualizes in scene pose:
+
+```python
+lid.bed_orientation = (180, 0, 0)   # flipped flat on the bed for printing, upright in the scene
+```
+
+`bed_orientation` defaults to `None` (scene pose prints as-is) and is preserved by `copy()`.
+
+The typical export flow saves the assembled scene as 3MF first, then re-exports as STL (which is where `bed_orientation` is applied):
+
+```python
+from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear
+
+# 1. Assembled visualization scene (colors, parts posed together)
+export(channel, cap)
+save_3mf("models/.../export.3mf", current=True)
+
+# 2. Slicer-ready STLs (bed_orientation applied; clear() avoids duplicating shapes)
+clear()
+export(channel, cap)
+save_stl("models/.../stl")
+```
+
 ### Scale
 
 ```python
@@ -237,6 +262,25 @@ sphere.create_shell(dim.thickness).cut_z(cut_fraction=-dim.cut_fraction)
 # Trim a connector to match another component's height
 connector.cut_z(cut=connector.z_size - target.z_size)
 ```
+
+## Bevel
+
+Shave one side face at an angle, by intersecting the solid with its bounding box tapered on that face. `side` is the world face to cut; `direction` is the (perpendicular) world axis the cut tilts along; `angle` is the wall angle from horizontal (90° = vertical = no cut, smaller = steeper bevel). Works on any solid, not just boxes.
+
+```python
+solid.bevel(side, direction, angle)              # mutates in place, returns self
+result = solid.beveled(side, direction, angle)   # non-mutating copy
+```
+
+```python
+# Chamfer the east face so it leans inward toward the top
+solid.bevel(Direction.E, Direction.U, 45)
+
+# Miter the end of a channel for a right-angle corner join
+channel.bevel(Direction.E, Direction.S, 45)
+```
+
+`side` must be perpendicular to `direction` (you can't tilt a face along its own normal).
 
 ## Filleting
 

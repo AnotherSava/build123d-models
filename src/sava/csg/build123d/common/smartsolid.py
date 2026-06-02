@@ -93,7 +93,10 @@ class SmartSolid:
         self.label = label
         self.solid = fuse(*args) if len(args) > 0 else None
         self.origin = Vector(0, 0, 0)
-        self._orientation = Vector(0, 0, 0)
+        # Track the solid's actual orientation so the `_orientation == solid.orientation`
+        # invariant holds even for `plane=`-constructed solids (whose rotation is baked into
+        # solid.orientation); assuming (0,0,0) here would make rotate()/transform-replay drop it.
+        self._orientation = Vector(self.solid.orientation) if self.solid is not None and not isinstance(self.solid, ShapeList) else Vector(0, 0, 0)
         self.bed_orientation: VectorLike | None = None
         self._reanchor()
         self.assert_valid()
@@ -639,6 +642,31 @@ class SmartSolid:
 
     def intersected(self, *args, label: str = None) -> 'SmartSolid':
         return self.copy(label).intersect(*args)
+
+    def bevel(self, side: Direction, direction: Direction, angle: float) -> 'SmartSolid':
+        """Shave this solid's `side` face with an angled cut that tilts along `direction`
+        (90° = vertical wall = no cut), by intersecting with the solid's bounding box tapered
+        on that face. `side` must be perpendicular to `direction`. Mutates in place.
+
+        `side` is a world direction: `with_top(direction)` re-frames the bounding box so the
+        taper tilts along `direction`, but its local axes depend on `direction`, so we map the
+        world `side` to the matching local wall via the box's actual frame.
+        """
+        assert abs(side.value.dot(direction.value)) < 0.5, "side must be perpendicular to direction"
+
+        box = self.create_bound_box().with_top(direction)
+        frame = Plane(box.solid.location)   # the reframed box's local axes, in world coordinates
+
+        if side.value.dot(frame.x_dir) > 0.5:
+            return self.intersect(box.taper(angle_east=angle))
+        if side.value.dot(frame.x_dir) < -0.5:
+            return self.intersect(box.taper(angle_west=angle))
+        if side.value.dot(frame.y_dir) > 0.5:
+            return self.intersect(box.taper(angle_north=angle))
+        return self.intersect(box.taper(angle_south=angle))
+
+    def beveled(self, side: Direction, direction: Direction, angle: float, label: str = None) -> 'SmartSolid':
+        return self.copy(label).bevel(side, direction, angle)
 
     def add_notch(self, direction: Direction, depth: float, length: float):
         raise NotImplementedError("Remove dependency on pencil")

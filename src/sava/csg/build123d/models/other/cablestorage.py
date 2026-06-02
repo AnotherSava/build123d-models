@@ -22,7 +22,7 @@ class ConnectorRecesses:
 
     def generic(self, length: float, width: float, height: float) -> tuple[SmartSolid, SmartBox]:
         extra_width = height / tan(radians(self.dim.cable_holder_angle))
-        connector_cut = SmartBox.with_base_angles_and_height(length + extra_width, width + extra_width, -height, 90, self.dim.cable_holder_angle)
+        connector_cut = SmartBox(length + extra_width, width - extra_width, height, tapered_width=width + extra_width)
         connector_offset = connector_cut.create_offset(self.dim.cable_holder_width, up=0, down=0)
         return connector_cut, connector_offset
 

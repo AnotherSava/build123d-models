@@ -1,6 +1,8 @@
 # SmartBox — Box Primitives Guide
 
-Box primitive with optional tapering support. Creates rectangular solids where the top face can differ in size from the base, producing frustum shapes. Inherits all fluent API methods from SmartSolid (see `smartsolid.md`).
+Box primitive with optional, per-side tapering support. Creates rectangular solids where the top face can differ in size from the base, producing frustum and wedge shapes. Inherits all fluent API methods from SmartSolid (see `smartsolid.md`).
+
+The construction math (resolving tapering parameters into a top rectangle, building the solid, computing offsets) lives in `boxgeometry.py`; SmartBox itself is the user-facing API and delegates the "how" there.
 
 ## Quick start
 
@@ -10,17 +12,17 @@ from sava.csg.build123d.common.smartbox import SmartBox
 # Simple box: length 100, width 80, height 50
 box = SmartBox(100, 80, 50)
 
-# Tapered box: base 100x80, top 90x70
+# Symmetric taper: base 100x80, top 90x70
 tapered = SmartBox(100, 80, 50, tapered_length=90, tapered_width=70)
 
-# Tapered box defined by wall angles (80 degrees from horizontal)
-angled = SmartBox.with_base_angles_and_height(100, 80, 50, 80, 80)
+# Asymmetric: east wall vertical, west wall at 45 degrees
+wedge = SmartBox(100, 80, 50, angle_east=90, angle_west=45)
 ```
 
 ## Constructor
 
 ```python
-SmartBox(length, width, height, tapered_length=None, tapered_width=None, plane=Plane.XY, label=None)
+SmartBox(length, width, height, tapered_length=None, tapered_width=None, angle_east=None, angle_west=None, angle_north=None, angle_south=None, plane=Plane.XY, label=None)
 ```
 
 | Parameter | Description |
@@ -28,35 +30,30 @@ SmartBox(length, width, height, tapered_length=None, tapered_width=None, plane=P
 | `length` | X dimension at the base |
 | `width` | Y dimension at the base |
 | `height` | Z dimension |
-| `tapered_length` | X dimension at the top (defaults to `length`) |
-| `tapered_width` | Y dimension at the top (defaults to `width`) |
+| `tapered_length` | Symmetric top X dimension — applies equally to the east and west walls |
+| `tapered_width` | Symmetric top Y dimension — applies equally to the north and south walls |
+| `angle_east` | Angle of the east (+X) wall from horizontal (90 = vertical, <90 = inward, >90 = outward) |
+| `angle_west` | Angle of the west (-X) wall |
+| `angle_north` | Angle of the north (+Y) wall |
+| `angle_south` | Angle of the south (-Y) wall |
 | `plane` | Plane to create the box in (default: XY) |
 | `label` | Optional label for export logging |
 
-The box is always centered on X and Y, with its base at Z=0.
+The **base** is always a `length` × `width` rectangle centered on X/Y with its base at Z=0. The **top** is an axis-aligned rectangle whose four edges are placed independently, so the top can be smaller, larger, off-center, or skewed relative to the base.
+
+### How each top edge is resolved
+
+Each wall's top edge comes from whichever parameter is supplied, in priority order:
+
+1. The per-side `angle_*` for that wall (takes precedence).
+2. Otherwise the symmetric `tapered_length` / `tapered_width` for that wall's pair.
+3. Otherwise the wall is vertical.
+
+So `tapered_length=80` alone tapers the east and west walls inward symmetrically, while `angle_east=90, angle_west=45` leaves the east wall vertical and leans only the west wall — producing an off-center top. A per-side angle and the symmetric dimension can be mixed across pairs (e.g. `tapered_width=60, angle_east=70`), but passing `tapered_length` together with **both** `angle_east` and `angle_west` (which would fully override it) is rejected; likewise for width.
+
+Angles follow the same convention everywhere: measured from horizontal, `90` = vertical, `<90` = inward taper (wall leans toward center going up), `>90` = outward flare.
 
 ## Class methods
-
-### `with_base_angles_and_height`
-
-Define tapering by wall angles instead of explicit top dimensions.
-
-```python
-SmartBox.with_base_angles_and_height(length, width, height, angle_length, angle_width)
-```
-
-| Parameter | Description |
-|-----------|-------------|
-| `angle_length` | Angle of length-direction walls from horizontal (90 = vertical, <90 = inward taper) |
-| `angle_width` | Angle of width-direction walls from horizontal (90 = vertical, <90 = inward taper) |
-
-```python
-# 10-degree inward taper on all walls
-box = SmartBox.with_base_angles_and_height(100, 80, 50, 80, 80)
-
-# Vertical length walls, tapered width walls
-box = SmartBox.with_base_angles_and_height(100, 80, 50, 90, 75)
-```
 
 ### `with_delta`
 
@@ -72,6 +69,43 @@ Positive delta makes the top larger, negative makes it smaller. The top dimensio
 # Top is 4mm smaller on each axis (2mm inset per side)
 box = SmartBox.with_delta(100, 80, 50, -2)
 ```
+
+## `taper`
+
+Return a new box with this box's base footprint, height, and placement, re-tapered per the given parameters. Takes the same tapering inputs as the constructor — `tapered_length`, `tapered_width`, `angle_east/west/north/south` — but `length`, `width`, `height`, and the box's orientation are reused from this box, so they're not repeated.
+
+```python
+box.taper(tapered_length=None, tapered_width=None, angle_east=None, angle_west=None, angle_north=None, angle_south=None, label=None)
+```
+
+```python
+# Take an existing (possibly moved/rotated) box and lean its west wall to 45 degrees
+panel = SmartBox(100, 80, 50).move(20, 30, 0)
+wedge = panel.taper(angle_east=90, angle_west=45)   # sits exactly where panel sits
+```
+
+The taper is applied to the base (length × width) footprint: walls left unspecified are vertical, so any existing taper is replaced rather than compounded. The result is placed where this box is — its tracked move/rotate transforms are re-applied.
+
+## `with_top`
+
+Return a new box occupying the **exact same space**, but re-framed so the face on the given `Direction` is its top (local +Z / height axis). The geometry doesn't move — that face still points the same way in the world; only which face the box *calls* "top" changes, so `height` becomes the extent along that direction and the construction plane is rotated to match. Effectively a face rename.
+
+```python
+box.with_top(direction, label=None)
+```
+
+Non-tapered, axis-aligned boxes only — a tapered box's taper is tied to its Z axis and can't be re-pointed at another face.
+
+```python
+from sava.csg.build123d.common.geometry import Direction
+
+box = SmartBox(10, 20, 30)            # L×W×H, occupies some region
+renamed = box.with_top(Direction.N)  # same region, but +Y face is now the top → height 20
+```
+
+`Direction.U` is a no-op (top stays the top); `Direction.D` re-frames the bottom face as top.
+
+Note: operations keyed to world +Z (`create_offset(up=...)`, `add_cutout`, `z_max`, `bed_orientation`) act on the world top, not the renamed one — the renamed frame is what plane-aware methods and the box's own `length`/`width`/`height` reflect.
 
 ## Tapering queries
 
@@ -90,7 +124,7 @@ box.center(0.5)          # center point at half height: Vector(0, 0, 25)
 
 ## `create_offset`
 
-Create a new box with dimensions adjusted by per-direction offsets. Positive = outward (larger), negative = inward (smaller). Correctly accounts for taper when adjusting dimensions.
+Create a new box with dimensions adjusted by per-direction offsets. Positive = outward (larger), negative = inward (smaller). Each wall is offset along its own slope, so the result tracks per-side taper correctly — including when extending past the base (`down`) or top (`up`), which extrapolates each wall's angle.
 
 ```python
 # Uniform offset: expand by 2mm on all sides
