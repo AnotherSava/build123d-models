@@ -76,7 +76,7 @@ class SmartLoft(SmartSolid):
         result.target_profile = copy(self.target_profile)
         return result
 
-    def move(self, x: float, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartLoft':
+    def move(self, x: float = 0, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartLoft':
         super().move(x, y, z, plane=plane)
         # Convert plane-local offsets to global coordinates if plane is specified
         if plane is not None:

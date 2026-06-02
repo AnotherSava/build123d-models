@@ -245,7 +245,7 @@ class SmartSolid:
     def moved_vector(self, vector: Vector, plane: Plane = None) -> 'SmartSolid':
         return self.copy().move_vector(vector, plane=plane)
 
-    def move(self, x: float, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartSolid':
+    def move(self, x: float = 0, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartSolid':
         """Move the solid by the specified offsets.
 
         Args:
@@ -280,7 +280,7 @@ class SmartSolid:
         self.origin += global_offset
         return self
 
-    def moved(self, x: float, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartSolid':
+    def moved(self, x: float = 0, y: float = 0, z: float = 0, plane: Plane = None) -> 'SmartSolid':
         return self.copy().move(x, y, z, plane=plane)
 
     def move_x(self, x: float, plane: Plane = None) -> 'SmartSolid':

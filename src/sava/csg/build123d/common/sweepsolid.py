@@ -24,7 +24,7 @@ class SweepSolid(SmartSolid):
         result._original_plane_path = copy(self._original_plane_path)
         return result
 
-    def move(self, x: float, y: float = 0, z: float = 0, plane: Plane = None) -> 'SweepSolid':
+    def move(self, x: float = 0, y: float = 0, z: float = 0, plane: Plane = None) -> 'SweepSolid':
         super().move(x, y, z, plane=plane)
         # Convert plane-local offsets to global coordinates if plane is specified
         if plane is not None:
