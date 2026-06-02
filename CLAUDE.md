@@ -49,7 +49,7 @@ f3d models/current_model.3mf --watch --opacity=0.6
   - Support for both single solids and ShapeList collections
   - Cut helpers (`cut_x`, `cut_y`, `cut_z`): trim along an axis using `cut` (absolute to remove), `cut_fraction` (fraction to remove), `keep` (absolute to keep), or `keep_fraction` (fraction to keep)
 
-- **SmartBox**: Extends SmartSolid for box primitives with cutout operations
+- **SmartBox**: Extends SmartSolid for box primitives with cutout operations. Supports per-side tapering (independent wall angles or symmetric top dimensions), producing frustum/wedge shapes with a possibly off-center top. Construction math (parameter resolution, solid building, offset geometry) lives in `boxgeometry.py`
 
 - **Pencil**: 2D drawing tool for creating complex profiles via lines and arcs, then extruding/revolving them into 3D shapes. Supports mirroring across axes in arbitrary planes (not just XY)
 
@@ -177,11 +177,15 @@ When building models, prefer the project's high-level classes (SmartBox, Smarter
 
 Use `.align()` and alignment operations (`align_x`, `align_y`, `align_z`) for positioning objects relative to each other. Avoid manual coordinate math — the alignment system handles bounding-box-relative positioning cleanly. See `docs/code/smartsolid.md` for full alignment documentation.
 
-### Build in print orientation
+### Build in scene (visualization) orientation
 
-Each `create_*` method should return its part in the orientation that prints easiest on an FDM printer (flat face on the bed, no overhangs that need supports, no internal cavities that bridge across a wide span). That natural state is what flows into the STL — so the exported STL drops straight into a slicer without manual reorientation.
+Each `create_*` method should return its part in the orientation that reads best in the **assembled scene** — how the part sits relative to the others when you view the whole model. That natural state is what flows into the assembled 3MF view, and it's what makes the `show_red` / `show_green` / `show_blue` debug helpers overlay where you expect.
 
-Achieve the print orientation natively in the Pencil trace (choose the start point and direction so the geometry comes out the right way up) — don't extrude in some other orientation and then `rotate_x`/`move` it after. The reorienting/translating transforms for assembled-view visualization belong in the caller, after `create_*` returns.
+Do **not** build in print orientation. If a part prints better in a different pose (flat face on the bed, no overhangs), set its `bed_orientation` (a rotation vector) on the SmartSolid. Export applies `bed_orientation` **only when writing STL** — so the part still visualizes in scene pose but slices ready-to-print. Leave `bed_orientation` unset when the scene pose already prints fine.
+
+Achieve the scene orientation natively in the Pencil trace (choose the start point and direction so the geometry comes out posed correctly) — don't build in some other orientation and then `rotate_x`/`move` it after.
+
+**Export flow** (see `tray.py` / `splitter.py`): arrange the parts into their assembled positions and `save_3mf(...)` **first** (the visualization scene, with colors), then `clear()`, then export the parts in their print layout and `save_stl(...)` (which applies each part's `bed_orientation`). Exporting 3MF first gives the assembled debug view; the `clear()` between prevents the STL pass from duplicating shapes into the 3MF.
 
 ## Code Style
 

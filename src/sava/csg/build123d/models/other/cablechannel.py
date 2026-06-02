@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 from build123d import Plane
 
-from sava.csg.build123d.common.exporter import clear, export_3mf, export_stl
-from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.exporter import export_3mf, export_stl
+from sava.csg.build123d.common.geometry import Alignment, Direction
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -11,8 +11,8 @@ from sava.csg.build123d.common.smartsolid import SmartSolid
 
 @dataclass(frozen=True)
 class CableChannelDimensions:
-    length: float = 20.0
-    width: float = 20.0
+    length: float = 30.0
+    width: float = 15.0
     wall_thickness: float = 1.5
     cavity_length: float = 11.0
     cavity_slope_run: float = 0.5
@@ -85,7 +85,14 @@ class CableChannel:
     def __init__(self, dim: CableChannelDimensions):
         self.dim = dim
 
-    def create_channel(self) -> SmartSolid:
+    def create_straight(self, length: float, cavities: bool = False) -> tuple[SmartSolid, SmartSolid]:
+        channel = self.create_channel(length, cavities)
+        cap = self.create_cap(length)
+        cap.align(channel).z(Alignment.RL, self.dim.wall_thickness)
+        return channel, cap
+
+
+    def create_channel(self, length: float, cavities: bool = False) -> SmartSolid:
         dim = self.dim
         body = Pencil(Plane.YZ, start=(dim.width / 2, 0))
         body.right(dim.width / 2)                                                            # outer floor
@@ -98,45 +105,59 @@ class CableChannel:
         body.down(dim.rim_inner_face_length)                                                 # E → F
         body.jump((dim.wall_thickness, -dim.inner_diag_dz))                                  # F → G
         body.down(dim.inner_cavity_wall_height)                                              # G → H
-        channel = body.extrude_mirrored_y(dim.length, center=0, label='channel')
+        channel = body.extrude_mirrored_y(length, center=0, label='channel')
 
-        # Trapezoidal cavity cuts at each end: long side along inner floor,
-        # non-parallel sides match the source cavity slopes.
-        cavity = SmartBox(dim.cavity_length, dim.cavity_bottom_width, dim.wall_thickness, tapered_width=dim.cavity_top_width)
-        cavity.move(dim.cavity_length / 2, dim.width / 2, dim.wall_thickness)
-        for shift_x in [0, dim.length - dim.cavity_length]:
-            channel.cut(cavity.copy().move(shift_x, 0, 0))
+        if cavities:
+            # Trapezoidal cavity cuts at each end: long side along inner floor,
+            # non-parallel sides match the source cavity slopes.
+            cavity = SmartBox(dim.cavity_length, dim.cavity_bottom_width, dim.wall_thickness, tapered_width=dim.cavity_top_width)
+            cavity.move(dim.cavity_length / 2, dim.width / 2, dim.wall_thickness)
+            for shift_x in [0, dim.length - dim.cavity_length]:
+                channel.cut(cavity.copy().move(shift_x, 0, 0))
 
         return channel
 
-    def create_cap(self) -> SmartSolid:
-        # Built natively in print orientation: ceiling resting on the bed (Z=0..wall_thickness),
-        # walls extending upward, open cavity and V-ridges facing up. `arrange_scene` flips
-        # this back over the channel rim for the assembled view.
-        dim = self.dim
-        body = Pencil(Plane.YZ, start=(dim.width / 2, dim.wall_thickness))
-        body.down(dim.wall_thickness)                                                            # ceiling → bed
-        body.right(dim.width / 2)                                                                # bed → outer
-        body.up(dim.rim_height + dim.wall_thickness)                                             # outer wall up
-        body.left(dim.wall_thickness - dim.rim_outer_offset)                                     # → A
-        body.jump((-dim.rim_groove_depth, -dim.rim_groove_apex_dz))                              # A → B
-        body.jump((dim.rim_groove_depth, -(dim.rim_groove_upper_dz - dim.rim_groove_apex_dz)))  # B → C
-        body.down(dim.rim_height - dim.rim_groove_upper_dz)                                      # C → D
-        return body.extrude_mirrored_y(dim.length, center=0, label='cap')
 
-    def arrange_scene(self, channel: SmartSolid, cap: SmartSolid, path: str) -> None:
-        """Move the print-orientation parts into their assembled position (cap on
-        top of the channel rim) and export the combined view as a 3MF. Mutates
-        the inputs — call this after the slicer-ready STL has been written."""
+    def bend_right(self, before: SmartSolid, after: SmartSolid):
+        before.bevel(Direction.E, Direction.S, 45)
+        after.bevel(Direction.W, Direction.S, 45).rotate_z(-90)
+        after.align(before).x(Alignment.RL).y(Alignment.RL)
+        return before.fuse(after)
+
+    def create_corder_right(self, length_before: float, length_after: float) -> tuple[SmartSolid, SmartSolid]:
+        channel_before, cap_before = self.create_straight(length_before)
+        channel_after, cap_after = self.create_straight(length_after)
+
+        return self.bend_right(channel_before, channel_after), self.bend_right(cap_before, cap_after)
+
+    def create_cap(self, length: float) -> SmartSolid:
+        # Built natively in scene orientation: ceiling on top, walls and V-ridges facing down
+        # to wrap the channel rim — how the cap sits in the assembled view. It prints best
+        # flipped (ceiling flat on the bed, no overhangs), so `bed_orientation` carries that
+        # flip and is applied only when exporting STL.
         dim = self.dim
-        cap.rotate_x(180).align(channel).z(Alignment.RL, dim.wall_thickness)
-        clear()
-        export_3mf(path, channel, cap)
+        body = Pencil(Plane.YZ, start=(dim.width / 2, dim.rim_height))
+        body.up(dim.wall_thickness)                                                            # ceiling (inner → top)
+        body.right(dim.width / 2)                                                              # ceiling → outer
+        body.down(dim.rim_height + dim.wall_thickness)                                         # outer wall down
+        body.left(dim.wall_thickness - dim.rim_outer_offset)                                   # → A
+        body.jump((-dim.rim_groove_depth, dim.rim_groove_apex_dz))                             # A → B
+        body.jump((dim.rim_groove_depth, dim.rim_groove_upper_dz - dim.rim_groove_apex_dz))    # B → C
+        body.up(dim.rim_height - dim.rim_groove_upper_dz)                                       # C → D
+        cap = body.extrude_mirrored_y(length, center=0, label='cap')
+        cap.bed_orientation = (180, 0, 0)
+
+        return cap
 
 
 if __name__ == "__main__":
-    cable_channel = CableChannel(CableChannelDimensions())
-    channel = cable_channel.create_channel()
-    cap = cable_channel.create_cap()
-    export_stl("models/other/cable_channel/stl", channel, cap)
-    cable_channel.arrange_scene(channel, cap, "models/other/cable_channel/export.3mf")
+    dimensions = CableChannelDimensions()
+    cable_channel = CableChannel(dimensions)
+    # channel_model, cap_model = cable_channel.create_straight(dimensions.length)
+    channel_model, cap_model = cable_channel.create_corder_right(dimensions.length, dimensions.length * 1.5)
+
+    # Assembled visualization scene first (3MF), then slicer-ready STLs — the cap's
+    # bed_orientation flips it flat onto the bed during the STL pass.
+    # cable_channel.arrange_scene(channel_model, cap_model)
+    export_3mf("models/other/cable_channel/export.3mf", channel_model, cap_model)
+    export_stl("models/other/cable_channel/stl", channel_model, cap_model)
