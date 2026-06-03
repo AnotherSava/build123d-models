@@ -177,6 +177,8 @@ When building models, prefer the project's high-level classes (SmartBox, Smarter
 
 Use `.align()` and alignment operations (`align_x`, `align_y`, `align_z`) for positioning objects relative to each other. Avoid manual coordinate math — the alignment system handles bounding-box-relative positioning cleanly. See `docs/code/smartsolid.md` for full alignment documentation.
 
+When a fillet on an axis-rotated solid fails after a move/align, try filleting **at the origin first and moving the finished solid after** — moving such a solid has been observed to inject ~1e-7 transform error that breaks the fillet (`cablechannel.py` dovetail, R0.7). Note: based on one clean failure case; rotated-then-moved solids have also filleted fine elsewhere, so treat this as the first suspect for a mysteriously failing fillet rather than a hard rule.
+
 ### Build in scene (visualization) orientation
 
 Each `create_*` method should return its part in the orientation that reads best in the **assembled scene** — how the part sits relative to the others when you view the whole model. That natural state is what flows into the assembled 3MF view, and it's what makes the `show_red` / `show_green` / `show_blue` debug helpers overlay where you expect.
