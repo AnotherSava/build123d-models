@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="arrL" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 10 0 L 0 5 L 10 10 z" fill="#222"/></marker><marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#222"/></marker><marker id="axisArr" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#333"/></marker></defs>
+<rect width="1120" height="760" fill="white"/>
+<text x="560" y="32" text-anchor="middle" font-size="20" font-weight="bold">Cable Channel - Puzzle Floor Connector</text>
+<text x="560" y="52" text-anchor="middle" font-size="11" fill="#555">all dimensions in mm</text>
+<line x1="240" y1="150" x2="262" y2="150" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
+<line x1="240" y1="150" x2="240" y2="128" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
+<text x="243" y="128" dominant-baseline="hanging" font-size="7.5" fill="#333" text-anchor="start">Y</text>
+<text x="262" y="147" font-size="7.5" fill="#333" text-anchor="end">X</text>
+<text x="276" y="150" text-anchor="start" font-size="14" font-weight="bold">End floor - top view</text>
+<path d="M 147.00 485.00 L 345.00 485.00 L 345.00 428.38 L 344.64 425.06 L 343.57 421.90 L 341.85 419.05 L 339.55 416.63 L 336.79 414.76 L 333.69 413.53 L 330.40 413.00 L 327.07 413.19 L 296.93 418.21 L 293.60 418.40 L 290.31 417.87 L 287.21 416.64 L 284.45 414.77 L 282.15 412.35 L 280.43 409.50 L 279.36 406.34 L 279.00 403.02 L 279.00 351.38 L 279.36 348.06 L 280.43 344.90 L 282.15 342.05 L 284.45 339.63 L 287.21 337.76 L 290.31 336.53 L 293.60 336.00 L 296.93 336.19 L 327.07 341.21 L 330.40 341.40 L 333.69 340.87 L 336.79 339.64 L 339.55 337.77 L 341.85 335.35 L 343.57 332.50 L 344.64 329.34 L 345.00 326.02 L 345.00 313.98 L 345.36 310.66 L 346.43 307.50 L 348.15 304.65 L 350.45 302.23 L 353.21 300.36 L 356.31 299.13 L 359.60 298.60 L 362.93 298.79 L 393.07 303.81 L 396.40 304.00 L 399.69 303.47 L 402.79 302.24 L 405.55 300.37 L 407.85 297.95 L 409.57 295.10 L 410.64 291.94 L 411.00 288.62 L 411.00 236.98 L 410.64 233.66 L 409.57 230.50 L 407.85 227.65 L 405.55 225.23 L 402.79 223.36 L 399.69 222.13 L 396.40 221.60 L 393.07 221.79 L 362.93 226.81 L 359.60 227.00 L 356.31 226.47 L 353.21 225.24 L 350.45 223.37 L 348.15 220.95 L 346.43 218.10 L 345.36 214.94 L 345.00 211.62 L 345.00 155.00 L 147.00 155.00 Z" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
+<line x1="147.00" y1="188.00" x2="345.00" y2="188.00" stroke="#999" stroke-width="0.5" stroke-dasharray="3,3"/>
+<line x1="147.00" y1="452.00" x2="345.00" y2="452.00" stroke="#999" stroke-width="0.5" stroke-dasharray="3,3"/>
+<text x="147.00" y="184.00" text-anchor="start" font-size="8" fill="#999">inner wall face (Y=6)</text>
+<line x1="345.00" y1="485.00" x2="345.00" y2="155.00" stroke="#c0392b" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="345.00" y="320.00" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#1f6feb">●</text>
+<text x="337.00" y="324.00" text-anchor="end" font-size="8" fill="#1f6feb">180° rotation centre</text>
+<text x="378.00" y="199.00" text-anchor="middle" font-size="9" fill="#222">dovetail tab</text>
+<text x="312.00" y="377.20" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#222">socket</text>
+<line x1="147.00" y1="485.00" x2="117.00" y2="485.00" stroke="#666" stroke-width="0.5"/>
+<line x1="147.00" y1="155.00" x2="117.00" y2="155.00" stroke="#666" stroke-width="0.5"/>
+<line x1="117.00" y1="485.00" x2="117.00" y2="155.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="114.00" y="324.00" text-anchor="end" font-size="11">15  (width)</text>
+<line x1="345.00" y1="155.00" x2="345.00" y2="139.00" stroke="#666" stroke-width="0.5"/>
+<line x1="411.00" y1="155.00" x2="411.00" y2="139.00" stroke="#666" stroke-width="0.5"/>
+<line x1="345.00" y1="139.00" x2="411.00" y2="139.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="378.00" y="136.00" text-anchor="middle" font-size="11">3.0  depth</text>
+<line x1="411.00" y1="306.80" x2="427.00" y2="306.80" stroke="#666" stroke-width="0.5"/>
+<line x1="411.00" y1="218.80" x2="427.00" y2="218.80" stroke="#666" stroke-width="0.5"/>
+<line x1="427.00" y1="306.80" x2="427.00" y2="218.80" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="430.00" y="266.80" text-anchor="start" font-size="11">4.0 tip</text>
+<line x1="411.00" y1="320.00" x2="469.00" y2="320.00" stroke="#666" stroke-width="0.5"/>
+<line x1="411.00" y1="262.80" x2="469.00" y2="262.80" stroke="#666" stroke-width="0.5"/>
+<line x1="469.00" y1="320.00" x2="469.00" y2="262.80" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="472.00" y="295.40" text-anchor="start" font-size="11">2.6 offset</text>
+<line x1="345.00" y1="295.80" x2="380.20" y2="313.40" stroke="#666" stroke-width="0.5"/>
+<text x="383.50" y="313.40" text-anchor="start" dominant-baseline="central" font-size="8.5" fill="#222">root 3.0</text>
+<text x="147.00" y="505.00" text-anchor="start" font-size="8.5" fill="#777">all corners filleted R0.7; tab/socket are 180° rotations of each other</text>
+<text x="147.00" y="518.00" text-anchor="start" font-size="8.5" fill="#777">socket is a through-cut of the lock pad; fit clearance 0.35 mm around the socket</text>
+<line x1="660" y1="110" x2="682" y2="110" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
+<line x1="660" y1="110" x2="660" y2="88" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
+<text x="663" y="88" dominant-baseline="hanging" font-size="7.5" fill="#333" text-anchor="start">Y</text>
+<text x="682" y="107" font-size="7.5" fill="#333" text-anchor="end">X</text>
+<text x="696" y="110" text-anchor="start" font-size="14" font-weight="bold">Mated pair (one piece rotated 180°)</text>
+<path d="M 585.00 362.50 L 720.00 362.50 L 720.00 323.89 L 719.75 321.63 L 719.03 319.48 L 717.85 317.53 L 716.29 315.88 L 714.40 314.61 L 712.29 313.77 L 710.04 313.41 L 707.77 313.54 L 687.23 316.96 L 684.96 317.09 L 682.71 316.73 L 680.60 315.89 L 678.71 314.62 L 677.15 312.97 L 675.97 311.02 L 675.25 308.87 L 675.00 306.61 L 675.00 271.39 L 675.25 269.13 L 675.97 266.98 L 677.15 265.03 L 678.71 263.38 L 680.60 262.11 L 682.71 261.27 L 684.96 260.91 L 687.23 261.04 L 707.77 264.46 L 710.04 264.59 L 712.29 264.23 L 714.40 263.39 L 716.29 262.12 L 717.85 260.47 L 719.03 258.52 L 719.75 256.37 L 720.00 254.11 L 720.00 245.89 L 720.25 243.63 L 720.97 241.48 L 722.15 239.53 L 723.71 237.88 L 725.60 236.61 L 727.71 235.77 L 729.96 235.41 L 732.23 235.54 L 752.77 238.96 L 755.04 239.09 L 757.29 238.73 L 759.40 237.89 L 761.29 236.62 L 762.85 234.97 L 764.03 233.02 L 764.75 230.87 L 765.00 228.61 L 765.00 193.39 L 764.75 191.13 L 764.03 188.98 L 762.85 187.03 L 761.29 185.38 L 759.40 184.11 L 757.29 183.27 L 755.04 182.91 L 752.77 183.04 L 732.23 186.46 L 729.96 186.59 L 727.71 186.23 L 725.60 185.39 L 723.71 184.12 L 722.15 182.47 L 720.97 180.52 L 720.25 178.37 L 720.00 176.11 L 720.00 137.50 L 585.00 137.50 Z" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
+<path d="M 720.00 362.50 L 720.00 323.89 L 719.75 321.63 L 719.03 319.48 L 717.85 317.53 L 716.29 315.88 L 714.40 314.61 L 712.29 313.77 L 710.04 313.41 L 707.77 313.54 L 687.23 316.96 L 684.96 317.09 L 682.71 316.73 L 680.60 315.89 L 678.71 314.62 L 677.15 312.97 L 675.97 311.02 L 675.25 308.87 L 675.00 306.61 L 675.00 271.39 L 675.25 269.13 L 675.97 266.98 L 677.15 265.03 L 678.71 263.38 L 680.60 262.11 L 682.71 261.27 L 684.96 260.91 L 687.23 261.04 L 707.77 264.46 L 710.04 264.59 L 712.29 264.23 L 714.40 263.39 L 716.29 262.12 L 717.85 260.47 L 719.03 258.52 L 719.75 256.37 L 720.00 254.11 L 720.00 245.89 L 720.25 243.63 L 720.97 241.48 L 722.15 239.53 L 723.71 237.88 L 725.60 236.61 L 727.71 235.77 L 729.96 235.41 L 732.23 235.54 L 752.77 238.96 L 755.04 239.09 L 757.29 238.73 L 759.40 237.89 L 761.29 236.62 L 762.85 234.97 L 764.03 233.02 L 764.75 230.87 L 765.00 228.61 L 765.00 193.39 L 764.75 191.13 L 764.03 188.98 L 762.85 187.03 L 761.29 185.38 L 759.40 184.11 L 757.29 183.27 L 755.04 182.91 L 752.77 183.04 L 732.23 186.46 L 729.96 186.59 L 727.71 186.23 L 725.60 185.39 L 723.71 184.12 L 722.15 182.47 L 720.97 180.52 L 720.25 178.37 L 720.00 176.11 L 720.00 137.50 L 855.00 137.50 L 855.00 362.50 Z" fill="#c8d4e3" stroke="#1f2933" stroke-width="0.9"/>
+<text x="607.50" y="250.00" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#222">A</text>
+<text x="817.50" y="250.00" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#222">B (flipped)</text>
+<text x="720.00" y="382.50" text-anchor="middle" font-size="8.5" fill="#777">A's tab -> B's socket, and B's tab -> A's socket: the same part mates either way up</text>
+<line x1="150" y1="560" x2="172" y2="560" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
+<line x1="150" y1="560" x2="150" y2="538" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
+<text x="153" y="538" dominant-baseline="hanging" font-size="7.5" fill="#333" text-anchor="start">Z</text>
+<text x="172" y="557" font-size="7.5" fill="#333" text-anchor="end">X</text>
+<text x="186" y="560" text-anchor="start" font-size="14" font-weight="bold">Side view (X-Z): lock region = 2× floor thickness</text>
+<rect x="57.00" y="657.00" width="99.00" height="33.00" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
+<rect x="156.00" y="624.00" width="165.00" height="66.00" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
+<line x1="255.00" y1="690.00" x2="255.00" y2="624.00" stroke="#c0392b" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="57.00" y="618.00" text-anchor="start" font-size="8.5" fill="#777">raised pad rises into the channel; floor bottom stays flat</text>
+<text x="57.00" y="712.00" text-anchor="start" font-size="8.5" fill="#777">wall/rim butt flush above (not shown)</text>
+<line x1="57.00" y1="690.00" x2="43.00" y2="690.00" stroke="#666" stroke-width="0.5"/>
+<line x1="57.00" y1="657.00" x2="43.00" y2="657.00" stroke="#666" stroke-width="0.5"/>
+<line x1="43.00" y1="690.00" x2="43.00" y2="657.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="40.00" y="677.50" text-anchor="end" font-size="11">1.5 floor</text>
+<line x1="321.00" y1="690.00" x2="335.00" y2="690.00" stroke="#666" stroke-width="0.5"/>
+<line x1="321.00" y1="624.00" x2="335.00" y2="624.00" stroke="#666" stroke-width="0.5"/>
+<line x1="335.00" y1="690.00" x2="335.00" y2="624.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="338.00" y="661.00" text-anchor="start" font-size="11">3.0 lock</text>
+<line x1="255.00" y1="624.00" x2="255.00" y2="610.00" stroke="#666" stroke-width="0.5"/>
+<line x1="321.00" y1="624.00" x2="321.00" y2="610.00" stroke="#666" stroke-width="0.5"/>
+<line x1="255.00" y1="610.00" x2="321.00" y2="610.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="288.00" y="607.00" text-anchor="middle" font-size="11">3.0 depth</text>
+</svg>

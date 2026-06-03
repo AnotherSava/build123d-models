@@ -1,22 +1,33 @@
 from dataclasses import dataclass
 
-from build123d import Plane, Ellipse, extrude
+from build123d import Axis, Plane, fillet
 
+from sava.csg.build123d.common.edgefilters import filter_edges_by_axis, filter_edges_by_position
 from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import Alignment, Direction
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
-from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 @dataclass(frozen=True)
 class CableChannelDimensions:
-    length: float = 30.0
+    length: float = 15.0
     width: float = 15.0
     wall_thickness: float = 1.5
-    pin_radius: float = 1
-    pin_delta: float = 0.7
+
+    # Puzzle-piece floor connector: each end terminates in an interlocking
+    # dovetail (tab on one half, socket on the other) so adjacent channels snap
+    # together. The profile is point-symmetric about the end-edge midpoint, so
+    # any end mates with any end, in either orientation (genderless). The lock
+    # region is built up to lock_thickness (2x floor) and rises into the channel.
+    lock_protrusion: float = 3.0   # dovetail depth beyond the joint plane
+    lock_offset_y: float = 3.0     # tab/socket centre offset from the channel centreline
+    lock_root_half: float = 1.2    # half-width at the root (joint)
+    lock_tip_half: float = 2.5     # half-width at the tip (wider -> undercut)
+    lock_fillet: float = 0.8       # corner fillet (no sharp stress risers)
+    lock_clearance: float = 0.0   # tab<->socket gap for fit
+    lock_pad_margin: float = 1.5   # pad reach inboard of the deepest socket point
 
     # Total Z height of the channel. The rim section sits at the top (fixed
     # height = rim_height); below it the outer wall and inner cavity wall make
@@ -40,6 +51,18 @@ class CableChannelDimensions:
     @property
     def inner_width(self) -> float:
         return self.width - 2 * self.wall_thickness
+
+    @property
+    def lock_thickness(self) -> float:
+        """Z height of the lock region — twice the floor thickness, so the tab
+        and socket are chunky. The extra height rises into the channel interior."""
+        return 2 * self.wall_thickness
+
+    @property
+    def lock_pad_inboard(self) -> float:
+        """How far the raised lock pad reaches inboard of the joint plane: deep
+        enough to fully contain the socket plus a margin of material behind it."""
+        return self.lock_protrusion + self.lock_clearance + self.lock_pad_margin
 
     @property
     def outer_wall_height(self) -> float:
@@ -70,16 +93,8 @@ class CableChannelDimensions:
         """Vertical length of the inner cavity wall at Y = width/2 - wall_thickness,
         between the floor top and the start of the inner diagonal."""
         value = self.total_height - self.wall_thickness - self.rim_inner_face_length - self.inner_diag_dz
-        assert value >= self.wall_thickness, f"inner cavity wall too short ({value}) for end hole cuts"
+        assert value >= self.lock_thickness, f"inner cavity wall too short ({value}) for the lock pad"
         return value
-
-    @property
-    def lock_x_radius(self) -> float:
-        return self.inner_width / 2 - self.wall_thickness / 2
-
-    @property
-    def lock_y_radius(self) -> float:
-        return self.inner_width / 2
 
 
 class CableChannel:
@@ -90,13 +105,13 @@ class CableChannel:
     def __init__(self, dim: CableChannelDimensions):
         self.dim = dim
 
-    def create_straight(self, length: float, hole_start: bool = False, hole_end: bool = False) -> tuple[SmartSolid, SmartSolid]:
-        channel = self.create_channel(length, hole_start, hole_end)
+    def create_straight(self, length: float, connector_start: bool = False, connector_end: bool = False) -> tuple[SmartSolid, SmartSolid]:
+        channel = self.create_channel(length, connector_start, connector_end)
         cap = self.create_cap(length)
         cap.align(channel).z(Alignment.RL, self.dim.wall_thickness)
         return channel, cap
 
-    def create_channel(self, length: float, hole_start: bool = False, hole_end: bool = False) -> SmartSolid:
+    def create_channel(self, length: float, connector_start: bool = False, connector_end: bool = False) -> SmartSolid:
         dim = self.dim
         body = Pencil(Plane.YZ, start=(dim.width / 2, 0))
         body.right(dim.width / 2)                                                            # outer floor
@@ -111,17 +126,73 @@ class CableChannel:
         body.down(dim.inner_cavity_wall_height)                                              # G → H
         channel = body.extrude_mirrored_y(length, label=f"channel_{length}mm")
 
-        if hole_end:
-            hole = self.create_hole()
-            hole.align(channel).x(Alignment.RR, -dim.lock_x_radius - dim.pin_delta).y(Alignment.CL, dim.pin_radius + dim.pin_delta / 2).z(Alignment.LR)
-            channel.cut(hole)
-
-        if hole_start:
-            hole = self.create_hole().rotate_z(180)
-            hole.align(channel).x(Alignment.LL, dim.lock_x_radius + dim.pin_delta).y(Alignment.CR, -dim.pin_radius - dim.pin_delta / 2).z(Alignment.LR)
-            channel.cut(hole)
+        # The tab protrudes outward (East at the +X end, West at the start); the
+        # socket is its 180° image cut into the body on the opposite lateral half,
+        # so either end mates with any other end.
+        if connector_end:
+            self._apply_connector(channel, Direction.E)
+        if connector_start:
+            self._apply_connector(channel, Direction.W)
 
         return channel
+
+    def _create_dovetail(self, clearance: float = 0) -> SmartBox:
+        """The bare dovetail bump in its default pose: width tapers from the root to
+        the (wider) tip over the protrusion depth, grown on every side by `clearance`
+        (0 for the tab, the fit clearance for the socket). Used by `_create_lock_plate`,
+        which rotates, rounds, and mounts it on a slab."""
+        dim = self.dim
+        return SmartBox(dim.lock_thickness, 2 * (dim.lock_root_half + clearance), dim.lock_protrusion + clearance, tapered_width=2 * (dim.lock_tip_half + clearance))
+
+    def _create_lock_plate(self, sign: int, slab_depth: float, slab_half_width: float, bump_offset: float, clearance: float = 0) -> SmartSolid:
+        """Build, at the origin, a lock-height slab carrying a dovetail bump, rounded so
+        the bump's tip corners are convex (outward) while its root corners — where it
+        meets the slab — are concave (inward), exactly as the dimensioned draft shows.
+        The bump points along `sign`*X and sits `bump_offset` off the slab centreline;
+        `clearance` grows it on every side. Returned in a canonical pose — bump root on
+        the x=0 plane, slab centred on y=0, base on z=0 — so the caller just moves it.
+
+        Rounding happens here at the origin on purpose: the bump is an axis-rotated
+        SmartBox, and moving such a solid injects ~1e-7 transform error that makes a
+        later fillet fail outright — so it must be rounded before it is placed."""
+        dim = self.dim
+        slab = SmartBox(slab_depth, 2 * slab_half_width, dim.lock_thickness)
+        bump = self._create_dovetail(clearance).rotate_y(90 * sign)
+        bump.align(slab).x(Alignment.RR if sign > 0 else Alignment.LL).y(Alignment.C, bump_offset).z(Alignment.C)
+        plate = slab.fuse(bump)
+        plate.move(x=-sign * slab_depth / 2)   # bump root onto the x=0 plane
+
+        z_edges = filter_edges_by_axis(plate.solid.edges(), Axis.Z)
+        tip_x = sign * (dim.lock_protrusion + clearance)
+        tip = filter_edges_by_position(z_edges, Axis.X, tip_x - 0.1, tip_x + 0.1, (True, True))
+        root_half = dim.lock_root_half + clearance
+        root = filter_edges_by_position(z_edges, Axis.X, -0.1, 0.1, (True, True))
+        root = filter_edges_by_position(root, Axis.Y, bump_offset - root_half - 0.2, bump_offset + root_half + 0.2, (True, True))
+        plate.solid = fillet(list(tip) + list(root), dim.lock_fillet)
+        return plate
+
+    def _apply_connector(self, channel: SmartSolid, direction: Direction) -> None:
+        """Add the puzzle connector at the channel end facing `direction`
+        (Direction.E = the +X end, Direction.W = the start). Fuse the raised pad +
+        dovetail tab, then cut the socket — the tab's 180° image, grown by the fit
+        clearance — as a full-depth pocket the mating tab seats into. Tab and socket
+        share `_create_lock_plate`: the tab's slab is the raised pad (channel-wide, with
+        the bump offset to one half); the socket's slab is a sacrificial flange sitting
+        in empty space just outboard of the joint, there only to give its bump a concave
+        root so the pocket mouth rounds convex and its interior concave — the exact
+        complement of the mating tab."""
+        dim = self.dim
+        sign = direction.value.X    # +1 East / -1 West
+        joint = channel.x_max if direction == Direction.E else channel.x_min
+
+        tab = self._create_lock_plate(sign, dim.lock_pad_inboard, dim.inner_width / 2, sign * dim.lock_offset_y)
+        tab.move(x=joint, y=channel.y_mid)
+        channel.fuse(tab)
+
+        flange_half_width = dim.lock_tip_half + dim.lock_clearance + dim.lock_fillet
+        socket = self._create_lock_plate(-sign, dim.lock_protrusion, flange_half_width, 0, dim.lock_clearance)
+        socket.move(x=joint, y=channel.y_mid - sign * dim.lock_offset_y)
+        channel.cut(socket)
 
     def bend_right(self, before: SmartSolid, after: SmartSolid, top_cut_height: float = 0, top_cut_length: float = 0):
         before_bevel = before.create_bound_box().bevel(Direction.E, Direction.S, 45)
@@ -140,8 +211,8 @@ class CableChannel:
         return after_bevel.fuse(before_bevel)
 
     def create_corner_right(self, length_before: float, length_after: float) -> tuple[SmartSolid, SmartSolid]:
-        channel_before, cap_before = self.create_straight(length_before, hole_start=True)
-        channel_after, cap_after = self.create_straight(length_after, hole_end=True)
+        channel_before, cap_before = self.create_straight(length_before, connector_start=True)
+        channel_after, cap_after = self.create_straight(length_after, connector_end=True)
 
         label_suffix = f"_right_{length_before}mm_{length_after}mm"
         channel_right = SmartSolid(self.bend_right(channel_before, channel_after, self.dim.rim_inner_face_length, self.dim.rim_inner_face_length), label=f"channel_{label_suffix}")
@@ -168,53 +239,16 @@ class CableChannel:
 
         return cap
 
-    def create_lock(self):
-        profile = Ellipse(self.dim.lock_x_radius, self.dim.lock_y_radius)
-        lock = SmartSolid(extrude(profile, amount=self.dim.wall_thickness), label='lock')
-
-        cut = SmartBox(self.dim.wall_thickness, lock.y_size - self.dim.wall_thickness * 2, lock.z_size * 0.7)
-        cut.align(lock).z(Alignment.RL)
-        lock.cut(cut)
-
-        pin = SmarterCone.cylinder(self.dim.pin_radius, self.dim.wall_thickness)
-        pin.align(lock).z(Alignment.LL)
-
-        for alignment in [Alignment.RL, Alignment.LR]:
-            lock.fuse(pin.align_x(lock, alignment))
-
-        lock.bed_orientation = (180, 0, 0)
-
-        return lock
-
-    def create_hole(self):
-        pencil = Pencil()
-
-        extra_angle = 15
-
-        pencil.arc_with_radius(self.dim.pin_radius + self.dim.pin_delta / 2, -90, -180 - extra_angle)
-        pencil.arc_with_radius(self.dim.lock_x_radius - self.dim.pin_radius * 2, -80, 25)
-        pencil.arc_with_radius(self.dim.lock_x_radius - self.dim.pin_radius * 2 - self.dim.pin_delta, -38, 15)
-        pencil.arc_with_radius(self.dim.pin_radius + self.dim.pin_delta / 2, 150, -180)
-        pencil.spline_abs((0, 0), (0, 1))
-
-        return pencil.extrude(self.dim.wall_thickness)
-
-
 if __name__ == "__main__":
     dimensions = CableChannelDimensions()
     cable_channel = CableChannel(dimensions)
-    channel_model, _cap_model = cable_channel.create_corner_right(dimensions.length, dimensions.length * 1.5)
 
-    channel_straight_model, _cap_straight_model = cable_channel.create_straight(dimensions.length, True, True)
-    channel_straight_model.align(channel_model).x(Alignment.LL).y(Alignment.RL)
+    channel_model = cable_channel.create_channel(dimensions.length, connector_start=True, connector_end=True)
 
-    lock_model = cable_channel.create_lock()
-    lock_model.align(channel_straight_model).x(Alignment.R).z(Alignment.LR)
+    # A second piece snapped onto the first end-to-end shows the puzzle joint —
+    # B's start end mates with A's end (genderless, so no flipping needed).
+    mate_model = cable_channel.create_channel(dimensions.length, connector_start=True, connector_end=True).move(x=dimensions.length)
 
-    lock_model.rotate_z(50)
-    lock_model.align(channel_straight_model).x(Alignment.R).z(Alignment.LR)
-
-    # Assembled visualization scene first (3MF), then slicer-ready STLs — each part's
-    # bed_orientation flips it flat onto the bed during the STL pass.
-    export_3mf("models/other/cable_channel/export.3mf", channel_model, lock_model, channel_straight_model)
-    export_stl("models/other/cable_channel/stl", channel_model, lock_model, channel_straight_model)
+    # Assembled visualization scene first (3MF), then a single slicer-ready STL.
+    export_3mf("models/other/cable_channel/export.3mf", channel_model, mate_model)
+    export_stl("models/other/cable_channel/stl", channel_model)
