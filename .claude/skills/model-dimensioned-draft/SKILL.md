@@ -44,11 +44,12 @@ For a single overview drawing, `<draft_name>` matches the model directory name (
    sys.path.insert(0, str(REPO_ROOT / '.claude' / 'skills' / 'model-dimensioned-draft' / 'scripts'))
    from draft_lib import Drawing, View
 
-   d = Drawing('<Model Name> — Dimensioned Draft', width=1000, height=800)
+   d = Drawing('<Model Name>')  # subtitle defaults to 'Dimensioned Draft (mm)'; canvas auto-sizes
 
-   # One View per projection. origin = SVG (x, y) that corresponds to mm (0, 0).
-   cs = d.add_view(View(origin=(150, 440), scale=14,
-                        title='Cross-section', title_pos=(290, 200)))
+   # One View per projection. origin = authored (x, y) that corresponds to mm (0, 0) —
+   # page placement is automatic (View.row groups views into page rows), so origin only
+   # needs to be consistent within the view. The header auto-centers over the content.
+   cs = d.add_view(View(origin=(150, 440), scale=14, title='Cross-section', axis_labels=('Y', 'Z')))
    cs.path([(0,0), (20,0), (20,12.9), (0,12.9)])  # body polygon
    cs.dim_h(v_at=12.9, u1=0, u2=20, label='20  (width)', side='above', offset_px=14)
    ...
@@ -65,17 +66,26 @@ For a single overview drawing, `<draft_name>` matches the model directory name (
    - Dimension extension lines: `#666`, 0.5 px (thin)
    - Dimension line: `#222`, 0.8 px with arrows at both ends
    - Sub-dimensions stack at `offset_px=14..16`; overall dimensions at `offset_px=36..60`
-   - Title above each view in 14 pt bold; main title 20 pt; subtitle `all dimensions in mm`
+   - Main title 20 pt = just the model/feature name; subtitle (11 pt) defaults to `Dimensioned Draft (mm)`
+   - View headers (14 pt bold title + axis hint) are placed by the lib: centred horizontally over the view's tracked content bounds (figure + dims + labels), `TITLE_PAD` (18 px) above the topmost element, with a fixed `TITLE_AXIS_GAP` (5× the header word spacing, AFM-measured) between title and axis hint
+   - Axis hints follow the F3D colour convention: X red, Y green, Z blue (`AXIS_COLORS` in the lib)
+   - Derive dimension-label values from the script's design constants with f-strings (`f'{2 * (TIP_HALF - LEAD_IN):g} tab bottom'`), never hardcode the numbers in label strings — drafts get retuned, and literal labels silently go stale
    - Vertex letter labels (A, B, C, …) — when tagging polygon corners so model code can reference them: place each letter along the bisector of the **wider** angle at that vertex. For a CCW polygon, that's the **exterior** bisector at convex vertices (interior < 180°, polygon "bumps out") and the **interior** bisector at concave vertices (interior > 180°, polygon "indents"). Offset ~0.3 mm out from the corner, size ~6 pt, and pass `baseline='central'` to `view.text()` so the letter's geometric centre sits on the bisector point (not its alphabetic baseline). The interior-bisector direction at vertex P is `unit(perp_left(e_in) + perp_left(e_out))` where `perp_left((a,b)) = (-b, a)`; concave uses it, convex uses its negation. Worked example: cable-channel cross-section labels A–H.
 
-6. **Render SVG and review.** Run the script (`venv/Scripts/python.exe models/<group>/<model_name>/dimensioned_drafts/<draft_name>.py`); it writes the SVG next to the script. Open the SVG in IntelliJ, a browser, or any SVG viewer. Common issues:
-   - Title overlap with topmost dimension labels (fix with `title_pos` overrides)
+6. **Render SVG and review.** Run the script (`venv/Scripts/python.exe models/<group>/<model_name>/dimensioned_drafts/<draft_name>.py`); it writes the SVG next to the script. **Self-review before showing the user**: render the SVG to PNG via headless Chrome and Read the image to catch layout collisions yourself —
+   ```powershell
+   $chrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+   & $chrome --headless --disable-gpu --screenshot="$env:TEMP\<draft_name>.png" --window-size=<W>,<H> --default-background-color=FFFFFFFF "file:///<abs-path-to-svg>"
+   ```
+   (read `--window-size` from the `width`/`height` attributes on the generated SVG's root element — the canvas auto-sizes; delete the PNG when done). Fix what you spot, re-render, re-screenshot.
+
+   **Layout is automated by the lib.** Each view tracks the bounds of everything it draws (figure, dims, labels); the header (title + axis hint) is centred over those bounds, `TITLE_PAD` (18 px) above the topmost element, with `TITLE_AXIS_GAP` (5× the header word spacing, AFM-measured) between title and axis hint. `Drawing.to_svg` then arranges whole view blocks: `View.row` groups views into page rows (add order within a row), rows are centred and stacked exactly `2 × TITLE_PAD` apart below the page header, views within a row sit `2 × TITLE_PAD` apart, and the canvas auto-sizes to the content. `View.origin` therefore only anchors the view's own mm coordinates — it does not control page placement. What remains manual: per-view content (dims, footers) and row assignment.
+
+   Common issues:
    - Dimension labels colliding (stagger `offset_px`, or use different `side`)
-   - Detail callouts going off-screen when their mm origin is far from (0,0) (set `View.origin` so `(svg_x = origin[0] + visible_mm * scale)` lands in-canvas; pair with `title_pos` because `title_y_offset` won't work)
-   - **Views intersecting other views.** Each view's "bounding box" includes figure + dim labels + footer annotations + title text + axis indicator (extends ~25 px above the title's baseline). When adding a new view below an existing one, account for the lower view's axis indicator above its title (`arm + label height ≈ 28 px`).
-   - **Padding ratio rule.** Padding between adjacent views (including their headers and axis indicators) must be **at least 2× the title-to-top-element padding within each view**. With a typical title-to-top of ~18 px, inter-view padding should be ≥ 36-40 px. Verify by computing the relevant edges: e.g., corner-detail-footer-y → rim-detail-axis-top-y for vertically-stacked views in the same column.
+   - **Long title on a narrow view.** The auto-centred header widens the block when the title is wider than the content — shorten the title and move detail into a footer note.
+   - **Footers spreading past the block.** Free-text labels relate to the *whole* view block: left-align them with the outermost dim ladder (or centre under the block) and keep them within the view's span — long notes split into multiple lines.
    - **Text comments intersecting dim arrows/labels within the same view.** Annotations placed near figure edges (`dx`/`dy` shifts on `view.text()`) can collide with dim lines/labels on the same side. Two fixes: (a) place the annotation INSIDE the body fill (typically clears dims since dims sit outside the figure) — pick coordinates so the annotation also clears any feature lines like slopes; (b) shift `dy` further until the annotation drops below the lowest dim label on that side.
-   - **View title overlapping the top dim label.** The top dim label sits at `figure_top_svg_y - offset_px`. If the title baseline is too close to that label's top, they collide. Aim for ≥ 15 px between the title baseline and the top dim label's top edge. To fix, push the figure DOWN by adjusting `View.origin[1]` (with `flip_y=True`, increasing origin_y moves the figure down) until the gap opens up — don't try to fight it via `offset_px`, since `offset_px` controls figure-to-dim spacing and shrinking it just moves the label into the figure.
 
 7. **Iterate with the user.** Ask the user to open the SVG; take feedback on labels, scale, missing dimensions, layout. Re-run the script.
 
@@ -83,8 +93,9 @@ For a single overview drawing, `<draft_name>` matches the model directory name (
 
 ## Reference
 
-- `scripts/draft_lib.py` — `Drawing` + `View` classes; `View.path/line/rect/text/dim_h/dim_v` are the building blocks
-- `models/other/cable_channel/dimensioned_drafts/cable_channel.py` — worked example: 3 views (cross-section, corner detail, side view), sub-dims + overall dims on each axis, hidden-feature callout
+- `scripts/draft_lib.py` — `Drawing` + `View` classes; `View.path/line/rect/text/dim_h/dim_v` are the building blocks, `fillet_polyline` rounds profile corners, layout (headers, rows, canvas) is automatic
+- `models/other/cable_channel/dimensioned_drafts/cable_channel.py` — worked example: cross-section with vertex labels + zoomed rim detail, sub-dims + overall dims on each axis, constants-derived geometry and labels
+- `models/other/cable_channel/dimensioned_drafts/puzzle_connector.py` — worked example: four views (top, mated schematic, side, zoomed section) across two rows, f-string labels
 
 ## Out of scope
 
