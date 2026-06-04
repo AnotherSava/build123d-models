@@ -283,6 +283,13 @@ pencil.jump((-offset, -offset))
 
 Note: `.fillet()` cannot be called before the first drawing operation. The radius is remembered — subsequent `.fillet()` calls without arguments reuse the last radius.
 
+A trailing `.fillet()` (with no segment drawn after it) also works: it applies to the next implicitly drawn segment — the auto-close line of `create_wire(enclose=True)` / `create_face()` / `extrude()`, or the segment the mirrored-wire builders add to reach the mirror axis.
+
+```python
+# Rounds the corner at (10, 10) between the up-segment and the auto-close line
+pencil.right(10).up(10).fillet(2).extrude(5)
+```
+
 ## Creating geometry
 
 ### Wire

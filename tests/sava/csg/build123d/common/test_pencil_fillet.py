@@ -256,6 +256,44 @@ class TestPencilFillet(unittest.TestCase):
         # The arc midpoint should be to the LEFT of the line from arc_start to arc_end
 
 
+class TestPencilFilletAutoClose(unittest.TestCase):
+    """Test that a trailing fillet applies to the implicit auto-close segment."""
+
+    def test_trailing_fillet_applies_to_auto_close(self):
+        """A fillet pending at create_wire time rounds the corner with the closing line."""
+        pencil = Pencil()
+        wire = pencil.right(10).up(10).fillet(2).create_wire()
+
+        self.assertTrue(wire.is_valid)
+        # right, up trimmed, arc, closure trimmed = 4 edges (3 without the fillet)
+        self.assertEqual(len(wire.edges()), 4)
+
+        # The vertex at exactly (10, 10) should be replaced by the arc
+        for v in wire.vertices():
+            self.assertFalse(abs(v.X - 10) < 0.01 and abs(v.Y - 10) < 0.01, f"Vertex at ({v.X}, {v.Y}) should not exist after fillet")
+
+    def test_trailing_fillet_create_wire_idempotent(self):
+        """Repeated create_wire calls produce the same result (pending fillet not consumed)."""
+        pencil = Pencil()
+        pencil.right(10).up(10).fillet(2)
+
+        first = pencil.create_wire()
+        second = pencil.create_wire()
+        self.assertEqual(len(first.edges()), len(second.edges()))
+
+    def test_trailing_fillet_extrude(self):
+        """A trailing fillet survives through create_face/extrude."""
+        pencil = Pencil()
+        solid = pencil.right(10).up(10).fillet(2).extrude(5)
+        self.assertTrue(solid.solid.is_valid)
+
+    def test_trailing_fillet_no_enclose_unaffected(self):
+        """Without enclosing there is no closure corner, so no arc is added."""
+        pencil = Pencil()
+        wire = pencil.right(10).up(10).fillet(2).create_wire(enclose=False)
+        self.assertEqual(len(wire.edges()), 2)
+
+
 class TestPencilFilletMirrored(unittest.TestCase):
     """Test fillet functionality with mirrored wires."""
 

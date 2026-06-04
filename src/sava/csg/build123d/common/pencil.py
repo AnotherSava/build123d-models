@@ -105,7 +105,10 @@ class Pencil:
             # Reusing the last radius:
             Pencil().right(1).fillet(0.1).up(1).fillet().left(1).create_wire()
             # Creates a wire with fillets at (1, 0) and (1, 1), both with radius 0.1
-        """
+
+        A trailing fillet() also applies to the next implicitly drawn segment:
+        the auto-close line of create_wire(enclose=True) and the segment the
+        mirrored-wire builders add to reach the mirror axis."""
         if not self.curves:
             raise ValueError("Cannot fillet at start - no previous curve exists")
 
@@ -119,9 +122,16 @@ class Pencil:
         return self
 
     def _add_curve(self, curve: Edge) -> None:
-        """Add a curve, applying any pending fillet at the junction."""
+        """Add a curve, applying (and consuming) any pending fillet at the junction."""
+        self.curves = self._curves_with(curve)
+        self._fillet_pending = False
+
+    def _curves_with(self, curve: Edge) -> list[Edge]:
+        """Return a copy of the curve list extended by `curve`, with any pending
+        fillet applied at the junction. Does not mutate the pencil state."""
+        curves = self.curves.copy()
         if self._fillet_pending:
-            prev_curve = self.curves[-1]
+            prev_curve = curves[-1]
             dir1 = prev_curve.tangent_at(1)
             dir2 = curve.tangent_at(0)
 
@@ -143,15 +153,13 @@ class Pencil:
                 arc_mid = arc_center + mid_dir * self._last_fillet_radius
 
                 # Trim previous curve, add fillet arc, trim new curve
-                self.curves[-1] = prev_curve.trim(0, param1)
-                self.curves.append(ThreePointArc(p1, arc_mid, p2))
-                self.curves.append(curve.trim(param2, 1))
-                self._fillet_pending = False
-                return
+                curves[-1] = prev_curve.trim(0, param1)
+                curves.append(ThreePointArc(p1, arc_mid, p2))
+                curves.append(curve.trim(param2, 1))
+                return curves
 
-            self._fillet_pending = False
-
-        self.curves.append(curve)
+        curves.append(curve)
+        return curves
 
     def double_arc(self, destination: VectorLike, shift_coefficient: float = 0.5, angle: float = None):
         """Draw two symmetric arcs to reach the destination.
@@ -392,9 +400,13 @@ class Pencil:
         return Face(self.create_wire(enclose))
 
     def create_wire(self, enclose: bool = True) -> Wire:
-        curves = self.curves.copy()
         if enclose and self.location != Vector(0, 0, 0):
-            curves.append(Line(self.location, Vector(0, 0, 0)))
+            # Route the closing line through the fillet logic so a trailing
+            # fillet() applies to the auto-close corner. The pending flag is
+            # deliberately not consumed, keeping repeated calls identical.
+            curves = self._curves_with(Line(self.location, Vector(0, 0, 0)))
+        else:
+            curves = self.curves.copy()
 
         # Create wire in local 2D coordinates and transform to global
         return Wire(curves).locate(Location(self.plane))
