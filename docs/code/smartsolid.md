@@ -238,16 +238,18 @@ Trim a solid along an axis. Exactly one parameter must be provided per call.
 
 | Parameter | Meaning | Sign convention |
 |-----------|---------|-----------------|
-| `cut` | absolute amount to remove | positive = remove from +side, negative = remove from -side |
-| `cut_fraction` | fraction of size to remove | positive = remove from +side, negative = remove from -side |
+| `cut` | absolute amount to remove | positive = remove from -side, negative = remove from +side |
+| `cut_fraction` | fraction of size to remove | positive = remove from -side, negative = remove from +side |
 | `keep` | absolute amount to keep | positive = keep on +side, negative = keep on -side |
 | `keep_fraction` | fraction of size to keep | positive = keep on +side, negative = keep on -side |
 
+The sign always names the side that survives: positive keeps (or keeps more of) the +side, negative the -side.
+
 ```python
-solid.cut_x(cut=10)               # remove 10mm from +X side
-solid.cut_x(cut=-10)              # remove 10mm from -X side
-solid.cut_y(cut_fraction=0.3)     # remove 30% from +Y side
-solid.cut_y(cut_fraction=-0.3)    # remove 30% from -Y side
+solid.cut_x(cut=10)               # remove 10mm from -X side
+solid.cut_x(cut=-10)              # remove 10mm from +X side
+solid.cut_y(cut_fraction=0.3)     # remove 30% from -Y side
+solid.cut_y(cut_fraction=-0.3)    # remove 30% from +Y side
 solid.cut_z(keep=20)              # keep only 20mm on +Z side
 solid.cut_z(keep_fraction=0.5)    # keep 50% on +Z side
 solid.cut_z(keep_fraction=-0.5)   # keep 50% on -Z side
