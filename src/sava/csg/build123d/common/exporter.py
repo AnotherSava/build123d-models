@@ -386,9 +386,14 @@ def create_file_path(location: str, filename: str = None) -> str:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     return path
 
-def export_stl(directory: str, *shapes) -> None:
+def export_stl(directory: str, *shapes, clean: bool = False) -> None:
+    """Export shapes to STL files in `directory`. With `clean`, remove all existing
+    .stl files there first, so renamed or dropped parts leave no stale files behind."""
     clear()
     export(*shapes)
+    if clean:
+        for stale in Path(_resolve_path(directory)).glob("*.stl"):
+            stale.unlink()
     save_stl(directory)
 
 def export_3mf(directory: str, *shapes) -> None:
