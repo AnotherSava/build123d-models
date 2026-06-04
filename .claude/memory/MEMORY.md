@@ -16,6 +16,7 @@
 - [reference_alignment_builder_defaults.md](reference_alignment_builder_defaults.md) — `align()` chain silently re-centres any axis not explicitly set via `.x()/.y()/.z()`
 - [reference_smartsolid_invariant.md](reference_smartsolid_invariant.md) — Two SmartSolid invariants (origin/location, _orientation/solid.orientation); _reanchor + _apply_tracked_transforms restore after ops
 - [reference_arrange_scene_pattern.md](reference_arrange_scene_pattern.md) — Multi-part export: assembled 3MF scene first, then `clear()`, then STL (applies `bed_orientation`); tray.py/splitter.py are the correct examples
+- [reference_slice_verification.md](reference_slice_verification.md) — Verify geometry via thin-Box slices (area/bbox/probe strips); baseline contradictory probes against HEAD via git stash
 
 # Feedback
 - [feedback_visualization_orientation.md](feedback_visualization_orientation.md) — Build models in scene/visualization orientation, NOT print; use `SmartSolid.bed_orientation` for print pose (applied only at STL export). Reverses the old "build in print orientation" guidance
@@ -34,3 +35,4 @@
 - [feedback_dim_field_grouping.md](feedback_dim_field_grouping.md) — Group Dimensions fields by primary owner (the piece whose geometry they define), not by where they're consumed downstream
 - [feedback_nested_dim_classes.md](feedback_nested_dim_classes.md) — Extract a coherent dim cluster (4+ fields, or any group used in 2+ places) into a nested @dataclass; instantiate from outer __post_init__ a la stand.py
 - [feedback_diff_against_draft.md](feedback_diff_against_draft.md) — On model/draft mismatch reports, diff feature-by-feature (corner convexity!); generic metrics that already passed can't catch it
+- [feedback_draft_rules_as_automation.md](feedback_draft_rules_as_automation.md) — Implement quantitative draft layout rules as draft_lib automation (bounds → auto-layout), never as guidance + per-draft tuning

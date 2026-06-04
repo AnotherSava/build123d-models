@@ -1,6 +1,7 @@
 /.review-venv/
 /venv/
 /models/current_model.3mf
+/models/current_model/
 /.idea/
 /.claude/settings.local.json
 /nul
