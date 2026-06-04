@@ -6,9 +6,17 @@ end holes). The profile is point-symmetric (180deg rotation) about the midpoint
 of the end edge, which makes the connector genderless: any end mates with any
 end, in either orientation (including one piece flipped 180deg about Z).
 
-The lock region is built up to 2x the floor thickness (3.0 mm) so the tab and
-socket are chunky and resist snapping; the extra 1.5 mm rises into the channel
+The lock region is built up to 2x the floor thickness (2.4 mm) so the tab and
+socket are chunky and resist snapping; the extra 1.2 mm rises into the channel
 interior (the floor bottom stays flat for printing).
+
+Insertion lead-in: the joint assembles vertically (one piece drops onto the
+other), with near-zero clearance. To ease the drop, the top and bottom 25%
+of the lock height (0.6 mm each) are graded: the tab shrinks by 0.3 mm per
+side toward its top and bottom edges, and the socket opens by 0.3 mm per side
+toward both mouths. Every contact pair then has lead-ins on both parts — the
+descending tab's tapered bottom meets a flared socket top, and the descending
+socket's flared bottom passes over a tapered tab top.
 
 Top view looks down -Z at the floor: X = channel/length axis (joint opens to
 +X), Y = width. Body is to the left of the joint plane (X=0).
@@ -16,63 +24,38 @@ Top view looks down -Z at the floor: X = channel/length axis (joint opens to
 Run from repo root:
     venv/Scripts/python.exe models/other/cable_channel/dimensioned_drafts/puzzle_connector.py
 """
-import math
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO_ROOT / '.claude' / 'skills' / 'model-dimensioned-draft' / 'scripts'))
-from draft_lib import Drawing, View
+from draft_lib import Drawing, View, fillet_polyline
 
 
 # --- Design parameters (mm) -------------------------------------------------
 WIDTH = 15.0            # channel width (Y)
 HALF = WIDTH / 2        # 7.5
-FLOOR_T = 1.5           # nominal floor thickness (= wall_thickness)
-LOCK_T = 2 * FLOOR_T    # 3.0  lock region thickness (raised pad eats into channel)
-INNER_HALF = HALF - FLOOR_T  # 6.0  inner wall face (tab/socket stay inside this)
+FLOOR_T = 1.2           # nominal floor thickness (= wall_thickness)
+LOCK_T = 2 * FLOOR_T    # 2.4  lock region thickness (raised pad eats into channel)
+INNER_HALF = HALF - FLOOR_T  # 6.3  inner wall face (tab/socket stay inside this)
 PROTRUSION = 3.0        # dovetail depth beyond the joint plane (X=0) — short & stubby
-OFFSET_Y = 2.6          # lateral position of the tab (and socket) centre
-ROOT_HALF = 1.5         # half-width at the root (joint plane); root width = 3.0
-TIP_HALF = 2.0          # half-width at the tip; tip width = 4.0 (wider -> undercut)
-LOCK_LEN = PROTRUSION + 1.5  # how far the 3.0 mm pad reaches inboard of the joint
-FILLET = 0.7            # corner fillet (applied here and in the model)
-CLEARANCE = 0.35        # tab<->socket gap for fit (noted; not drawn)
+OFFSET_Y = 3.0          # lateral position of the tab (and socket) centre
+ROOT_HALF = 1.2         # half-width at the root (joint plane); root width = 2.4
+TIP_HALF = 2.5          # half-width at the tip; tip width = 5.0 (wider -> undercut)
+FILLET = 0.8            # corner fillet (applied here and in the model)
+CLEARANCE = 0.05        # tab<->socket gap for fit; the lead-ins ease entry
+LOCK_LEN = PROTRUSION + CLEARANCE + 1.5  # how far the pad reaches inboard of the joint
+LEAD_IN = 0.3           # per-side lead-in at the top and bottom edges (tab -, socket +)
+LEAD_IN_FRACTION = 0.25  # fraction of the lock height each lead-in is graded over
+LEAD_IN_H = LEAD_IN_FRACTION * LOCK_T  # 0.6  lead-in zone height (each end)
 BODY_LEFT = -9.0        # representative body length shown (truncated)
 
 
-def _unit(v):
-    L = math.hypot(*v)
-    return (v[0] / L, v[1] / L) if L else (0.0, 0.0)
-
-
-def fillet_corners(pts, r, region_x=6.0, min_deflection=20.0, n=8):
-    """Round sharp corners that fall inside the feature region (near the joint,
-    within the inner width). Near-straight vertices and the body/wall corners are
-    left untouched. Approximates each fillet with a short arc."""
-    out = []
-    for i, P in enumerate(pts):
-        A, B = pts[i - 1], pts[(i + 1) % len(pts)]
-        la = math.hypot(A[0] - P[0], A[1] - P[1])
-        lb = math.hypot(B[0] - P[0], B[1] - P[1])
-        if not (abs(P[0]) < region_x and abs(P[1]) < INNER_HALF + 0.5) or la < 1e-6 or lb < 1e-6:
-            out.append(P)
-            continue
-        d1 = _unit((A[0] - P[0], A[1] - P[1]))
-        d2 = _unit((B[0] - P[0], B[1] - P[1]))
-        a = math.acos(max(-1.0, min(1.0, d1[0] * d2[0] + d1[1] * d2[1])))
-        if math.degrees(math.pi - a) < min_deflection:
-            out.append(P)
-            continue
-        t = min(r / math.tan(a / 2), 0.45 * min(la, lb))
-        reff = t * math.tan(a / 2)
-        bis = _unit((d1[0] + d2[0], d1[1] + d2[1]))
-        C = (P[0] + bis[0] * reff / math.sin(a / 2), P[1] + bis[1] * reff / math.sin(a / 2))
-        a1 = math.atan2(P[1] + d1[1] * t - C[1], P[0] + d1[0] * t - C[0])
-        a2 = math.atan2(P[1] + d2[1] * t - C[1], P[0] + d2[0] * t - C[0])
-        da = (a2 - a1 + math.pi) % (2 * math.pi) - math.pi
-        out += [(C[0] + reff * math.cos(a1 + da * k / n), C[1] + reff * math.sin(a1 + da * k / n)) for k in range(n + 1)]
-    return out
+def fillet_seam(pts):
+    """Round the seam corners that fall inside the feature region (near the
+    joint, within the inner width); body/wall corners stay sharp."""
+    indices = {i for i, p in enumerate(pts) if abs(p[0]) < 6.0 and abs(p[1]) < INNER_HALF + 0.5}
+    return fillet_polyline(pts, FILLET, indices=indices, closed=True)
 
 
 def end_seam():
@@ -96,18 +79,17 @@ def end_seam():
 
 
 def build() -> Drawing:
-    d = Drawing('Cable Channel - Puzzle Floor Connector', width=1120, height=760)
-    seam = fillet_corners([(BODY_LEFT, -HALF)] + end_seam() + [(BODY_LEFT, HALF)], FILLET)
-    seam_body = fillet_corners(end_seam(), FILLET)  # seam alone for the mated view
+    d = Drawing('Cable Channel - Puzzle Floor Connector')
+    seam = fillet_seam([(BODY_LEFT, -HALF)] + end_seam() + [(BODY_LEFT, HALF)])
+    seam_body = fillet_seam(end_seam())  # seam alone for the mated view
 
     # ---------------------------------------------------------------- Top view
-    tv = d.add_view(View(origin=(345, 320), scale=22, title='End floor - top view',
-                         title_pos=(240, 150), axis_labels=('X', 'Y')))
+    tv = d.add_view(View(origin=(345, 334), scale=22, title='End floor - top view', axis_labels=('X', 'Y')))
     tv.path(seam)
 
     for wy in (INNER_HALF, -INNER_HALF):
         tv.line((BODY_LEFT, wy), (0, wy), stroke='#999', stroke_width=0.5, dasharray='3,3')
-    tv.text('inner wall face (Y=6)', (BODY_LEFT, INNER_HALF), size=8, color='#999', anchor='start', dy=-4)
+    tv.text(f'inner wall face (Y={INNER_HALF:g})', (BODY_LEFT, INNER_HALF), size=8, color='#999', anchor='start', dy=-4)
 
     tv.line((0, -HALF), (0, HALF), stroke='#c0392b', stroke_width=0.8, dasharray='4,3')
     tv.text('●', (0, 0), size=9, color='#1f6feb', anchor='middle', baseline='central')
@@ -116,21 +98,20 @@ def build() -> Drawing:
     tv.text('dovetail tab', (PROTRUSION / 2, OFFSET_Y + TIP_HALF + 0.9), size=9, anchor='middle')
     tv.text('socket', (-PROTRUSION / 2, -OFFSET_Y), size=9, anchor='middle', baseline='central')
 
-    tv.dim_v(u_at=BODY_LEFT, v1=-HALF, v2=HALF, label='15  (width)', side='left', offset_px=30)
-    tv.dim_h(v_at=HALF, u1=0, u2=PROTRUSION, label='3.0  depth', side='above', offset_px=16)
-    tv.dim_v(u_at=PROTRUSION, v1=OFFSET_Y - TIP_HALF, v2=OFFSET_Y + TIP_HALF, label='4.0 tip', side='right', offset_px=16)
-    tv.dim_v(u_at=PROTRUSION, v1=0, v2=OFFSET_Y, label='2.6 offset', side='right', offset_px=58)
+    tv.dim_v(u_at=BODY_LEFT, v1=-HALF, v2=HALF, label=f'{WIDTH:g}  (width)', side='left', offset_px=30)
+    tv.dim_h(v_at=HALF, u1=0, u2=PROTRUSION, label=f'{PROTRUSION:g}  depth', side='above', offset_px=16)
+    tv.dim_v(u_at=PROTRUSION, v1=OFFSET_Y - TIP_HALF, v2=OFFSET_Y + TIP_HALF, label=f'{2 * TIP_HALF:g} tip', side='right', offset_px=16)
+    tv.dim_v(u_at=PROTRUSION, v1=0, v2=OFFSET_Y, label=f'{OFFSET_Y:g} offset', side='right', offset_px=58)
     tv.line((0, OFFSET_Y - ROOT_HALF), (1.6, 0.3), stroke='#666', stroke_width=0.5)
-    tv.text('root 3.0', (1.75, 0.3), size=8.5, anchor='start', baseline='central')
+    tv.text(f'root {2 * ROOT_HALF:g}', (1.75, 0.3), size=8.5, anchor='start', baseline='central')
 
     tv.text(f'all corners filleted R{FILLET}; tab/socket are 180° rotations of each other',
             (BODY_LEFT, -HALF), size=8.5, color='#777', anchor='start', dy=20)
-    tv.text(f'socket is a through-cut of the lock pad; fit clearance {CLEARANCE} mm around the socket',
+    tv.text(f'socket is a through-cut of the lock pad, grown by the {CLEARANCE:g} fit clearance — profile shown in the middle band ({LEAD_IN_H:g} ≤ z ≤ {LOCK_T - LEAD_IN_H:g})',
             (BODY_LEFT, -HALF), size=8.5, color='#777', anchor='start', dy=33)
 
     # ---------------------------------------------------- Mated pair schematic
-    mv = d.add_view(View(origin=(720, 250), scale=15, title='Mated pair (one piece rotated 180°)',
-                         title_pos=(660, 110), axis_labels=('X', 'Y')))
+    mv = d.add_view(View(origin=(720, 252), scale=15, title='Mated pair (one piece rotated 180°)', axis_labels=('X', 'Y')))
     mv.path([(BODY_LEFT, -HALF)] + seam_body + [(BODY_LEFT, HALF)], fill='#dde3ea')
     mv.path(seam_body + [(-BODY_LEFT, HALF), (-BODY_LEFT, -HALF)], fill='#c8d4e3')
     mv.text('A', (BODY_LEFT + 1.5, 0), size=12, anchor='middle', baseline='central')
@@ -139,16 +120,44 @@ def build() -> Drawing:
             (0, -HALF), size=8.5, color='#777', anchor='middle', dy=20)
 
     # ----------------------------- Side view (X-Z): lock pad is 2x floor thick
-    sv = d.add_view(View(origin=(255, 690), scale=22, title='Side view (X-Z): lock region = 2× floor thickness',
-                         title_pos=(150, 560), axis_labels=('X', 'Z')))
-    sv.rect((BODY_LEFT, 0), (-LOCK_LEN, FLOOR_T))          # nominal floor (1.5)
-    sv.rect((-LOCK_LEN, 0), (PROTRUSION, LOCK_T))          # raised lock pad + tab (3.0)
+    sv = d.add_view(View(origin=(255, 710), scale=22, title='Side view: lock = 2× floor', row=1, axis_labels=('X', 'Z')))
+    sv.rect((BODY_LEFT, 0), (-LOCK_LEN, FLOOR_T))          # nominal floor
+    sv.path([(-LOCK_LEN, 0), (PROTRUSION - LEAD_IN, 0), (PROTRUSION, LEAD_IN_H),
+             (PROTRUSION, LOCK_T - LEAD_IN_H), (PROTRUSION - LEAD_IN, LOCK_T),
+             (-LOCK_LEN, LOCK_T)])                         # raised lock pad + tab, tip lead-ins top and bottom
     sv.line((0, 0), (0, LOCK_T), stroke='#c0392b', stroke_width=0.8, dasharray='4,3')
     sv.text('raised pad rises into the channel; floor bottom stays flat', (BODY_LEFT, LOCK_T), size=8.5, color='#777', anchor='start', dy=-6)
     sv.text('wall/rim butt flush above (not shown)', (BODY_LEFT, 0), size=8.5, color='#777', anchor='start', dy=22)
-    sv.dim_v(u_at=BODY_LEFT, v1=0, v2=FLOOR_T, label='1.5 floor', side='left', offset_px=14)
-    sv.dim_v(u_at=PROTRUSION, v1=0, v2=LOCK_T, label='3.0 lock', side='right', offset_px=14)
-    sv.dim_h(v_at=LOCK_T, u1=0, u2=PROTRUSION, label='3.0 depth', side='above', offset_px=14)
+    sv.text(f'tab faces pull in {LEAD_IN:g} over the top and bottom {LEAD_IN_H:g} — see lead-in section', (BODY_LEFT, 0), size=8.5, color='#777', anchor='start', dy=35)
+    sv.dim_v(u_at=BODY_LEFT, v1=0, v2=FLOOR_T, label=f'{FLOOR_T:g} floor', side='left', offset_px=14)
+    sv.dim_v(u_at=PROTRUSION, v1=0, v2=LOCK_T, label=f'{LOCK_T:g} lock', side='right', offset_px=14)
+    sv.dim_h(v_at=LOCK_T, u1=0, u2=PROTRUSION, label=f'{PROTRUSION:g} depth', side='above', offset_px=14)
+
+    # --------- Lead-in section (Y-Z): graded entry over the top and bottom 25%
+    # Vertical section across the tab tip, mated at full seat. In the middle band
+    # tab and socket faces sit at the fit clearance (drawn coincident); toward both
+    # edges the tab pulls in and the socket opens out, so the edges never have to
+    # align exactly.
+    WALL_HALF = 4.2  # representative socket-wall extent shown (truncated)
+    lv = d.add_view(View(origin=(840, 649), scale=50, title='Lead-in — section across the tab tip (mated)', row=1, axis_labels=('Y', 'Z')))
+    for s in (-1, 1):  # A's lock pad around the socket, opened +LEAD_IN/side toward both mouths
+        lv.path([(s * WALL_HALF, 0), (s * (TIP_HALF + LEAD_IN), 0), (s * TIP_HALF, LEAD_IN_H),
+                 (s * TIP_HALF, LOCK_T - LEAD_IN_H), (s * (TIP_HALF + LEAD_IN), LOCK_T), (s * WALL_HALF, LOCK_T)])
+    # B's tab, pulled in -LEAD_IN/side toward its top and bottom edges
+    lv.path([(-(TIP_HALF - LEAD_IN), 0), (TIP_HALF - LEAD_IN, 0), (TIP_HALF, LEAD_IN_H),
+             (TIP_HALF, LOCK_T - LEAD_IN_H), (TIP_HALF - LEAD_IN, LOCK_T),
+             (-(TIP_HALF - LEAD_IN), LOCK_T), (-TIP_HALF, LOCK_T - LEAD_IN_H), (-TIP_HALF, LEAD_IN_H)], fill='#c8d4e3')
+    lv.text('B tab — drops in ▼', (0, LOCK_T / 2 + 0.45), size=9, anchor='middle', baseline='central')
+    lv.text(f'{2 * TIP_HALF:g} nominal (+{CLEARANCE:g} clearance) in the middle band', (0, LOCK_T / 2 - 0.45), size=8, color='#777', anchor='middle', baseline='central')
+    lv.text('A', (-WALL_HALF + 0.55, LOCK_T / 2 + 0.45), size=9, anchor='middle', baseline='central')
+    lv.text('A', (WALL_HALF - 0.55, LOCK_T / 2 + 0.45), size=9, anchor='middle', baseline='central')
+
+    lv.dim_h(v_at=LOCK_T, u1=-(TIP_HALF - LEAD_IN), u2=TIP_HALF - LEAD_IN, label=f'{2 * (TIP_HALF - LEAD_IN):g} tab top (−{LEAD_IN:g}/side)', side='above', offset_px=16)
+    lv.dim_h(v_at=0, u1=-(TIP_HALF - LEAD_IN), u2=TIP_HALF - LEAD_IN, label=f'{2 * (TIP_HALF - LEAD_IN):g} tab bottom (−{LEAD_IN:g}/side)', side='below', offset_px=14)
+    lv.dim_h(v_at=0, u1=-(TIP_HALF + LEAD_IN), u2=TIP_HALF + LEAD_IN, label=f'{2 * (TIP_HALF + LEAD_IN):g} socket mouth at top and bottom (+{LEAD_IN:g}/side)', side='below', offset_px=36)
+    lv.dim_v(u_at=WALL_HALF, v1=0, v2=LOCK_T, label=f'{LOCK_T:g} lock', side='right', offset_px=14)
+    lv.dim_v(u_at=-WALL_HALF, v1=0, v2=LEAD_IN_H, label=f'{LEAD_IN_H:g} lead-in ({LEAD_IN_FRACTION:.0%})', side='left', offset_px=14)
+    lv.dim_v(u_at=-WALL_HALF, v1=LOCK_T - LEAD_IN_H, v2=LOCK_T, label=f'{LEAD_IN_H:g}', side='left', offset_px=14)
 
     return d
 

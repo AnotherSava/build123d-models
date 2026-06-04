@@ -1,166 +1,105 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" font-family="Helvetica, Arial, sans-serif">
-<defs><marker id="arrL" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 10 0 L 0 5 L 10 10 z" fill="#222"/></marker><marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#222"/></marker><marker id="axisArr" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#333"/></marker></defs>
-<rect width="1000" height="800" fill="white"/>
-<text x="500" y="32" text-anchor="middle" font-size="20" font-weight="bold">Cable Channel — Dimensioned Draft</text>
-<text x="500" y="52" text-anchor="middle" font-size="11" fill="#555">all dimensions in mm</text>
-<line x1="220" y1="200" x2="242" y2="200" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
-<line x1="220" y1="200" x2="220" y2="178" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
-<text x="223" y="178" dominant-baseline="hanging" font-size="7.5" fill="#333" text-anchor="start">Z</text>
-<text x="242" y="197" font-size="7.5" fill="#333" text-anchor="end">Y</text>
-<text x="256" y="200" text-anchor="start" font-size="14" font-weight="bold">Cross-section</text>
-<path d="M 150.00 455.00 L 430.00 455.00 L 430.00 322.00 L 413.72 322.00 L 404.28 297.50 L 413.72 288.06 L 413.72 274.40 L 388.00 274.40 L 388.00 308.00 L 409.00 362.53 L 409.00 434.00 L 171.00 434.00 L 171.00 362.53 L 192.00 308.00 L 192.00 274.40 L 166.28 274.40 L 166.28 288.06 L 175.72 297.50 L 166.28 322.00 L 150.00 322.00 Z" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
-<line x1="164.00" y1="434.00" x2="171.00" y2="413.00" stroke="#c0392b" stroke-width="0.9" stroke-dasharray="4,3"/>
-<line x1="416.00" y1="434.00" x2="409.00" y2="413.00" stroke="#c0392b" stroke-width="0.9" stroke-dasharray="4,3"/>
-<text x="290.00" y="445.20" text-anchor="middle" font-size="9" fill="#c0392b">cavity slope (at Y-ends only)</text>
-<text x="411.34" y="325.46" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">A</text>
-<text x="400.18" y="296.63" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">B</text>
-<text x="417.60" y="289.67" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">C</text>
-<text x="416.69" y="271.43" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">D</text>
-<text x="385.03" y="271.43" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">E</text>
-<text x="383.87" y="308.77" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">F</text>
-<text x="413.13" y="361.76" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">G</text>
-<text x="411.97" y="436.97" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">H</text>
-<line x1="150.00" y1="274.40" x2="150.00" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="166.28" y1="274.40" x2="166.28" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="258.40" x2="166.28" y2="258.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="158.14" y="255.40" text-anchor="middle" font-size="11">1.163</text>
-<line x1="166.28" y1="274.40" x2="166.28" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="192.00" y1="274.40" x2="192.00" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="166.28" y1="258.40" x2="192.00" y2="258.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="179.14" y="255.40" text-anchor="middle" font-size="11">1.837</text>
-<line x1="192.00" y1="274.40" x2="192.00" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="388.00" y1="274.40" x2="388.00" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="192.00" y1="258.40" x2="388.00" y2="258.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="290.00" y="255.40" text-anchor="middle" font-size="11">14</text>
-<line x1="388.00" y1="274.40" x2="388.00" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="413.72" y1="274.40" x2="413.72" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="388.00" y1="258.40" x2="413.72" y2="258.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="400.86" y="255.40" text-anchor="middle" font-size="11">1.837</text>
-<line x1="413.72" y1="274.40" x2="413.72" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="430.00" y1="274.40" x2="430.00" y2="258.40" stroke="#666" stroke-width="0.5"/>
-<line x1="413.72" y1="258.40" x2="430.00" y2="258.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="421.86" y="255.40" text-anchor="middle" font-size="11">1.163</text>
-<line x1="150.00" y1="274.40" x2="150.00" y2="234.40" stroke="#666" stroke-width="0.5"/>
-<line x1="430.00" y1="274.40" x2="430.00" y2="234.40" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="234.40" x2="430.00" y2="234.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="290.00" y="231.40" text-anchor="middle" font-size="11">20</text>
-<line x1="150.00" y1="455.00" x2="130.00" y2="455.00" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="434.00" x2="130.00" y2="434.00" stroke="#666" stroke-width="0.5"/>
-<line x1="130.00" y1="455.00" x2="130.00" y2="434.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="127.00" y="448.50" text-anchor="end" font-size="11">1.5</text>
-<line x1="150.00" y1="434.00" x2="130.00" y2="434.00" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="362.53" x2="130.00" y2="362.53" stroke="#666" stroke-width="0.5"/>
-<line x1="130.00" y1="434.00" x2="130.00" y2="362.53" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="127.00" y="402.26" text-anchor="end" font-size="11">5.105</text>
-<line x1="150.00" y1="362.53" x2="130.00" y2="362.53" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="322.00" x2="130.00" y2="322.00" stroke="#666" stroke-width="0.5"/>
-<line x1="130.00" y1="362.53" x2="130.00" y2="322.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="127.00" y="346.26" text-anchor="end" font-size="11">2.895</text>
-<line x1="150.00" y1="322.00" x2="130.00" y2="322.00" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="308.00" x2="130.00" y2="308.00" stroke="#666" stroke-width="0.5"/>
-<line x1="130.00" y1="322.00" x2="130.00" y2="308.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="127.00" y="319.00" text-anchor="end" font-size="11">1</text>
-<line x1="150.00" y1="308.00" x2="130.00" y2="308.00" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="274.40" x2="130.00" y2="274.40" stroke="#666" stroke-width="0.5"/>
-<line x1="130.00" y1="308.00" x2="130.00" y2="274.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="127.00" y="295.20" text-anchor="end" font-size="11">2.4</text>
-<line x1="150.00" y1="434.00" x2="100.00" y2="434.00" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="322.00" x2="100.00" y2="322.00" stroke="#666" stroke-width="0.5"/>
-<line x1="100.00" y1="434.00" x2="100.00" y2="322.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="97.00" y="382.00" text-anchor="end" font-size="11">8</text>
-<line x1="150.00" y1="322.00" x2="100.00" y2="322.00" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="274.40" x2="100.00" y2="274.40" stroke="#666" stroke-width="0.5"/>
-<line x1="100.00" y1="322.00" x2="100.00" y2="274.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="97.00" y="302.20" text-anchor="end" font-size="11">3.4</text>
-<line x1="150.00" y1="455.00" x2="70.00" y2="455.00" stroke="#666" stroke-width="0.5"/>
-<line x1="150.00" y1="274.40" x2="70.00" y2="274.40" stroke="#666" stroke-width="0.5"/>
-<line x1="70.00" y1="455.00" x2="70.00" y2="274.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="67.00" y="368.70" text-anchor="end" font-size="11">12.9</text>
-<line x1="515" y1="200" x2="537" y2="200" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
-<line x1="515" y1="200" x2="515" y2="178" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
-<text x="518" y="178" dominant-baseline="hanging" font-size="7.5" fill="#333" text-anchor="start">Z</text>
-<text x="537" y="197" font-size="7.5" fill="#333" text-anchor="end">Y</text>
-<text x="551" y="200" text-anchor="start" font-size="14" font-weight="bold">Right corner detail</text>
-<path d="M 540.00 405.00 L 660.00 405.00 L 660.00 245.00 L 540.00 245.00 Z" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
-<line x1="580.00" y1="405.00" x2="540.00" y2="285.00" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="5,3"/>
-<line x1="540.00" y1="245.00" x2="540.00" y2="231.00" stroke="#666" stroke-width="0.5"/>
-<line x1="660.00" y1="245.00" x2="660.00" y2="231.00" stroke="#666" stroke-width="0.5"/>
-<line x1="540.00" y1="231.00" x2="660.00" y2="231.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="600.00" y="228.00" text-anchor="middle" font-size="11">1.5  (wall thickness)</text>
-<line x1="580.00" y1="405.00" x2="580.00" y2="419.00" stroke="#666" stroke-width="0.5"/>
-<line x1="660.00" y1="405.00" x2="660.00" y2="419.00" stroke="#666" stroke-width="0.5"/>
-<line x1="580.00" y1="419.00" x2="660.00" y2="419.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="620.00" y="431.00" text-anchor="middle" font-size="11">1.0</text>
-<line x1="660.00" y1="405.00" x2="678.00" y2="405.00" stroke="#666" stroke-width="0.5"/>
-<line x1="660.00" y1="285.00" x2="678.00" y2="285.00" stroke="#666" stroke-width="0.5"/>
-<line x1="678.00" y1="405.00" x2="678.00" y2="285.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="681.00" y="349.00" text-anchor="start" font-size="11">1.5  (floor)</text>
-<line x1="540.00" y1="285.00" x2="522.00" y2="285.00" stroke="#666" stroke-width="0.5"/>
-<line x1="540.00" y1="245.00" x2="522.00" y2="245.00" stroke="#666" stroke-width="0.5"/>
-<line x1="522.00" y1="285.00" x2="522.00" y2="245.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="519.00" y="269.00" text-anchor="end" font-size="11">0.5*</text>
-<text x="568.00" y="293.00" text-anchor="start" font-size="8" fill="#c0392b">slope run: 0.5 mm</text>
-<text x="568.00" y="309.00" text-anchor="start" font-size="8" fill="#c0392b">slope rise: 1.5 mm</text>
-<text x="568.00" y="325.00" text-anchor="start" font-size="8" fill="#c0392b">(= wall_thickness)</text>
-<text x="540.00" y="447.00" text-anchor="start" font-size="9" fill="#777">* slope_run (cavity widens by this on each side)</text>
-<line x1="500" y1="510" x2="522" y2="510" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
-<line x1="500" y1="510" x2="500" y2="488" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
-<text x="503" y="488" dominant-baseline="hanging" font-size="7.5" fill="#333" text-anchor="start">Z</text>
-<text x="522" y="507" font-size="7.5" fill="#333" text-anchor="end">Y</text>
-<text x="536" y="510" text-anchor="start" font-size="14" font-weight="bold">Top rim detail (right side)</text>
-<path d="M 720.00 760.00 L 650.22 760.00 L 609.78 655.00 L 650.22 614.56 L 650.22 556.00 L 540.00 556.00 L 540.00 700.00 L 563.10 760.00 Z" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
-<line x1="720.00" y1="760.00" x2="734.00" y2="760.00" stroke="#666" stroke-width="0.5"/>
-<line x1="720.00" y1="700.00" x2="734.00" y2="700.00" stroke="#666" stroke-width="0.5"/>
-<line x1="734.00" y1="760.00" x2="734.00" y2="700.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="737.00" y="734.00" text-anchor="start" font-size="11">1</text>
-<line x1="720.00" y1="700.00" x2="734.00" y2="700.00" stroke="#666" stroke-width="0.5"/>
-<line x1="720.00" y1="655.00" x2="734.00" y2="655.00" stroke="#666" stroke-width="0.5"/>
-<line x1="734.00" y1="700.00" x2="734.00" y2="655.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="737.00" y="681.50" text-anchor="start" font-size="11">0.75</text>
-<line x1="720.00" y1="655.00" x2="734.00" y2="655.00" stroke="#666" stroke-width="0.5"/>
-<line x1="720.00" y1="614.56" x2="734.00" y2="614.56" stroke="#666" stroke-width="0.5"/>
-<line x1="734.00" y1="655.00" x2="734.00" y2="614.56" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="737.00" y="638.78" text-anchor="start" font-size="11">0.674</text>
-<line x1="720.00" y1="614.56" x2="734.00" y2="614.56" stroke="#666" stroke-width="0.5"/>
-<line x1="720.00" y1="556.00" x2="734.00" y2="556.00" stroke="#666" stroke-width="0.5"/>
-<line x1="734.00" y1="614.56" x2="734.00" y2="556.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="737.00" y="589.28" text-anchor="start" font-size="11">0.976</text>
-<line x1="720.00" y1="760.00" x2="765.00" y2="760.00" stroke="#666" stroke-width="0.5"/>
-<line x1="720.00" y1="556.00" x2="765.00" y2="556.00" stroke="#666" stroke-width="0.5"/>
-<line x1="765.00" y1="760.00" x2="765.00" y2="556.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="768.00" y="662.00" text-anchor="start" font-size="11">3.4</text>
-<line x1="540.00" y1="556.00" x2="540.00" y2="542.00" stroke="#666" stroke-width="0.5"/>
-<line x1="650.22" y1="556.00" x2="650.22" y2="542.00" stroke="#666" stroke-width="0.5"/>
-<line x1="540.00" y1="542.00" x2="650.22" y2="542.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="595.11" y="539.00" text-anchor="middle" font-size="11">1.837</text>
-<line x1="609.78" y1="760.00" x2="609.78" y2="774.00" stroke="#666" stroke-width="0.5"/>
-<line x1="650.22" y1="760.00" x2="650.22" y2="774.00" stroke="#666" stroke-width="0.5"/>
-<line x1="609.78" y1="774.00" x2="650.22" y2="774.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="630.00" y="786.00" text-anchor="middle" font-size="11">0.674</text>
-<line x1="225" y1="610" x2="247" y2="610" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
-<line x1="225" y1="610" x2="225" y2="588" stroke="#333" stroke-width="0.9" marker-end="url(#axisArr)"/>
-<text x="228" y="588" dominant-baseline="hanging" font-size="7.5" fill="#333" text-anchor="start">Z</text>
-<text x="247" y="607" font-size="7.5" fill="#333" text-anchor="end">X</text>
-<text x="261" y="610" text-anchor="start" font-size="14" font-weight="bold">Side view</text>
-<rect x="80.00" y="678.40" width="400.00" height="51.60" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
-<rect x="80.00" y="718.00" width="44.00" height="6.00" fill="#fcebea" stroke="#c0392b" stroke-width="0.9" stroke-dasharray="4,3"/>
-<rect x="436.00" y="718.00" width="44.00" height="6.00" fill="#fcebea" stroke="#c0392b" stroke-width="0.9" stroke-dasharray="4,3"/>
-<text x="102.00" y="703.00" text-anchor="middle" font-size="10" fill="#c0392b">cavity</text>
-<text x="458.00" y="703.00" text-anchor="middle" font-size="10" fill="#c0392b">cavity</text>
-<line x1="80.00" y1="678.40" x2="80.00" y2="664.40" stroke="#666" stroke-width="0.5"/>
-<line x1="124.00" y1="678.40" x2="124.00" y2="664.40" stroke="#666" stroke-width="0.5"/>
-<line x1="80.00" y1="664.40" x2="124.00" y2="664.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="102.00" y="661.40" text-anchor="middle" font-size="11">11</text>
-<line x1="124.00" y1="678.40" x2="124.00" y2="664.40" stroke="#666" stroke-width="0.5"/>
-<line x1="436.00" y1="678.40" x2="436.00" y2="664.40" stroke="#666" stroke-width="0.5"/>
-<line x1="124.00" y1="664.40" x2="436.00" y2="664.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="280.00" y="661.40" text-anchor="middle" font-size="11">78</text>
-<line x1="436.00" y1="678.40" x2="436.00" y2="664.40" stroke="#666" stroke-width="0.5"/>
-<line x1="480.00" y1="678.40" x2="480.00" y2="664.40" stroke="#666" stroke-width="0.5"/>
-<line x1="436.00" y1="664.40" x2="480.00" y2="664.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="458.00" y="661.40" text-anchor="middle" font-size="11">11</text>
-<line x1="80.00" y1="678.40" x2="80.00" y2="642.40" stroke="#666" stroke-width="0.5"/>
-<line x1="480.00" y1="678.40" x2="480.00" y2="642.40" stroke="#666" stroke-width="0.5"/>
-<line x1="80.00" y1="642.40" x2="480.00" y2="642.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
-<text x="280.00" y="639.40" text-anchor="middle" font-size="11">100</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="788" height="458" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="arrL" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 10 0 L 0 5 L 10 10 z" fill="#222"/></marker><marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#222"/></marker><marker id="axisArr" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#333"/></marker><marker id="axisArrX" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#d32f2f"/></marker><marker id="axisArrY" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#2e7d32"/></marker><marker id="axisArrZ" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#1565c0"/></marker></defs>
+<rect width="788" height="458" fill="white"/>
+<text x="394" y="32" text-anchor="middle" font-size="20" font-weight="bold">Cable Channel</text>
+<text x="394" y="52" text-anchor="middle" font-size="11" fill="#555">Dimensioned Draft (mm)</text>
+<g transform="translate(-9.00, -5.40)">
+<text x="130.09" y="122.40" text-anchor="start" font-size="14" font-weight="bold">Cross-section</text>
+<line x1="242.91" y1="122.4" x2="264.91" y2="122.4" stroke="#2e7d32" stroke-width="0.9" marker-end="url(#axisArrY)"/>
+<line x1="242.91" y1="122.4" x2="242.91" y2="100.4" stroke="#1565c0" stroke-width="0.9" marker-end="url(#axisArrZ)"/>
+<text x="245.91" y="100.4" dominant-baseline="hanging" font-size="7.5" fill="#1565c0" text-anchor="start">Z</text>
+<text x="264.91" y="119.4" font-size="7.5" fill="#2e7d32" text-anchor="end">Y</text>
+<path d="M 150.00 375.00 L 360.00 375.00 L 360.00 242.00 L 347.92 242.00 L 338.48 217.50 L 347.92 208.06 L 347.92 194.40 L 326.40 194.40 L 326.40 228.00 L 343.20 271.62 L 343.20 358.20 L 166.80 358.20 L 166.80 271.62 L 183.60 228.00 L 183.60 194.40 L 162.08 194.40 L 162.08 208.06 L 171.52 217.50 L 162.08 242.00 L 150.00 242.00 Z" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
+<text x="345.54" y="245.46" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">A</text>
+<text x="334.38" y="216.63" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">B</text>
+<text x="351.80" y="209.67" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">C</text>
+<text x="350.89" y="191.43" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">D</text>
+<text x="323.43" y="191.43" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">E</text>
+<text x="322.27" y="228.77" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">F</text>
+<text x="347.33" y="270.85" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">G</text>
+<text x="346.17" y="361.17" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#1f6feb">H</text>
+<line x1="183.60" y1="194.40" x2="183.60" y2="178.40" stroke="#666" stroke-width="0.5"/>
+<line x1="326.40" y1="194.40" x2="326.40" y2="178.40" stroke="#666" stroke-width="0.5"/>
+<line x1="183.60" y1="178.40" x2="326.40" y2="178.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="255.00" y="175.40" text-anchor="middle" font-size="11">10.2</text>
+<line x1="150.00" y1="194.40" x2="150.00" y2="154.40" stroke="#666" stroke-width="0.5"/>
+<line x1="360.00" y1="194.40" x2="360.00" y2="154.40" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="154.40" x2="360.00" y2="154.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="255.00" y="151.40" text-anchor="middle" font-size="11">15</text>
+<line x1="150.00" y1="375.00" x2="130.00" y2="375.00" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="358.20" x2="130.00" y2="358.20" stroke="#666" stroke-width="0.5"/>
+<line x1="130.00" y1="375.00" x2="130.00" y2="358.20" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="127.00" y="370.60" text-anchor="end" font-size="11">1.2</text>
+<line x1="150.00" y1="358.20" x2="130.00" y2="358.20" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="271.62" x2="130.00" y2="271.62" stroke="#666" stroke-width="0.5"/>
+<line x1="130.00" y1="358.20" x2="130.00" y2="271.62" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="127.00" y="318.91" text-anchor="end" font-size="11">6.184</text>
+<line x1="150.00" y1="271.62" x2="130.00" y2="271.62" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="242.00" x2="130.00" y2="242.00" stroke="#666" stroke-width="0.5"/>
+<line x1="130.00" y1="271.62" x2="130.00" y2="242.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="127.00" y="260.81" text-anchor="end" font-size="11">2.116</text>
+<line x1="150.00" y1="242.00" x2="130.00" y2="242.00" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="228.00" x2="130.00" y2="228.00" stroke="#666" stroke-width="0.5"/>
+<line x1="130.00" y1="242.00" x2="130.00" y2="228.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="127.00" y="239.00" text-anchor="end" font-size="11">1</text>
+<line x1="150.00" y1="228.00" x2="130.00" y2="228.00" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="194.40" x2="130.00" y2="194.40" stroke="#666" stroke-width="0.5"/>
+<line x1="130.00" y1="228.00" x2="130.00" y2="194.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="127.00" y="215.20" text-anchor="end" font-size="11">2.4</text>
+<line x1="150.00" y1="358.20" x2="100.00" y2="358.20" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="242.00" x2="100.00" y2="242.00" stroke="#666" stroke-width="0.5"/>
+<line x1="100.00" y1="358.20" x2="100.00" y2="242.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="97.00" y="304.10" text-anchor="end" font-size="11">8.3</text>
+<line x1="150.00" y1="242.00" x2="100.00" y2="242.00" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="194.40" x2="100.00" y2="194.40" stroke="#666" stroke-width="0.5"/>
+<line x1="100.00" y1="242.00" x2="100.00" y2="194.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="97.00" y="222.20" text-anchor="end" font-size="11">3.4</text>
+<line x1="150.00" y1="375.00" x2="70.00" y2="375.00" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="194.40" x2="70.00" y2="194.40" stroke="#666" stroke-width="0.5"/>
+<line x1="70.00" y1="375.00" x2="70.00" y2="194.40" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="67.00" y="288.70" text-anchor="end" font-size="11">12.9</text>
+<text x="70.00" y="405.00" text-anchor="start" font-size="8.5" fill="#777">corners A–D rounded R0.4 (rim_fillet) — drawn in the rim detail</text>
+<text x="70.00" y="418.00" text-anchor="start" font-size="8.5" fill="#777">floor lock pad and end connectors are in the puzzle_connector draft</text>
+</g>
+<g transform="translate(-130.25, -4.00)">
+<text x="590.26" y="121.00" text-anchor="start" font-size="14" font-weight="bold">Top rim detail (right side)</text>
+<line x1="777.74" y1="121.0" x2="799.74" y2="121.0" stroke="#2e7d32" stroke-width="0.9" marker-end="url(#axisArrY)"/>
+<line x1="777.74" y1="121.0" x2="777.74" y2="99.0" stroke="#1565c0" stroke-width="0.9" marker-end="url(#axisArrZ)"/>
+<text x="780.74" y="99.0" dominant-baseline="hanging" font-size="7.5" fill="#1565c0" text-anchor="start">Z</text>
+<text x="799.74" y="118.0" font-size="7.5" fill="#2e7d32" text-anchor="end">Y</text>
+<path d="M 744.00 371.00 L 708.70 371.00 L 705.10 370.73 L 701.58 369.92 L 698.23 368.60 L 695.11 366.79 L 692.30 364.53 L 689.86 361.87 L 687.84 358.88 L 686.30 355.63 L 657.39 280.56 L 656.38 277.26 L 655.86 273.84 L 655.84 270.38 L 656.31 266.96 L 657.26 263.64 L 658.69 260.49 L 660.55 257.58 L 662.81 254.97 L 685.19 232.59 L 686.77 230.84 L 688.18 228.95 L 689.39 226.93 L 690.39 224.80 L 691.19 222.59 L 691.76 220.30 L 692.10 217.97 L 692.22 215.62 L 692.22 191.00 L 691.76 186.32 L 690.39 181.82 L 688.18 177.67 L 685.19 174.03 L 681.55 171.04 L 677.40 168.83 L 672.90 167.46 L 668.22 167.00 L 600.00 167.00 L 600.00 311.00 L 623.11 371.00 Z" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
+<line x1="744.00" y1="371.00" x2="758.00" y2="371.00" stroke="#666" stroke-width="0.5"/>
+<line x1="744.00" y1="311.00" x2="758.00" y2="311.00" stroke="#666" stroke-width="0.5"/>
+<line x1="758.00" y1="371.00" x2="758.00" y2="311.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="761.00" y="345.00" text-anchor="start" font-size="11">1</text>
+<line x1="744.00" y1="311.00" x2="758.00" y2="311.00" stroke="#666" stroke-width="0.5"/>
+<line x1="744.00" y1="266.00" x2="758.00" y2="266.00" stroke="#666" stroke-width="0.5"/>
+<line x1="758.00" y1="311.00" x2="758.00" y2="266.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="761.00" y="292.50" text-anchor="start" font-size="11">0.75</text>
+<line x1="744.00" y1="266.00" x2="758.00" y2="266.00" stroke="#666" stroke-width="0.5"/>
+<line x1="744.00" y1="225.56" x2="758.00" y2="225.56" stroke="#666" stroke-width="0.5"/>
+<line x1="758.00" y1="266.00" x2="758.00" y2="225.56" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="761.00" y="249.78" text-anchor="start" font-size="11">0.674</text>
+<line x1="744.00" y1="225.56" x2="758.00" y2="225.56" stroke="#666" stroke-width="0.5"/>
+<line x1="744.00" y1="167.00" x2="758.00" y2="167.00" stroke="#666" stroke-width="0.5"/>
+<line x1="758.00" y1="225.56" x2="758.00" y2="167.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="761.00" y="200.28" text-anchor="start" font-size="11">0.976</text>
+<line x1="744.00" y1="371.00" x2="789.00" y2="371.00" stroke="#666" stroke-width="0.5"/>
+<line x1="744.00" y1="167.00" x2="789.00" y2="167.00" stroke="#666" stroke-width="0.5"/>
+<line x1="789.00" y1="371.00" x2="789.00" y2="167.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="792.00" y="273.00" text-anchor="start" font-size="11">3.4</text>
+<line x1="600.00" y1="167.00" x2="600.00" y2="153.00" stroke="#666" stroke-width="0.5"/>
+<line x1="692.22" y1="167.00" x2="692.22" y2="153.00" stroke="#666" stroke-width="0.5"/>
+<line x1="600.00" y1="153.00" x2="692.22" y2="153.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="646.11" y="150.00" text-anchor="middle" font-size="11">1.537</text>
+<line x1="692.22" y1="167.00" x2="692.22" y2="153.00" stroke="#666" stroke-width="0.5"/>
+<line x1="744.00" y1="167.00" x2="744.00" y2="153.00" stroke="#666" stroke-width="0.5"/>
+<line x1="692.22" y1="153.00" x2="744.00" y2="153.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="718.11" y="150.00" text-anchor="middle" font-size="11">0.863</text>
+<line x1="651.78" y1="371.00" x2="651.78" y2="385.00" stroke="#666" stroke-width="0.5"/>
+<line x1="692.22" y1="371.00" x2="692.22" y2="385.00" stroke="#666" stroke-width="0.5"/>
+<line x1="651.78" y1="385.00" x2="692.22" y2="385.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="672.00" y="397.00" text-anchor="middle" font-size="11">0.674</text>
+<text x="700.00" y="423.00" text-anchor="middle" font-size="8.5" fill="#777">A–D filleted R0.4; the cap inner profile carries the same arcs, so the fit stays tight</text>
+</g>
 </svg>

@@ -7,6 +7,7 @@ from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import Alignment, Direction
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
+from sava.csg.build123d.common.smartloft import SmartLoft
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
@@ -14,20 +15,29 @@ from sava.csg.build123d.common.smartsolid import SmartSolid
 class CableChannelDimensions:
     length: float = 15.0
     width: float = 15.0
-    wall_thickness: float = 1.5
+    wall_thickness: float = 1.2
 
     # Puzzle-piece floor connector: each end terminates in an interlocking
     # dovetail (tab on one half, socket on the other) so adjacent channels snap
     # together. The profile is point-symmetric about the end-edge midpoint, so
     # any end mates with any end, in either orientation (genderless). The lock
     # region is built up to lock_thickness (2x floor) and rises into the channel.
+    # The joint assembles vertically (one piece drops onto the other) with near-zero
+    # clearance, so the top and bottom of the lock height (lock_lead_in_fraction
+    # each) are graded as insertion lead-ins: the tab pulls in by lock_lead_in per side toward its
+    # top and bottom edges, and the socket opens out by the same amount toward
+    # both mouths. Every contact pair then has lead-ins on both parts: the
+    # descending tab's tapered bottom meets a flared socket top, and the
+    # descending socket's flared bottom passes over a tapered tab top.
     lock_protrusion: float = 3.0   # dovetail depth beyond the joint plane
     lock_offset_y: float = 3.0     # tab/socket centre offset from the channel centreline
     lock_root_half: float = 1.2    # half-width at the root (joint)
     lock_tip_half: float = 2.5     # half-width at the tip (wider -> undercut)
     lock_fillet: float = 0.8       # corner fillet (no sharp stress risers)
-    lock_clearance: float = 0.0   # tab<->socket gap for fit
+    lock_clearance: float = 0.05   # tab<->socket gap for fit
     lock_pad_margin: float = 1.5   # pad reach inboard of the deepest socket point
+    lock_lead_in: float = 0.3      # per-side lead-in at the top and bottom edges (tab -, socket +)
+    lock_lead_in_fraction: float = 0.25  # fraction of the lock height each lead-in is graded over
 
     # Total Z height of the channel. The rim section sits at the top (fixed
     # height = rim_height); below it the outer wall and inner cavity wall make
@@ -44,6 +54,13 @@ class CableChannelDimensions:
     rim_groove_depth: float = 0.674
     rim_groove_apex_dz: float = 1.75
 
+    # Experimental: fillet radius for the cross-section corners A-D (see the
+    # dimensioned draft) — the rim shoulder, V-groove apex, groove upper edge,
+    # and rim top corner. Applied to the same trace segments in both the channel
+    # and the cap, so the mating profiles stay congruent and the fit stays tight.
+    # Keep below ~0.69: the C->D segment (0.976) must fit both corners' trims.
+    rim_fillet: float = 0.4
+
     # Z extent of the rim's inner face straight section (Y=width/2 - 2*wall_thickness),
     # from rim top down to the start of the inner diagonal.
     rim_inner_face_length: float = 2.4
@@ -57,6 +74,11 @@ class CableChannelDimensions:
         """Z height of the lock region — twice the floor thickness, so the tab
         and socket are chunky. The extra height rises into the channel interior."""
         return 2 * self.wall_thickness
+
+    @property
+    def lock_lead_in_height(self) -> float:
+        """Z extent of each graded lead-in zone at the top and bottom of the lock region."""
+        return self.lock_lead_in_fraction * self.lock_thickness
 
     @property
     def lock_pad_inboard(self) -> float:
@@ -117,9 +139,13 @@ class CableChannel:
         body.right(dim.width / 2)                                                            # outer floor
         body.up(dim.outer_wall_height)                                                       # outer wall up
         body.left(dim.wall_thickness - dim.rim_outer_offset)                                 # → A
+        body.fillet(dim.rim_fillet)
         body.jump((-dim.rim_groove_depth, dim.rim_groove_apex_dz))                           # A → B
+        body.fillet()
         body.jump((dim.rim_groove_depth, dim.rim_groove_upper_dz - dim.rim_groove_apex_dz))  # B → C
+        body.fillet()
         body.up(dim.rim_height - dim.rim_groove_upper_dz)                                    # C → D
+        body.fillet()
         body.left(dim.wall_thickness + dim.rim_outer_offset)                                 # D → E
         body.down(dim.rim_inner_face_length)                                                 # E → F
         body.jump((dim.wall_thickness, -dim.inner_diag_dz))                                  # F → G
@@ -144,13 +170,20 @@ class CableChannel:
         dim = self.dim
         return SmartBox(dim.lock_thickness, 2 * (dim.lock_root_half + clearance), dim.lock_protrusion + clearance, tapered_width=2 * (dim.lock_tip_half + clearance))
 
-    def _create_lock_plate(self, sign: int, slab_depth: float, slab_half_width: float, bump_offset: float, clearance: float = 0) -> SmartSolid:
+    def _create_lock_plate(self, sign: int, slab_depth: float, slab_half_width: float, bump_offset: float, clearance: float = 0, lead_in: float = 0) -> SmartSolid:
         """Build, at the origin, a lock-height slab carrying a dovetail bump, rounded so
         the bump's tip corners are convex (outward) while its root corners — where it
         meets the slab — are concave (inward), exactly as the dimensioned draft shows.
         The bump points along `sign`*X and sits `bump_offset` off the slab centreline;
         `clearance` grows it on every side. Returned in a canonical pose — bump root on
         the x=0 plane, slab centred on y=0, base on z=0 — so the caller just moves it.
+
+        `lead_in` grades the bump over the lead-in zones at both ends of the lock
+        height: its footprint at the very top and bottom edges is grown by
+        `clearance + lead_in` per side, blending linearly to `clearance` over
+        lock_lead_in_height. Negative shrinks the tab into an insertion taper;
+        positive opens the socket cutter into flared mouths. The slab footprint
+        is unaffected (the lofted lead sections keep its walls vertical).
 
         Rounding happens here at the origin on purpose: the bump is an axis-rotated
         SmartBox, and moving such a solid injects ~1e-7 transform error that makes a
@@ -169,6 +202,17 @@ class CableChannel:
         root = filter_edges_by_position(z_edges, Axis.X, -0.1, 0.1, (True, True))
         root = filter_edges_by_position(root, Axis.Y, bump_offset - root_half - 0.2, bump_offset + root_half + 0.2, (True, True))
         plate.solid = fillet(list(tip) + list(root), dim.lock_fillet)
+
+        if lead_in:
+            # Replace the plate's top and bottom lead-in zones with lofts between the
+            # offset footprint (a same-topology plate, bump grown by lead_in) and the
+            # nominal footprint — the graded entries from the dimensioned draft.
+            offset_plate = self._create_lock_plate(sign, slab_depth, slab_half_width, bump_offset, clearance + lead_in)
+            nominal_foot = plate.solid.faces().sort_by(Axis.Z)[0]
+            offset_foot = offset_plate.solid.faces().sort_by(Axis.Z)[0]
+            lead_bottom = SmartLoft.create(offset_foot, nominal_foot, height=dim.lock_lead_in_height)
+            lead_top = SmartLoft.create(nominal_foot, offset_foot, height=dim.lock_lead_in_height).move(z=dim.lock_thickness - dim.lock_lead_in_height)
+            plate.cut_z(cut=dim.lock_lead_in_height).cut_z(cut=-dim.lock_lead_in_height).fuse(lead_bottom).fuse(lead_top)
         return plate
 
     def _apply_connector(self, channel: SmartSolid, direction: Direction) -> None:
@@ -185,12 +229,12 @@ class CableChannel:
         sign = direction.value.X    # +1 East / -1 West
         joint = channel.x_max if direction == Direction.E else channel.x_min
 
-        tab = self._create_lock_plate(sign, dim.lock_pad_inboard, dim.inner_width / 2, sign * dim.lock_offset_y)
+        tab = self._create_lock_plate(sign, dim.lock_pad_inboard, dim.inner_width / 2, sign * dim.lock_offset_y, lead_in=-dim.lock_lead_in)
         tab.move(x=joint, y=channel.y_mid)
         channel.fuse(tab)
 
         flange_half_width = dim.lock_tip_half + dim.lock_clearance + dim.lock_fillet
-        socket = self._create_lock_plate(-sign, dim.lock_protrusion, flange_half_width, 0, dim.lock_clearance)
+        socket = self._create_lock_plate(-sign, dim.lock_protrusion, flange_half_width, 0, dim.lock_clearance, lead_in=dim.lock_lead_in)
         socket.move(x=joint, y=channel.y_mid - sign * dim.lock_offset_y)
         channel.cut(socket)
 
@@ -231,9 +275,13 @@ class CableChannel:
         body.right(dim.width / 2)                                                              # ceiling → outer
         body.down(dim.rim_height + dim.wall_thickness)                                         # outer wall down
         body.left(dim.wall_thickness - dim.rim_outer_offset)                                   # → A
+        body.fillet(dim.rim_fillet)
         body.jump((-dim.rim_groove_depth, dim.rim_groove_apex_dz))                             # A → B
+        body.fillet()
         body.jump((dim.rim_groove_depth, dim.rim_groove_upper_dz - dim.rim_groove_apex_dz))    # B → C
+        body.fillet()
         body.up(dim.rim_height - dim.rim_groove_upper_dz)                                       # C → D
+        body.fillet()                                                                           # applies on the mirror builder's closing segment
         cap = body.extrude_mirrored_y(length, label=f"cap_{length}mm")
         cap.bed_orientation = (180, 0, 0)
 
@@ -249,6 +297,10 @@ if __name__ == "__main__":
     # B's start end mates with A's end (genderless, so no flipping needed).
     mate_model = cable_channel.create_channel(dimensions.length, connector_start=True, connector_end=True).move(x=dimensions.length)
 
-    # Assembled visualization scene first (3MF), then a single slicer-ready STL.
-    export_3mf("models/other/cable_channel/export.3mf", channel_model, mate_model)
-    export_stl("models/other/cable_channel/stl", channel_model)
+    # A single double-length cap covers both channels, bridging the puzzle joint.
+    cap_model = cable_channel.create_cap(2 * dimensions.length)
+    cap_model.align(SmartSolid(channel_model, mate_model)).z(Alignment.RL, dimensions.wall_thickness)
+
+    # Assembled visualization scene first (3MF), then slicer-ready STLs.
+    export_3mf("models/other/cable_channel/export.3mf", channel_model, mate_model, cap_model)
+    export_stl("models/other/cable_channel/stl", channel_model, cap_model, clean=True)
