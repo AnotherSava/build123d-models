@@ -71,8 +71,11 @@ For a single overview drawing, `<draft_name>` matches the model directory name (
    - Axis hints follow the F3D colour convention: X red, Y green, Z blue (`AXIS_COLORS` in the lib)
    - Derive dimension-label values from the script's design constants with f-strings (`f'{2 * (TIP_HALF - LEAD_IN):g} tab bottom'`), never hardcode the numbers in label strings — drafts get retuned, and literal labels silently go stale
    - Vertex letter labels (A, B, C, …) — when tagging polygon corners so model code can reference them: place each letter along the bisector of the **wider** angle at that vertex. For a CCW polygon, that's the **exterior** bisector at convex vertices (interior < 180°, polygon "bumps out") and the **interior** bisector at concave vertices (interior > 180°, polygon "indents"). Offset ~0.3 mm out from the corner, size ~6 pt, and pass `baseline='central'` to `view.text()` so the letter's geometric centre sits on the bisector point (not its alphabetic baseline). The interior-bisector direction at vertex P is `unit(perp_left(e_in) + perp_left(e_out))` where `perp_left((a,b)) = (-b, a)`; concave uses it, convex uses its negation. Worked example: cable-channel cross-section labels A–H.
+   - Letters identify **model points, not view annotations**: when the same physical point (or the edge it projects to) is visible in several views of the page — different projections included — label it with the same letter in each view. When two lettered edges project onto the same line in a view, combine them (`V/X`). Across related drafts of one model, keep letters globally unique (the puzzle-connector draft continues the cross-section's A–H with J–X) so a letter reference is unambiguous in conversation.
 
-6. **Render SVG and review.** Run the script (`venv/Scripts/python.exe models/<group>/<model_name>/dimensioned_drafts/<draft_name>.py`); it writes the SVG next to the script. **Self-review before showing the user**: render the SVG to PNG via headless Chrome and Read the image to catch layout collisions yourself —
+6. **Verify non-trivial outlines against the model.** When a view projects an intricate 3D region — mitred corner joints, overlapping laps, anything where multiple seams meet or a leg was built in a rotated frame — do not hand-derive the silhouette from a mental projection. Compute it from the built solid: intersect the model with a thin Box slab aligned to the view's projection and read the section's vertices, then check every draft outline vertex against that list. Mental projections of rotated-frame geometry are exactly where drafts go wrong (the corner_channels outer-corner notch took three correction rounds — wrong tab side, missing notch, V instead of W — that one slice section would have caught up front).
+
+7. **Render SVG and review.** Run the script (`venv/Scripts/python.exe models/<group>/<model_name>/dimensioned_drafts/<draft_name>.py`); it writes the SVG next to the script. **Self-review before showing the user**: render the SVG to PNG via headless Chrome and Read the image to catch layout collisions yourself —
    ```powershell
    $chrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
    & $chrome --headless --disable-gpu --screenshot="$env:TEMP\<draft_name>.png" --window-size=<W>,<H> --default-background-color=FFFFFFFF "file:///<abs-path-to-svg>"
@@ -87,9 +90,9 @@ For a single overview drawing, `<draft_name>` matches the model directory name (
    - **Footers spreading past the block.** Free-text labels relate to the *whole* view block: left-align them with the outermost dim ladder (or centre under the block) and keep them within the view's span — long notes split into multiple lines.
    - **Text comments intersecting dim arrows/labels within the same view.** Annotations placed near figure edges (`dx`/`dy` shifts on `view.text()`) can collide with dim lines/labels on the same side. Two fixes: (a) place the annotation INSIDE the body fill (typically clears dims since dims sit outside the figure) — pick coordinates so the annotation also clears any feature lines like slopes; (b) shift `dy` further until the annotation drops below the lowest dim label on that side.
 
-7. **Iterate with the user.** Ask the user to open the SVG; take feedback on labels, scale, missing dimensions, layout. Re-run the script.
+8. **Iterate with the user.** Ask the user to open the SVG; take feedback on labels, scale, missing dimensions, layout. Re-run the script.
 
-8. **Commit.** Both files (`.py`, `.svg`) in `dimensioned_drafts/` go into the repo with the model — they're outputs of the model just like `export.3mf` and the STLs.
+9. **Commit.** Both files (`.py`, `.svg`) in `dimensioned_drafts/` go into the repo with the model — they're outputs of the model just like `export.3mf` and the STLs.
 
 ## Reference
 
