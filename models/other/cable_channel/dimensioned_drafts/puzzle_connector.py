@@ -18,8 +18,9 @@ toward both mouths. Every contact pair then has lead-ins on both parts — the
 descending tab's tapered bottom meets a flared socket top, and the descending
 socket's flared bottom passes over a tapered tab top.
 
-Top view looks down -Z at the floor: X = channel/length axis (joint opens to
-+X), Y = width. Body is to the left of the joint plane (X=0).
+Top view looks down -Z at the end joint: X = channel/length axis (joint opens
+to +X), Y = width. Body is to the left of the joint plane (X=0); the side
+walls butt at the joint plane.
 
 Run from repo root:
     venv/Scripts/python.exe models/other/cable_channel/dimensioned_drafts/puzzle_connector.py
@@ -48,14 +49,17 @@ LOCK_LEN = PROTRUSION + CLEARANCE + 1.5  # how far the pad reaches inboard of th
 LEAD_IN = 0.3           # per-side lead-in at the top and bottom edges (tab -, socket +)
 LEAD_IN_FRACTION = 0.25  # fraction of the lock height each lead-in is graded over
 LEAD_IN_H = LEAD_IN_FRACTION * LOCK_T  # 0.6  lead-in zone height (each end)
+GROOVE_D = 0.674        # rim_groove_depth
+Y_ACD = HALF - (FLOOR_T - GROOVE_D / 2)  # 6.637 rim outer face: cross-section A, C and D project onto this line
+Y_B = Y_ACD - GROOVE_D                   # 5.963 V-groove apex line (cross-section B)
+Y_EF = HALF - 2 * FLOOR_T                # 5.1   rim inner face line (cross-section E, F)
 BODY_LEFT = -9.0        # representative body length shown (truncated)
 
 
-def fillet_seam(pts):
-    """Round the seam corners that fall inside the feature region (near the
-    joint, within the inner width); body/wall corners stay sharp."""
-    indices = {i for i, p in enumerate(pts) if abs(p[0]) < 6.0 and abs(p[1]) < INNER_HALF + 0.5}
-    return fillet_polyline(pts, FILLET, indices=indices, closed=True)
+def fillet_seam(pts, dovetail_start):
+    """Round the eight dovetail vertices (starting at index `dovetail_start` in
+    `pts`); body and wall corners stay sharp, as in the model."""
+    return fillet_polyline(pts, FILLET, indices=set(range(dovetail_start, dovetail_start + 8)), closed=True)
 
 
 def end_seam():
@@ -80,16 +84,18 @@ def end_seam():
 
 def build() -> Drawing:
     d = Drawing('Cable Channel - Puzzle Floor Connector')
-    seam = fillet_seam([(BODY_LEFT, -HALF)] + end_seam() + [(BODY_LEFT, HALF)])
-    seam_body = fillet_seam(end_seam())  # seam alone for the mated view
+    seam = fillet_seam([(BODY_LEFT, -HALF)] + end_seam() + [(BODY_LEFT, HALF)], dovetail_start=2)
+    seam_body = fillet_seam(end_seam(), dovetail_start=1)  # seam alone for the mated view
 
     # ---------------------------------------------------------------- Top view
-    tv = d.add_view(View(origin=(345, 334), scale=22, title='End floor - top view', axis_labels=('X', 'Y')))
+    tv = d.add_view(View(origin=(345, 334), scale=22, title='End joint - top view', axis_labels=('X', 'Y')))
     tv.path(seam)
 
     for wy in (INNER_HALF, -INNER_HALF):
         tv.line((BODY_LEFT, wy), (0, wy), stroke='#999', stroke_width=0.5, dasharray='3,3')
     tv.text(f'inner wall face (Y={INNER_HALF:g})', (BODY_LEFT, INNER_HALF), size=8, color='#999', anchor='start', dy=-4)
+    tv.line((-LOCK_LEN, -INNER_HALF), (-LOCK_LEN, INNER_HALF), stroke='#999', stroke_width=0.5, dasharray='3,3')
+    tv.text(f'lock pad reach (z 0–{LOCK_T:g})', (-LOCK_LEN, -INNER_HALF), size=8, color='#999', anchor='middle', dy=12)
 
     tv.line((0, -HALF), (0, HALF), stroke='#c0392b', stroke_width=0.8, dasharray='4,3')
     tv.text('●', (0, 0), size=9, color='#1f6feb', anchor='middle', baseline='central')
@@ -97,6 +103,15 @@ def build() -> Drawing:
 
     tv.text('dovetail tab', (PROTRUSION / 2, OFFSET_Y + TIP_HALF + 0.9), size=9, anchor='middle')
     tv.text('socket', (-PROTRUSION / 2, -OFFSET_Y), size=9, anchor='middle', baseline='central')
+    # Key-point letters at the nominal (pre-fillet) seam corners, placed along the
+    # bisector of the wider angle. Lettering continues the cross-section draft's
+    # A-H, so references stay unique across the two drawings.
+    for letter, pos in [('J', (0.28, -HALF - 0.18)), ('M', (0.28, -OFFSET_Y - ROOT_HALF + 0.3)),
+                        ('N', (-PROTRUSION - 0.22, -OFFSET_Y - TIP_HALF - 0.22)), ('P', (-PROTRUSION - 0.22, -OFFSET_Y + TIP_HALF + 0.22)),
+                        ('Q', (0.28, -OFFSET_Y + ROOT_HALF - 0.3)), ('R', (-0.25, OFFSET_Y - ROOT_HALF - 0.18)),
+                        ('S', (PROTRUSION + 0.22, OFFSET_Y - TIP_HALF - 0.22)), ('T', (PROTRUSION + 0.22, OFFSET_Y + TIP_HALF + 0.22)),
+                        ('U', (-0.25, OFFSET_Y + ROOT_HALF + 0.18)), ('X', (0.35, HALF + 0.28))]:
+        tv.text(letter, pos, size=6, color='#1f6feb', anchor='middle', baseline='central')
 
     tv.dim_v(u_at=BODY_LEFT, v1=-HALF, v2=HALF, label=f'{WIDTH:g}  (width)', side='left', offset_px=30)
     tv.dim_h(v_at=HALF, u1=0, u2=PROTRUSION, label=f'{PROTRUSION:g}  depth', side='above', offset_px=16)
@@ -109,6 +124,8 @@ def build() -> Drawing:
             (BODY_LEFT, -HALF), size=8.5, color='#777', anchor='start', dy=20)
     tv.text(f'socket is a through-cut of the lock pad, grown by the {CLEARANCE:g} fit clearance — profile shown in the middle band ({LEAD_IN_H:g} ≤ z ≤ {LOCK_T - LEAD_IN_H:g})',
             (BODY_LEFT, -HALF), size=8.5, color='#777', anchor='start', dy=33)
+    tv.text('key points marked at the nominal (pre-fillet) corners; letters continue the cross-section draft (A–H there)',
+            (BODY_LEFT, -HALF), size=8.5, color='#777', anchor='start', dy=46)
 
     # ---------------------------------------------------- Mated pair schematic
     mv = d.add_view(View(origin=(720, 252), scale=15, title='Mated pair (one piece rotated 180°)', axis_labels=('X', 'Y')))
@@ -126,6 +143,9 @@ def build() -> Drawing:
              (PROTRUSION, LOCK_T - LEAD_IN_H), (PROTRUSION - LEAD_IN, LOCK_T),
              (-LOCK_LEN, LOCK_T)])                         # raised lock pad + tab, tip lead-ins top and bottom
     sv.line((0, 0), (0, LOCK_T), stroke='#c0392b', stroke_width=0.8, dasharray='4,3')
+    sv.text('floor', (BODY_LEFT + 2.2, FLOOR_T / 2), size=8, anchor='middle', baseline='central')
+    sv.text('lock pad', (-LOCK_LEN / 2, LOCK_T - 0.6), size=8, anchor='middle', baseline='central')
+    sv.text('tab', (PROTRUSION / 2, LOCK_T - 0.6), size=8, anchor='middle', baseline='central')
     sv.text('raised pad rises into the channel; floor bottom stays flat', (BODY_LEFT, LOCK_T), size=8.5, color='#777', anchor='start', dy=-6)
     sv.text('wall/rim butt flush above (not shown)', (BODY_LEFT, 0), size=8.5, color='#777', anchor='start', dy=22)
     sv.text(f'tab faces pull in {LEAD_IN:g} over the top and bottom {LEAD_IN_H:g} — see lead-in section', (BODY_LEFT, 0), size=8.5, color='#777', anchor='start', dy=35)
@@ -148,6 +168,8 @@ def build() -> Drawing:
              (TIP_HALF, LOCK_T - LEAD_IN_H), (TIP_HALF - LEAD_IN, LOCK_T),
              (-(TIP_HALF - LEAD_IN), LOCK_T), (-TIP_HALF, LOCK_T - LEAD_IN_H), (-TIP_HALF, LEAD_IN_H)], fill='#c8d4e3')
     lv.text('B tab — drops in ▼', (0, LOCK_T / 2 + 0.45), size=9, anchor='middle', baseline='central')
+    lv.text('S', (-TIP_HALF - 0.18, LOCK_T / 2), size=6, color='#1f6feb', anchor='middle', baseline='central')
+    lv.text('T', (TIP_HALF + 0.18, LOCK_T / 2), size=6, color='#1f6feb', anchor='middle', baseline='central')
     lv.text(f'{2 * TIP_HALF:g} nominal (+{CLEARANCE:g} clearance) in the middle band', (0, LOCK_T / 2 - 0.45), size=8, color='#777', anchor='middle', baseline='central')
     lv.text('A', (-WALL_HALF + 0.55, LOCK_T / 2 + 0.45), size=9, anchor='middle', baseline='central')
     lv.text('A', (WALL_HALF - 0.55, LOCK_T / 2 + 0.45), size=9, anchor='middle', baseline='central')
@@ -158,6 +180,30 @@ def build() -> Drawing:
     lv.dim_v(u_at=WALL_HALF, v1=0, v2=LOCK_T, label=f'{LOCK_T:g} lock', side='right', offset_px=14)
     lv.dim_v(u_at=-WALL_HALF, v1=0, v2=LEAD_IN_H, label=f'{LEAD_IN_H:g} lead-in ({LEAD_IN_FRACTION:.0%})', side='left', offset_px=14)
     lv.dim_v(u_at=-WALL_HALF, v1=LOCK_T - LEAD_IN_H, v2=LOCK_T, label=f'{LEAD_IN_H:g}', side='left', offset_px=14)
+
+    # --------------- End wall edges (X-Y): cross-section features in plan view
+    # Same end as the top view, with the wall's cross-section features projected
+    # as edge lines: A/C/D (rim outer face), B (groove apex), G/H (cavity wall
+    # face), E/F (rim inner face) — letters from the cross-section draft.
+    ev = d.add_view(View(origin=(900, 1000), scale=30, title='End wall edges - top view', row=2, axis_labels=('X', 'Y')))
+    EV_LEFT = -6.0
+    # Walls only — each band is the wall + rim plan footprint (outer skin down to
+    # the rim inner face E/F); the floor and its dovetail are omitted, so the
+    # space between the bands is the open channel. Both walls butt at the joint.
+    for s in (1, -1):
+        ev.path([(EV_LEFT, s * Y_EF), (0, s * Y_EF), (0, s * HALF), (EV_LEFT, s * HALF)])
+        ev.line((EV_LEFT, s * Y_ACD), (0, s * Y_ACD), stroke='#1f2933', stroke_width=0.5)
+        ev.line((EV_LEFT, s * Y_B), (0, s * Y_B), stroke='#999', stroke_width=0.5, dasharray='3,3')
+        ev.line((EV_LEFT, s * INNER_HALF), (0, s * INNER_HALF), stroke='#999', stroke_width=0.5, dasharray='3,3')
+        for label, y in (('A/C/D', Y_ACD), ('G/H', INNER_HALF), ('B', Y_B), ('E/F', Y_EF)):
+            ev.text(label, (EV_LEFT, s * y), size=6, color='#1f6feb', anchor='end', dx=-4, baseline='central')
+    ev.line((0, -HALF), (0, HALF), stroke='#c0392b', stroke_width=0.8, dasharray='4,3')
+    for letter, pos in [('X', (0.35, HALF + 0.28)), ('J', (0.28, -HALF - 0.28))]:
+        ev.text(letter, pos, size=6, color='#1f6feb', anchor='middle', baseline='central')
+    ev.text('walls only (floor and dovetail omitted); red dashed = joint plane through the rotation centre',
+            (EV_LEFT, -HALF), size=8.5, color='#777', anchor='start', dy=20)
+    ev.text('cross-section features projected in plan: solid = visible from above, dashed = hidden under the rim top',
+            (EV_LEFT, -HALF), size=8.5, color='#777', anchor='start', dy=33)
 
     return d
 
