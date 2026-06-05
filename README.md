@@ -40,6 +40,7 @@ See `docs/code/reconstruct/` for the algorithm, findings, and the public Python 
 
 ### Other
 
+- **Cable Channel** - Snap-on cable channel with puzzle-piece connectors and corner pieces *(work in progress)*.
 - **Cable Holder** - Wall-mounted holder with split ball cable organizers ([Thingiverse](https://www.thingiverse.com/thing:7290467), [MakerWorld](https://makerworld.com/en/models/2367034)).
 - **Cable Storage** - Wall-mounted cable organizer with railings *(work in progress)*.
 - **Dispenser Bottle Mount** - Inverted-bottle refill mount with iris grip for simplehuman wall pump dispensers ([Thingiverse](https://www.thingiverse.com/thing:7356658), [MakerWorld](https://makerworld.com/en/models/2827942)).

@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1114" height="597" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="arrL" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 10 0 L 0 5 L 10 10 z" fill="#222"/></marker><marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#222"/></marker><marker id="axisArr" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#333"/></marker><marker id="axisArrX" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#d32f2f"/></marker><marker id="axisArrY" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#2e7d32"/></marker><marker id="axisArrZ" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 12 6 L 0 12 Z" fill="#1565c0"/></marker></defs>
+<rect width="1114" height="597" fill="white"/>
+<text x="557" y="32" text-anchor="middle" font-size="20" font-weight="bold">Cable Channel - Corners</text>
+<text x="557" y="52" text-anchor="middle" font-size="11" fill="#555">Dimensioned Draft (mm)</text>
+<g transform="translate(-59.60, -195.00)">
+<text x="260.94" y="312.00" text-anchor="start" font-size="14" font-weight="bold">Corner right - top view</text>
+<line x1="429.76" y1="312.0" x2="451.76" y2="312.0" stroke="#d32f2f" stroke-width="0.9" marker-end="url(#axisArrX)"/>
+<line x1="429.76" y1="312.0" x2="429.76" y2="290.0" stroke="#2e7d32" stroke-width="0.9" marker-end="url(#axisArrY)"/>
+<text x="432.76" y="290.0" dominant-baseline="hanging" font-size="7.5" fill="#2e7d32" text-anchor="start">Y</text>
+<text x="451.76" y="309.0" font-size="7.5" fill="#d32f2f" text-anchor="end">X</text>
+<path d="M 270.00 480.00 L 270.00 600.00 L 286.65 600.00 L 288.22 599.81 L 289.69 599.23 L 290.98 598.32 L 292.00 597.11 L 292.70 595.69 L 293.03 594.15 L 292.97 592.57 L 292.52 591.06 L 289.88 584.94 L 289.43 583.43 L 289.37 581.85 L 289.70 580.31 L 290.40 578.89 L 291.42 577.68 L 292.71 576.77 L 294.18 576.19 L 295.75 576.00 L 316.25 576.00 L 317.82 576.19 L 319.29 576.77 L 320.58 577.68 L 321.60 578.89 L 322.30 580.31 L 322.63 581.85 L 322.57 583.43 L 322.12 584.94 L 319.48 591.06 L 319.03 592.57 L 318.97 594.15 L 319.30 595.69 L 320.00 597.11 L 321.02 598.32 L 322.31 599.23 L 323.78 599.81 L 325.35 600.00 L 334.65 600.00 L 336.22 600.19 L 337.69 600.77 L 338.98 601.68 L 340.00 602.89 L 340.70 604.31 L 341.03 605.85 L 340.97 607.43 L 340.52 608.94 L 337.88 615.06 L 337.43 616.57 L 337.37 618.15 L 337.70 619.69 L 338.40 621.11 L 339.42 622.32 L 340.71 623.23 L 342.18 623.81 L 343.75 624.00 L 364.25 624.00 L 365.82 623.81 L 367.29 623.23 L 368.58 622.32 L 369.60 621.11 L 370.30 619.69 L 370.63 618.15 L 370.57 616.57 L 370.12 615.06 L 367.48 608.94 L 367.03 607.43 L 366.97 605.85 L 367.30 604.31 L 368.00 602.89 L 369.02 601.68 L 370.31 600.77 L 371.78 600.19 L 373.35 600.00 L 390.00 600.00 L 390.00 360.00 L 150.00 360.00 L 150.00 376.65 L 149.81 378.22 L 149.23 379.69 L 148.32 380.98 L 147.11 382.00 L 145.69 382.70 L 144.15 383.03 L 142.57 382.97 L 141.06 382.52 L 134.94 379.88 L 133.43 379.43 L 131.85 379.37 L 130.31 379.70 L 128.89 380.40 L 127.68 381.42 L 126.77 382.71 L 126.19 384.18 L 126.00 385.75 L 126.00 406.25 L 126.19 407.82 L 126.77 409.29 L 127.68 410.58 L 128.89 411.60 L 130.31 412.30 L 131.85 412.63 L 133.43 412.57 L 134.94 412.12 L 141.06 409.48 L 142.57 409.03 L 144.15 408.97 L 145.69 409.30 L 147.11 410.00 L 148.32 411.02 L 149.23 412.31 L 149.81 413.78 L 150.00 415.35 L 150.00 424.65 L 150.19 426.22 L 150.77 427.69 L 151.68 428.98 L 152.89 430.00 L 154.31 430.70 L 155.85 431.03 L 157.43 430.97 L 158.94 430.52 L 165.06 427.88 L 166.57 427.43 L 168.15 427.37 L 169.69 427.70 L 171.11 428.40 L 172.32 429.42 L 173.23 430.71 L 173.81 432.18 L 174.00 433.75 L 174.00 454.25 L 173.81 455.82 L 173.23 457.29 L 172.32 458.58 L 171.11 459.60 L 169.69 460.30 L 168.15 460.63 L 166.57 460.57 L 165.06 460.12 L 158.94 457.48 L 157.43 457.03 L 155.85 456.97 L 154.31 457.30 L 152.89 458.00 L 151.68 459.02 L 150.77 460.31 L 150.19 461.78 L 150.00 463.35 L 150.00 480.00 Z" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
+<line x1="270.00" y1="480.00" x2="390.00" y2="360.00" stroke="#c0392b" stroke-width="0.8" stroke-dasharray="4,3"/>
+<line x1="250.80" y1="480.00" x2="370.80" y2="360.00" stroke="#999" stroke-width="0.6" stroke-dasharray="3,3"/>
+<line x1="270.00" y1="499.20" x2="390.00" y2="379.20" stroke="#999" stroke-width="0.6" stroke-dasharray="3,3"/>
+<text x="346.00" y="414.40" text-anchor="start" font-size="8" fill="#c0392b">body seam (45°)</text>
+<text x="255.60" y="454.40" text-anchor="end" font-size="8" fill="#777">rim seams</text>
+<line x1="258.00" y1="452.80" x2="279.60" y2="443.20" stroke="#666" stroke-width="0.5"/>
+<line x1="258.00" y1="456.00" x2="287.60" y2="475.20" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="360.00" x2="150.00" y2="344.00" stroke="#666" stroke-width="0.5"/>
+<line x1="390.00" y1="360.00" x2="390.00" y2="344.00" stroke="#666" stroke-width="0.5"/>
+<line x1="150.00" y1="344.00" x2="390.00" y2="344.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="270.00" y="341.00" text-anchor="middle" font-size="11">30</text>
+<line x1="125.60" y1="480.00" x2="109.60" y2="480.00" stroke="#666" stroke-width="0.5"/>
+<line x1="125.60" y1="360.00" x2="109.60" y2="360.00" stroke="#666" stroke-width="0.5"/>
+<line x1="109.60" y1="480.00" x2="109.60" y2="360.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="106.60" y="424.00" text-anchor="end" font-size="11">15</text>
+<line x1="390.00" y1="720.00" x2="406.00" y2="720.00" stroke="#666" stroke-width="0.5"/>
+<line x1="390.00" y1="360.00" x2="406.00" y2="360.00" stroke="#666" stroke-width="0.5"/>
+<line x1="406.00" y1="720.00" x2="406.00" y2="360.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="409.00" y="544.00" text-anchor="start" font-size="11">45</text>
+<line x1="250.80" y1="480.00" x2="250.80" y2="494.00" stroke="#666" stroke-width="0.5"/>
+<line x1="270.00" y1="480.00" x2="270.00" y2="494.00" stroke="#666" stroke-width="0.5"/>
+<line x1="250.80" y1="494.00" x2="270.00" y2="494.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="260.40" y="506.00" text-anchor="middle" font-size="11">2.4</text>
+<text x="125.60" y="740.00" text-anchor="start" font-size="8.5" fill="#777">rim bands retreat 2.4 from the body seam on both legs (the lap) — the crossing cap walls pass through the cleared zone</text>
+<text x="125.60" y="753.00" text-anchor="start" font-size="8.5" fill="#777">puzzle connectors at the free ends — see the puzzle_connector draft</text>
+</g>
+<g transform="translate(28.90, -187.80)">
+<text x="705.60" y="304.80" text-anchor="start" font-size="14" font-weight="bold">Corner down - side view</text>
+<line x1="886.10" y1="304.8" x2="908.10" y2="304.8" stroke="#d32f2f" stroke-width="0.9" marker-end="url(#axisArrX)"/>
+<line x1="886.10" y1="304.8" x2="886.10" y2="282.8" stroke="#1565c0" stroke-width="0.9" marker-end="url(#axisArrZ)"/>
+<text x="889.10" y="282.8" dominant-baseline="hanging" font-size="7.5" fill="#1565c0" text-anchor="start">Z</text>
+<text x="908.10" y="301.8" font-size="7.5" fill="#d32f2f" text-anchor="end">X</text>
+<path d="M 696.80 480.00 L 696.80 558.80 L 699.20 561.20 L 713.60 561.20 L 716.00 558.80 L 716.00 536.80 L 800.00 536.80 L 800.00 415.20 L 761.60 376.80 L 640.00 376.80 L 640.00 460.80 L 618.00 460.80 L 615.60 465.60 L 615.60 475.20 L 618.00 480.00 Z" fill="#dde3ea" stroke="#1f2933" stroke-width="0.9"/>
+<line x1="696.80" y1="480.00" x2="780.80" y2="396.00" stroke="#c0392b" stroke-width="0.8" stroke-dasharray="4,3"/>
+<line x1="720.00" y1="396.00" x2="761.60" y2="396.00" stroke="#999" stroke-width="0.5" stroke-dasharray="3,3"/>
+<line x1="772.80" y1="512.00" x2="772.80" y2="423.20" stroke="#999" stroke-width="0.5" stroke-dasharray="3,3"/>
+<text x="732.00" y="452.80" text-anchor="end" font-size="8" fill="#c0392b">body seam (45°)</text>
+<line x1="761.60" y1="376.80" x2="761.60" y2="360.80" stroke="#666" stroke-width="0.5"/>
+<line x1="800.00" y1="376.80" x2="800.00" y2="360.80" stroke="#666" stroke-width="0.5"/>
+<line x1="761.60" y1="360.80" x2="800.00" y2="360.80" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="780.80" y="357.80" text-anchor="middle" font-size="11">4.8</text>
+<line x1="640.00" y1="376.80" x2="640.00" y2="336.80" stroke="#666" stroke-width="0.5"/>
+<line x1="800.00" y1="376.80" x2="800.00" y2="336.80" stroke="#666" stroke-width="0.5"/>
+<line x1="640.00" y1="336.80" x2="800.00" y2="336.80" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="720.00" y="333.80" text-anchor="middle" font-size="11">20</text>
+<line x1="615.60" y1="480.00" x2="599.60" y2="480.00" stroke="#666" stroke-width="0.5"/>
+<line x1="615.60" y1="376.80" x2="599.60" y2="376.80" stroke="#666" stroke-width="0.5"/>
+<line x1="599.60" y1="480.00" x2="599.60" y2="376.80" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="596.60" y="432.40" text-anchor="end" font-size="11">12.9</text>
+<line x1="800.00" y1="415.20" x2="816.00" y2="415.20" stroke="#666" stroke-width="0.5"/>
+<line x1="800.00" y1="376.80" x2="816.00" y2="376.80" stroke="#666" stroke-width="0.5"/>
+<line x1="816.00" y1="415.20" x2="816.00" y2="376.80" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="819.00" y="400.00" text-anchor="start" font-size="11">4.8</text>
+<line x1="800.00" y1="536.80" x2="840.00" y2="536.80" stroke="#666" stroke-width="0.5"/>
+<line x1="800.00" y1="376.80" x2="840.00" y2="376.80" stroke="#666" stroke-width="0.5"/>
+<line x1="840.00" y1="536.80" x2="840.00" y2="376.80" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="843.00" y="460.80" text-anchor="start" font-size="11">20</text>
+<line x1="696.80" y1="561.20" x2="696.80" y2="575.20" stroke="#666" stroke-width="0.5"/>
+<line x1="716.00" y1="561.20" x2="716.00" y2="575.20" stroke="#666" stroke-width="0.5"/>
+<line x1="696.80" y1="575.20" x2="716.00" y2="575.20" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="706.40" y="587.20" text-anchor="middle" font-size="11">2.4</text>
+<line x1="640.00" y1="480.00" x2="640.00" y2="494.00" stroke="#666" stroke-width="0.5"/>
+<line x1="696.80" y1="480.00" x2="696.80" y2="494.00" stroke="#666" stroke-width="0.5"/>
+<line x1="640.00" y1="494.00" x2="696.80" y2="494.00" stroke="#222" stroke-width="0.8" marker-start="url(#arrL)" marker-end="url(#arrR)"/>
+<text x="668.40" y="506.00" text-anchor="middle" font-size="11">7.1 (= 20 − 12.9)</text>
+<text x="615.60" y="605.20" text-anchor="start" font-size="8.5" fill="#777">after leg runs down, opening toward +X; the piece prints lying on its side</text>
+<text x="615.60" y="618.20" text-anchor="start" font-size="8.5" fill="#777">bodies meet at the plain seam; the outer corner is a single 4.8 × 4.8 chamfer (45°),</text>
+<text x="615.60" y="631.20" text-anchor="start" font-size="8.5" fill="#777">perpendicular to the body seam through its exit at the bodies’ top — the cap’s corner covers the wedge</text>
+</g>
+</svg>

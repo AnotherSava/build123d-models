@@ -130,7 +130,10 @@ class CableChannel:
     def create_straight(self, length: float, connector_start: bool = False, connector_end: bool = False) -> tuple[SmartSolid, SmartSolid]:
         channel = self.create_channel(length, connector_start, connector_end)
         cap = self.create_cap(length)
-        cap.align(channel).z(Alignment.RL, self.dim.wall_thickness)
+        # z only: cap and channel already share x/y natively, and the full align()
+        # chain would re-centre the cap onto the channel's bbox — which a connector
+        # tab extends asymmetrically, shifting the cap off the rim
+        cap.align_z(channel, Alignment.RL, self.dim.wall_thickness)
         return channel, cap
 
     def create_channel(self, length: float, connector_start: bool = False, connector_end: bool = False) -> SmartSolid:
@@ -250,9 +253,67 @@ class CableChannel:
             after_bottom = after.intersected(after_bevel.moved(z=-top_cut_height)).rotate_z(-90)
             after_top = after.intersected(after_bevel.moved(x=top_cut_length, z=after.z_size - top_cut_height)).rotate_z(-90)
             after_bevel = SmartSolid(after_bottom, after_top)
+        else:
+            before_bevel = before.intersected(before_bevel)
+            after_bevel = after.intersected(after_bevel).rotate_z(-90)
 
         after_bevel.align(before_bevel).x(Alignment.RL).y(Alignment.RL)
         return after_bevel.fuse(before_bevel)
+
+    def bend_down(self, before: SmartSolid, after: SmartSolid, chamfer: float = 0, seam_offset: float = None):
+        """Mitre `before`'s end against `after` turned to run downward — the same
+        construction as `bend_right`, with the 45° seam in the X-Z plane (about Y):
+        the after piece is rotated about Y, so its opening faces +X.
+
+        The seam plane is x - z = `seam_offset`, defaulting to the plane through
+        `before`'s outer corner (x_max, z_max). Unlike the right turn, the down
+        turn rotates the cap's radial axis (Z) into the alignment axis (X), so a
+        cap must be bent with its channel's seam — pass the channel's value —
+        or its legs end up radially displaced against the rim.
+
+        `chamfer` cuts the outer corner with a 45° plane perpendicular to the
+        seam, spanning `chamfer` along the rim top and down the outer face.
+        Unlike bend_right's lap, both legs' width directions coincide (Y) here,
+        so no cap wall crosses the other leg's rim — the rim bands can meet at
+        the plain seam, and the chamfer only trims the joined outer corner."""
+        k = before.x_max - before.z_max if seam_offset is None else seam_offset
+        margin = before.x_size + before.z_size
+        before_bevel = before.create_bound_box().cut(self._create_corner_prism(
+            [(k + before.z_min, before.z_min), (before.x_max + margin, before.z_min), (before.x_max + margin, before.z_max), (k + before.z_max, before.z_max)], before))
+        # The after cut stops where the seam exits the before piece (x_max): the
+        # before piece cannot reach past its own end, so above that level the
+        # after piece keeps the outer corner (matters when z_max > x_max - k,
+        # e.g. a cap riding wall_thickness above its channel's seam).
+        cut_top = min(after.z_max, before.x_max - k)
+        after_bevel = after.create_bound_box().cut(self._create_corner_prism(
+            [(after.x_min - 1, after.z_min), (after.x_min + before.z_max - after.z_min, after.z_min), (after.x_min + before.z_max - cut_top, cut_top), (after.x_min - 1, cut_top)], after))
+
+        before_bevel = before.intersected(before_bevel)
+        after_bevel = after.intersected(after_bevel).rotate_y(90)
+
+        # Place the down leg so the mirror seam maps levels 1:1 — the after
+        # piece's pre-rotation z levels land at x = z + k, its top at before's
+        # top. Anchored on the leg's far end and floor bottom, which always
+        # survive the plain miter.
+        after_bevel.move(x=after.z_min + k - after_bevel.x_min, z=before.z_max - (after.x_max - after.x_min) - after_bevel.z_min)
+        corner = after_bevel.fuse(before_bevel)
+
+        if chamfer:
+            # Wedge x + z >= x_max + z_max - chamfer: a triangle prism past the
+            # 45° chamfer line from (x_max - chamfer, z_max) to (x_max, z_max - chamfer)
+            c = before.x_max + before.z_max - chamfer
+            z_top, x_out = before.z_max + 1, before.x_max + 1
+            corner.cut(self._create_corner_prism([(c - z_top, z_top), (x_out, z_top), (x_out, c - x_out)], corner))
+        return corner
+
+    def _create_corner_prism(self, points: list[tuple[float, float]], reference: SmartSolid) -> SmartSolid:
+        """Prism over an X-Z polygon (the 45° corner cutter for bend_down),
+        spanning the reference solid's full Y extent."""
+        pencil = Pencil(Plane.XZ, start=points[0])
+        for prev, nxt in zip(points, points[1:]):
+            pencil.jump((nxt[0] - prev[0], nxt[1] - prev[1]))
+        prism = pencil.extrude(reference.y_size + 2)
+        return prism.move(y=reference.y_mid - prism.y_mid)
 
     def create_corner_right(self, length_before: float, length_after: float) -> tuple[SmartSolid, SmartSolid]:
         channel_before, cap_before = self.create_straight(length_before, connector_start=True)
@@ -261,8 +322,27 @@ class CableChannel:
         label_suffix = f"_right_{length_before}mm_{length_after}mm"
         channel_right = SmartSolid(self.bend_right(channel_before, channel_after, self.dim.rim_inner_face_length, self.dim.rim_inner_face_length), label=f"channel_{label_suffix}")
         cap_right = SmartSolid(self.bend_right(cap_before, cap_after), label=f"cap_{label_suffix}")
+        cap_right.bed_orientation = (180, 0, 0)   # like the straight cap: ceiling flat on the bed
 
         return channel_right, cap_right
+
+    def create_corner_down(self, length_before: float, length_after: float) -> tuple[SmartSolid, SmartSolid]:
+        channel_before, cap_before = self.create_straight(length_before, connector_start=True)
+        channel_after, cap_after = self.create_straight(length_after, connector_end=True)
+
+        label_suffix = f"_down_{length_before}mm_{length_after}mm"
+        # The cap shares the channel's seam plane — see the bend_down docstring on
+        # why the down turn couples cap and channel.
+        seam_offset = channel_before.x_max - channel_before.z_max
+        channel_down = SmartSolid(self.bend_down(channel_before, channel_after, chamfer=2 * self.dim.rim_inner_face_length), label=f"channel_{label_suffix}")
+        cap_down = SmartSolid(self.bend_down(cap_before, cap_after, seam_offset=seam_offset), label=f"cap_{label_suffix}")
+
+        # Rest on the 45° outer-corner chamfer face — it becomes the lowest plane
+        # (everything past x + z = const is cut away), with both legs rising at 45°
+        channel_down.bed_orientation = (0, 135, 0)
+        cap_down.bed_orientation = (0, 135, 0)
+
+        return channel_down, cap_down
 
     def create_cap(self, length: float) -> SmartSolid:
         # Built natively in scene orientation: ceiling on top, walls and V-ridges facing down
@@ -282,7 +362,9 @@ class CableChannel:
         body.fillet()
         body.up(dim.rim_height - dim.rim_groove_upper_dz)                                       # C → D
         body.fillet()                                                                           # applies on the mirror builder's closing segment
-        cap = body.extrude_mirrored_y(length, label=f"cap_{length}mm")
+        # The trace winds clockwise, so the mirrored face's normal points -X and the
+        # extrusion runs backwards; shift to the scene pose spanning x 0..length.
+        cap = body.extrude_mirrored_y(length, label=f"cap_{length}mm").move(x=length)
         cap.bed_orientation = (180, 0, 0)
 
         return cap
@@ -301,6 +383,18 @@ if __name__ == "__main__":
     cap_model = cable_channel.create_cap(2 * dimensions.length)
     cap_model.align(SmartSolid(channel_model, mate_model)).z(Alignment.RL, dimensions.wall_thickness)
 
+    # Corner pieces with their caps (right in plan, down in elevation), placed
+    # beside the straights so the scene bounding boxes stay apart.
+    channel_right, cap_right = cable_channel.create_corner_right(30, 45)
+    channel_right.move(y=60)
+    cap_right.move(y=60)
+
+    channel_down, cap_down = cable_channel.create_corner_down(20, 20)
+    channel_down.move(y=90)
+    cap_down.move(y=120)
+
     # Assembled visualization scene first (3MF), then slicer-ready STLs.
-    export_3mf("models/other/cable_channel/export.3mf", channel_model, mate_model, cap_model)
-    export_stl("models/other/cable_channel/stl", channel_model, cap_model, clean=True)
+    export_3mf("models/other/cable_channel/export.3mf", channel_down)
+    # export_3mf("models/other/cable_channel/export.3mf", channel_model, mate_model, channel_right, cap_right, channel_down, cap_down)
+    # export_3mf("models/other/cable_channel/export.3mf", channel_model, mate_model, cap_model)
+    export_stl("models/other/cable_channel/stl", channel_model, cap_model, channel_right, cap_right, channel_down, cap_down, clean=True)
