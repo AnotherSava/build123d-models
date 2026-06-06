@@ -28,12 +28,13 @@ from puzzle_connector import FILLET, end_seam
 
 # --- Design parameters (mm), mirrored from the model -------------------------
 WIDTH = 15.0
+WALL = 1.2              # wall_thickness: the cap rides this far above the channel rim
 TOTAL = 12.9            # total_height
 RIM_H = 3.4             # rim_height
 LAP = 2.4               # rim_inner_face_length: the rim seam retreat on each leg
-L_BEFORE = 30.0         # right-corner demo leg lengths (create_corner_right(30, 45))
+L_BEFORE = 30.0         # right-corner demo leg lengths (create_channel(outer=30).right(outer=45))
 L_AFTER = 45.0
-DOWN_BEFORE = 20.0      # down-corner demo leg lengths (create_corner_down(20, 20))
+DOWN_BEFORE = 20.0      # down-corner demo channel leg lengths (create_channel(inner=7.1).down())
 DOWN_AFTER = 20.0
 K = DOWN_BEFORE - TOTAL  # 7.1  inner corner of the down turn (seam plane x - z = K)
 TAB = 3.05              # connector tab reach (lock_protrusion + lock_clearance)
@@ -63,15 +64,20 @@ def build() -> Drawing:
     tv.line((13.5, 3.4), (16.2, 4.6), stroke='#666', stroke_width=0.5)
     tv.line((13.5, 3.0), (17.2, 0.6), stroke='#666', stroke_width=0.5)
 
-    tv.dim_h(v_at=WIDTH, u1=0, u2=L_BEFORE, label=f'{L_BEFORE:g}', side='above', offset_px=16)
+    tv.dim_h(v_at=WIDTH, u1=0, u2=L_BEFORE, label=f'{L_BEFORE:g} (outer)', side='above', offset_px=16)
     tv.dim_v(u_at=-TAB, v1=0, v2=WIDTH, label=f'{WIDTH:g}', side='left', offset_px=16)
-    tv.dim_v(u_at=L_BEFORE, v1=WIDTH - L_AFTER, v2=WIDTH, label=f'{L_AFTER:g}', side='right', offset_px=16)
+    tv.dim_v(u_at=L_BEFORE, v1=WIDTH - L_AFTER, v2=WIDTH, label=f'{L_AFTER:g} (outer)', side='right', offset_px=16)
     tv.dim_h(v_at=0, u1=WIDTH - LAP, u2=WIDTH, label=f'{LAP:g}', side='below', offset_px=14)
+    # Each leg can equivalently be sized by its inner edge: inner = outer - WIDTH
+    tv.dim_h(v_at=0, u1=0, u2=L_BEFORE - WIDTH, label=f'{L_BEFORE - WIDTH:g} (inner)', side='below', offset_px=30)
+    tv.dim_v(u_at=L_BEFORE - WIDTH, v1=WIDTH - L_AFTER, v2=0, label=f'{L_AFTER - WIDTH:g} (inner)', side='left', offset_px=16)
 
     tv.text(f'rim bands retreat {LAP:g} from the body seam on both legs (the lap) — the crossing cap walls pass through the cleared zone',
             (-TAB, WIDTH - L_AFTER), size=8.5, color='#777', anchor='start', dy=20)
     tv.text('puzzle connectors at the free ends — see the puzzle_connector draft',
             (-TAB, WIDTH - L_AFTER), size=8.5, color='#777', anchor='start', dy=33)
+    tv.text('the cap is flush in plan, so the outer lengths hold with the cap on as well',
+            (-TAB, WIDTH - L_AFTER), size=8.5, color='#777', anchor='start', dy=46)
 
     # ------------------------------------------ Corner down, side view (X-Z)
     sv = d.add_view(View(origin=(640, 480), scale=8, title='Corner down - side view', axis_labels=('X', 'Z')))
@@ -99,13 +105,23 @@ def build() -> Drawing:
     sv.line((K + TOTAL - RIM_H, -4), (K + TOTAL - RIM_H, TOTAL - RIM_H - LAP), stroke='#999', stroke_width=0.5, dasharray='3,3')
     sv.text('body seam (45°)', (11.5, 3.4), size=8, color='#c0392b', anchor='end')
 
+    # Cap outer profile (dashed): the cap rides WALL above the rim, so the API's
+    # outer lengths measure to the cap's faces, not the channel's. Its down leg
+    # runs to the channel's far joint plane, covering the leg fully.
+    sv.line((0, TOTAL + WALL), (DOWN_BEFORE + WALL, TOTAL + WALL), stroke='#888', stroke_width=0.6, dasharray='4,2')
+    sv.line((DOWN_BEFORE + WALL, TOTAL + WALL), (DOWN_BEFORE + WALL, down_bottom), stroke='#888', stroke_width=0.6, dasharray='4,2')
+    sv.text('cap outer faces', (DOWN_BEFORE + WALL + 0.8, TOTAL - 2), size=8, color='#777', anchor='start')
+
     sv.dim_h(v_at=TOTAL, u1=DOWN_BEFORE - 2 * LAP, u2=DOWN_BEFORE, label=f'{2 * LAP:g}', side='above', offset_px=16)
-    sv.dim_h(v_at=TOTAL, u1=0, u2=DOWN_BEFORE, label=f'{DOWN_BEFORE:g}', side='above', offset_px=40)
+    sv.dim_h(v_at=TOTAL + WALL, u1=0, u2=DOWN_BEFORE + WALL, label=f'{DOWN_BEFORE + WALL:g} (outer, with cap)', side='above', offset_px=40)
     sv.dim_v(u_at=-TAB, v1=0, v2=TOTAL, label=f'{TOTAL:g}', side='left', offset_px=16)
     sv.dim_v(u_at=DOWN_BEFORE, v1=TOTAL - 2 * LAP, v2=TOTAL, label=f'{2 * LAP:g}', side='right', offset_px=16)
-    sv.dim_v(u_at=DOWN_BEFORE, v1=down_bottom, v2=TOTAL, label=f'{DOWN_AFTER:g}', side='right', offset_px=40)
+    sv.dim_v(u_at=DOWN_BEFORE + WALL, v1=down_bottom, v2=TOTAL + WALL, label=f'{DOWN_AFTER + WALL:g} (outer, with cap)', side='right', offset_px=40)
     sv.dim_h(v_at=down_bottom - TAB, u1=K, u2=K + LOCK_T, label=f'{LOCK_T:g}', side='below', offset_px=14)
-    sv.dim_h(v_at=0, u1=0, u2=K, label=f'{K:g} (= {DOWN_BEFORE:g} − {TOTAL:g})', side='below', offset_px=14)
+    # Each leg can equivalently be sized by its inner edge; the outer edge is the
+    # assembled duct's (cap on), so inner = outer - (TOTAL + WALL)
+    sv.dim_h(v_at=0, u1=0, u2=K, label=f'{K:g} (inner = outer − {TOTAL + WALL:g})', side='below', offset_px=14)
+    sv.dim_v(u_at=K, v1=down_bottom, v2=0, label=f'{DOWN_AFTER - TOTAL:g} (inner)', side='left', offset_px=16)
 
     sv.text('after leg runs down, opening toward +X; the piece prints lying on its side',
             (-TAB, down_bottom - TAB), size=8.5, color='#777', anchor='start', dy=44)
