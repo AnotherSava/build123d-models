@@ -1,22 +1,20 @@
 import warnings
-from copy import copy
 from collections.abc import Iterable
-from math import radians
-from typing import TYPE_CHECKING
+from copy import copy
+from math import radians, tan
+from typing import TYPE_CHECKING, Any
 
-from build123d import Vector, fillet, Axis, Location, ShapePredicate, Plane, GeomType, BoundBox, Compound, VectorLike, scale, mirror, Edge, ShapeList, Shape, Color, Solid, SkipClean, Face
+from build123d import Axis, BoundBox, Color, Compound, Edge, GeomType, Location, Plane, Shape, ShapeList, ShapePredicate, SkipClean, Vector, VectorLike, fillet, mirror, scale
 from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Trsf
 
 from sava.common.common import flatten
 from sava.common.logging import logger
 from sava.csg.build123d.common.alignmentbuilder import AlignmentBuilder
+from sava.csg.build123d.common.edgefilters import AxisFilter, EdgeFilter, FilletDebug, PositionalFilter, SurfaceFilter, filter_edges_by_axis, filter_edges_by_position, filter_edges_by_surface
+from sava.csg.build123d.common.geometry import Alignment, Direction, axis_to_string, calculate_orientation, calculate_position, multi_rotate_vector, orient_axis, rotate_axis, rotate_orientation, rotate_vector, to_vector
 
 
-from sava.csg.build123d.common.edgefilters import PositionalFilter, SurfaceFilter, AxisFilter, EdgeFilter, FilletDebug, AXIS_X, AXIS_Y, AXIS_Z, filter_edges_by_position, filter_edges_by_axis, filter_edges_by_surface
-from sava.csg.build123d.common.geometry import Alignment, Direction, calculate_position, rotate_orientation, to_vector, axis_to_string, multi_rotate_vector, orient_axis, calculate_orientation, rotate_vector, rotate_axis
-
-
-def get_solid(element, apply_bed_orientation: bool = False):
+def get_solid(element: Any, apply_bed_orientation: bool = False) -> Any:
     if isinstance(element, AlignmentBuilder):
         element = element.done()
     if isinstance(element, SmartSolid):
@@ -28,7 +26,7 @@ def get_solid(element, apply_bed_orientation: bool = False):
 if TYPE_CHECKING:
     from sava.csg.build123d.common.smartbox import SmartBox
 
-def fuse_two(shape1: Shape | None, shape2: Shape | None):
+def fuse_two(shape1: Shape | None, shape2: Shape | None) -> Shape | None:
     if shape1 is None:
         return shape2
     if shape2 is None:
@@ -42,10 +40,10 @@ def fuse_two(shape1: Shape | None, shape2: Shape | None):
             result = shape2 + shape1 if isinstance(shape1, ShapeList) else shape1 + shape2
     return result
 
-def wrap(element):
+def wrap(element: Any) -> Any:
     return Compound(element) if isinstance(element, ShapeList) else element
 
-def fuse(*args):
+def fuse(*args: Any) -> Shape | None:
     result = None
 
     for arg in flatten(args):
@@ -83,7 +81,7 @@ class SmartSolid:
     at origin.
     """
 
-    def __init__(self, *args, label: str = None):
+    def __init__(self, *args: Any, label: str = None) -> None:
         """Create a SmartSolid from one or more solid objects.
 
         Args:
@@ -160,7 +158,7 @@ class SmartSolid:
         solid = self.wrap_solid()
         if plane == Plane.XY:
             return solid.bounding_box()
-        
+
         # Transform solid to the plane's coordinate system
         transformed = solid.moved(plane.location.inverse())
         return transformed.bounding_box()
@@ -175,7 +173,7 @@ class SmartSolid:
         return self.bound_box.min.X
 
     @property
-    def x_mid(self):
+    def x_mid(self) -> float:
         return self.bound_box.center().X
 
     @property
@@ -191,11 +189,11 @@ class SmartSolid:
         return self.bound_box.min.Y
 
     @property
-    def y_mid(self):
+    def y_mid(self) -> float:
         return self.bound_box.center().Y
 
     @property
-    def y_max(self):
+    def y_max(self) -> float:
         return self.bound_box.max.Y
 
     @property
@@ -207,18 +205,18 @@ class SmartSolid:
         return self.bound_box.min.Z
 
     @property
-    def z_mid(self):
+    def z_mid(self) -> float:
         return self.bound_box.center().Z
 
     @property
-    def z_max(self):
+    def z_max(self) -> float:
         return self.bound_box.max.Z
 
     @property
     def z_size(self) -> float:
         return self.bound_box.size.Z
 
-    def assert_valid(self):
+    def assert_valid(self) -> None:
         assert self.solid is None or self.wrap_solid().is_valid, "Shape is invalid"
 
     def create_positional_filter_axis(self, axis: Axis, inclusive: tuple[bool, bool] = None) -> 'PositionalFilter':
@@ -234,7 +232,7 @@ class SmartSolid:
             result.append(self.create_positional_filter_axis(Axis.Z, inclusive))
         return result
 
-    def color(self, color: str):
+    def color(self, color: str) -> 'SmartSolid':
         self.solid.color = Color(color) if color else None
         self.solid.label = color
         return self
@@ -396,38 +394,38 @@ class SmartSolid:
     def rotated_multi(self, rotations: VectorLike, plane: Plane = Plane.XY, label: str = None) -> 'SmartSolid':
         return self.copy(label).rotate_multi(rotations, plane)
 
-    def get_size(self, axis: Axis):
+    def get_size(self, axis: Axis) -> float:
         bounds = self.get_bounds_along_axis(axis)
         return bounds[1] - bounds[0]
 
     def get_bounds_along_axis(self, axis: Axis) -> tuple[float, float]:
         """Get min and max coordinates of the solid along the specified axis direction.
-        
+
         This method creates a plane where the axis direction becomes the Z-axis,
         then uses get_bound_box() to get bounds in that coordinate system.
-        
+
         Args:
             axis: Axis defining the direction to measure bounds along
-            
+
         Returns:
             Tuple of (min_coord, max_coord) along the axis direction
         """
         if self.solid is None:
             raise RuntimeError("Cannot get bounds of None solid")
-            
+
         # Create a plane where the axis direction becomes the Z-axis
         axis_direction = axis.direction.normalized()
-        
+
         # Create plane with axis origin and axis direction as Z-axis
         plane = Plane(axis.position, z_dir=axis_direction)
-        
+
         # Get bounding box in the plane's coordinate system
         bound_box = self.get_bound_box(plane)
-        
+
         # Return Z bounds since the axis direction is aligned with Z in this plane
         return bound_box.min.Z, bound_box.max.Z
 
-    def cut(self, *args) -> 'SmartSolid':
+    def cut(self, *args: Any) -> 'SmartSolid':
         original = self.solid
         cutter = fuse(args)
         self.solid = wrap(original) - cutter
@@ -442,10 +440,10 @@ class SmartSolid:
         self.assert_valid()
         return self
 
-    def cutted(self, *args, label: str = None) -> 'SmartSolid':
+    def cutted(self, *args: Any, label: str = None) -> 'SmartSolid':
         return self.copy(label).cut(*args)
 
-    def fuse(self, *args) -> 'SmartSolid':
+    def fuse(self, *args: Any) -> 'SmartSolid':
         self.solid = fuse(self.solid, *args)
         self.origin = Vector(0, 0, 0)
         self._orientation = Vector(0, 0, 0)
@@ -453,10 +451,10 @@ class SmartSolid:
         self.assert_valid()
         return self
 
-    def fused(self, *args, label: str = None) -> 'SmartSolid':
+    def fused(self, *args: Any, label: str = None) -> 'SmartSolid':
         return self.copy(label).fuse(*args)
 
-    def is_simple(self):
+    def is_simple(self) -> bool:
         return not isinstance(self.solid, ShapeList)
 
     def colocate(self, solid: 'SmartSolid') -> 'SmartSolid':
@@ -563,7 +561,7 @@ class SmartSolid:
             from sava.csg.build123d.common.exporter import show_red  # inline to avoid circular import
             show_red(*edges)
         elif debug == FilletDebug.PARTIAL:
-            from sava.csg.build123d.common.exporter import show_red, show_green  # inline to avoid circular import
+            from sava.csg.build123d.common.exporter import show_green, show_red  # inline to avoid circular import
             succeeded = 0
             failed = 0
             for edge in edges:
@@ -625,7 +623,7 @@ class SmartSolid:
         self.solid = fillet(edges, radius)
         return self
 
-    def intersect(self, *args) -> 'SmartSolid':
+    def intersect(self, *args: Any) -> 'SmartSolid':
         original = self.wrap_solid()
         other = fuse(args)
         self.solid = original & other
@@ -640,35 +638,72 @@ class SmartSolid:
         self.assert_valid()
         return self
 
-    def intersected(self, *args, label: str = None) -> 'SmartSolid':
+    def intersected(self, *args: Any, label: str = None) -> 'SmartSolid':
         return self.copy(label).intersect(*args)
 
-    def bevel(self, side: Direction, direction: Direction, angle: float) -> 'SmartSolid':
-        """Shave this solid's `side` face with an angled cut that tilts along `direction`
-        (90° = vertical wall = no cut), by intersecting with the solid's bounding box tapered
-        on that face. `side` must be perpendicular to `direction`. Mutates in place.
+    def _proj_range(self, direction: Vector) -> tuple[float, float]:
+        """Min/max extent of the bounding box projected onto `direction` (a unit axis vector)."""
+        projections = direction.dot(self.bound_box.min), direction.dot(self.bound_box.max)
+        return min(projections), max(projections)
 
-        `side` is a world direction: `with_top(direction)` re-frames the bounding box so the
-        taper tilts along `direction`, but its local axes depend on `direction`, so we map the
-        world `side` to the matching local wall via the box's actual frame.
-        """
+    def _create_cut_prism(self, dir_u: Direction, dir_v: Direction, points: list[tuple[float, float]]) -> 'SmartSolid':
+        """Prism over a polygon drawn in the plane spanned by `dir_u` and `dir_v` (point
+        coordinates are world projections onto each direction), spanning this solid's full
+        extent along the third axis plus a margin. Cutter for bevel / bevel_edge."""
+        from sava.csg.build123d.common.pencil import Pencil  # inline to avoid circular import
+        normal = dir_u.value.cross(dir_v.value)
+        pencil = Pencil(Plane(origin=(0, 0, 0), x_dir=dir_u.value, z_dir=normal), start=points[0])
+        for prev, nxt in zip(points, points[1:], strict=False):   # pairwise: second is shorter by design
+            pencil.jump((nxt[0] - prev[0], nxt[1] - prev[1]))
+        # Extrusion follows the face normal, whose sign depends on the polygon winding —
+        # recentre the prism on the solid instead of assuming a direction
+        t_min, t_max = self._proj_range(normal)
+        prism = pencil.extrude(t_max - t_min + 2)
+        p_min, p_max = prism._proj_range(normal)
+        return prism.move_vector(normal * ((t_min + t_max - p_min - p_max) / 2))
+
+    def bevel(self, side: Direction, direction: Direction, angle: float, offset: float = 0) -> 'SmartSolid':
+        """Shave this solid's `side` face with a planar cut that tilts along `direction`
+        (90° = vertical wall = no cut). The cut plane hinges on the side face's edge opposite
+        to `direction`, slopes inward by `angle` from the direction axis, and is slid by
+        `offset` along the side's outward normal (negative cuts deeper, positive leaves
+        material). `side` must be perpendicular to `direction`. Mutates in place."""
         assert abs(side.value.dot(direction.value)) < 0.5, "side must be perpendicular to direction"
+        assert 0 < angle <= 90, f"Angle must be in (0, 90]: {angle}"
 
-        box = self.create_bound_box().with_top(direction)
-        frame = Plane(box.solid.location)   # the reframed box's local axes, in world coordinates
+        u_min, u_max = self._proj_range(direction.value)
+        _, v_max = self._proj_range(side.value)
+        slope = 1 / tan(radians(angle))   # inset per unit of travel along `direction`
+        # Half-space past the slanted plane, clipped to a quad just past the bound box
+        u_low, u_high = u_min - 1, u_max + 1
+        hinge_low, hinge_high = v_max + offset + slope, v_max + offset - (u_high - u_min) * slope
+        v_top = max(hinge_low, v_max) + 1
+        return self.cut(self._create_cut_prism(direction, side, [(u_low, hinge_low), (u_high, hinge_high), (u_high, v_top), (u_low, v_top)]))
 
-        if side.value.dot(frame.x_dir) > 0.5:
-            return self.intersect(box.taper(angle_east=angle))
-        if side.value.dot(frame.x_dir) < -0.5:
-            return self.intersect(box.taper(angle_west=angle))
-        if side.value.dot(frame.y_dir) > 0.5:
-            return self.intersect(box.taper(angle_north=angle))
-        return self.intersect(box.taper(angle_south=angle))
+    def beveled(self, side: Direction, direction: Direction, angle: float, offset: float = 0, label: str = None) -> 'SmartSolid':
+        return self.copy(label).bevel(side, direction, angle, offset)
 
-    def beveled(self, side: Direction, direction: Direction, angle: float, label: str = None) -> 'SmartSolid':
-        return self.copy(label).bevel(side, direction, angle)
+    def bevel_edge(self, side_a: Direction, side_b: Direction, size_a: float, size_b: float = None) -> 'SmartSolid':
+        """Cut a flat wedge off the bound-box edge where the `side_a` and `side_b` faces meet.
+        Each size is the leg the cut spans on that face, measured from the edge (`size_a` lies
+        on the `side_a` face), so equal legs give a 45° break. `size_b` defaults to `size_a`.
+        Mutates in place."""
+        assert abs(side_a.value.dot(side_b.value)) < 0.5, "sides must be perpendicular"
+        size_b = size_a if size_b is None else size_b
+        assert size_a > 0 and size_b > 0, f"Sizes must be positive: {size_a}, {size_b}"
 
-    def add_notch(self, direction: Direction, depth: float, length: float):
+        _, a_max = self._proj_range(side_a.value)
+        _, b_max = self._proj_range(side_b.value)
+        # Cut plane through (a_max, b_max - size_a) on the side_a face and (a_max - size_b, b_max)
+        # on the side_b face: the triangle past size_a * a + size_b * b = c, clipped just outside both faces
+        c = size_a * a_max + size_b * b_max - size_a * size_b
+        a_out, b_out = a_max + 1, b_max + 1
+        return self.cut(self._create_cut_prism(side_a, side_b, [((c - size_b * b_out) / size_a, b_out), (a_out, b_out), (a_out, (c - size_a * a_out) / size_b)]))
+
+    def beveled_edge(self, side_a: Direction, side_b: Direction, size_a: float, size_b: float = None, label: str = None) -> 'SmartSolid':
+        return self.copy(label).bevel_edge(side_a, side_b, size_a, size_b)
+
+    def add_notch(self, direction: Direction, depth: float, length: float) -> None:
         raise NotImplementedError("Remove dependency on pencil")
         # notch_height = depth / length * self.get_side_length(direction)
         #
@@ -682,7 +717,7 @@ class SmartSolid:
         #
         # self.fuse(notch.intersect(extended_shape))
 
-    def copy(self, label: str = None):
+    def copy(self, label: str = None) -> 'SmartSolid':
         result = SmartSolid()
         self._copy_base_fields(result, label)
         return result
@@ -695,12 +730,12 @@ class SmartSolid:
         target._orientation = Vector(self._orientation)
         target.bed_orientation = self.bed_orientation
 
-    def _scale_solid(self, factor_x: float, factor_y: float, factor_z: float):
+    def _scale_solid(self, factor_x: float, factor_y: float, factor_z: float) -> Shape:
         factor_y = factor_y or factor_x
         factor_z = factor_z or factor_y or factor_x
         return scale(self.solid, (factor_x, factor_y, factor_z))
 
-    def pad(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None):
+    def pad(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None) -> 'SmartSolid':
         pad_y = pad_x if pad_y is None else pad_y
         pad_z = pad_x if pad_z is None else pad_z
 
@@ -710,17 +745,17 @@ class SmartSolid:
         self._reanchor()
         return self
 
-    def padded(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None, label: str = None):
+    def padded(self, pad_x: float = 0, pad_y: float = None, pad_z: float = None, label: str = None) -> 'SmartSolid':
         return self.copy(label).pad(pad_x, pad_y, pad_z)
 
-    def scale(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None):
+    def scale(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None) -> 'SmartSolid':
         self.solid = self._scale_solid(factor_x, factor_y, factor_z)
         self.origin = Vector(0, 0, 0)
         self._orientation = Vector(0, 0, 0)
         self._reanchor()
         return self
 
-    def scaled(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None, label: str = None):
+    def scaled(self, factor_x: float = 1, factor_y: float = None, factor_z: float = None, label: str = None) -> 'SmartSolid':
         return self.copy(label).scale(factor_x, factor_y, factor_z)
 
     def mirror(self, about: Plane = Plane.XZ) -> 'SmartSolid':
@@ -738,7 +773,7 @@ class SmartSolid:
         outer.align_zxy(self, Alignment.RL)
         return outer.cut(self)
 
-    def wrap_solid(self):
+    def wrap_solid(self) -> Shape:
         return wrap(self.solid)
 
     def clone(self, count: int, shift: VectorLike, label: str = None) -> 'SmartSolid':

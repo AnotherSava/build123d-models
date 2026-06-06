@@ -70,43 +70,6 @@ Positive delta makes the top larger, negative makes it smaller. The top dimensio
 box = SmartBox.with_delta(100, 80, 50, -2)
 ```
 
-## `taper`
-
-Return a new box with this box's base footprint, height, and placement, re-tapered per the given parameters. Takes the same tapering inputs as the constructor — `tapered_length`, `tapered_width`, `angle_east/west/north/south` — but `length`, `width`, `height`, and the box's orientation are reused from this box, so they're not repeated.
-
-```python
-box.taper(tapered_length=None, tapered_width=None, angle_east=None, angle_west=None, angle_north=None, angle_south=None, label=None)
-```
-
-```python
-# Take an existing (possibly moved/rotated) box and lean its west wall to 45 degrees
-panel = SmartBox(100, 80, 50).move(20, 30, 0)
-wedge = panel.taper(angle_east=90, angle_west=45)   # sits exactly where panel sits
-```
-
-The taper is applied to the base (length × width) footprint: walls left unspecified are vertical, so any existing taper is replaced rather than compounded. The result is placed where this box is — its tracked move/rotate transforms are re-applied.
-
-## `with_top`
-
-Return a new box occupying the **exact same space**, but re-framed so the face on the given `Direction` is its top (local +Z / height axis). The geometry doesn't move — that face still points the same way in the world; only which face the box *calls* "top" changes, so `height` becomes the extent along that direction and the construction plane is rotated to match. Effectively a face rename.
-
-```python
-box.with_top(direction, label=None)
-```
-
-Non-tapered, axis-aligned boxes only — a tapered box's taper is tied to its Z axis and can't be re-pointed at another face.
-
-```python
-from sava.csg.build123d.common.geometry import Direction
-
-box = SmartBox(10, 20, 30)            # L×W×H, occupies some region
-renamed = box.with_top(Direction.N)  # same region, but +Y face is now the top → height 20
-```
-
-`Direction.U` is a no-op (top stays the top); `Direction.D` re-frames the bottom face as top.
-
-Note: operations keyed to world +Z (`create_offset(up=...)`, `add_cutout`, `z_max`, `bed_orientation`) act on the world top, not the renamed one — the renamed frame is what plane-aware methods and the box's own `length`/`width`/`height` reflect.
-
 ## Tapering queries
 
 For tapered boxes, query dimensions at any height:

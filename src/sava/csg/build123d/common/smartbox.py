@@ -35,7 +35,7 @@ class SmartBox(SmartSolid):
         mixed = SmartBox(100, 80, 50, tapered_width=60, angle_east=70)
     """
 
-    def __init__(self, length: float, width: float, height: float, tapered_length: float = None, tapered_width: float = None, angle_east: float = None, angle_west: float = None, angle_north: float = None, angle_south: float = None, plane: Plane = Plane.XY, label: str = None):
+    def __init__(self, length: float, width: float, height: float, tapered_length: float = None, tapered_width: float = None, angle_east: float = None, angle_west: float = None, angle_north: float = None, angle_south: float = None, plane: Plane = Plane.XY, label: str = None) -> None:
         """
         Creates a box, optionally tapered per side.
 
@@ -122,68 +122,6 @@ class SmartBox(SmartSolid):
         The base is centred at the origin, so an asymmetric top shifts the centre in X/Y
         as the height fraction increases."""
         return Vector(self._top.center_x * height_fraction, self._top.center_y * height_fraction, self.height * height_fraction)
-
-    def taper(self, tapered_length: float = None, tapered_width: float = None, angle_east: float = None, angle_west: float = None, angle_north: float = None, angle_south: float = None, label: str = None) -> 'SmartBox':
-        """Return a new SmartBox with this box's base footprint, height, and placement, but
-        re-tapered per the given parameters.
-
-        Takes the same tapering inputs as the constructor; ``length``, ``width``, ``height``
-        and the box's orientation come from this box, so they're not repeated. The taper is
-        applied to the base (length × width) footprint — walls left unspecified are vertical,
-        so any existing taper is replaced rather than compounded. The result is placed where
-        this box is (its tracked move/rotate transforms are re-applied).
-
-        Args:
-            tapered_length: Symmetric top length (applies to both the east and west walls)
-            tapered_width: Symmetric top width (applies to both the north and south walls)
-            angle_east: Wall angle of the east (+X) wall from horizontal (90° = vertical, <90° = inward)
-            angle_west: Wall angle of the west (-X) wall
-            angle_north: Wall angle of the north (+Y) wall
-            angle_south: Wall angle of the south (-Y) wall
-            label: Optional label for the new box (defaults to this box's label)
-        """
-        top = resolve_top_rect(self.length, self.width, self.height, tapered_length, tapered_width, angle_east, angle_west, angle_north, angle_south)
-        result = SmartBox._from_top(self.length, self.width, self.height, top, label=label or self.label)
-        # Copy this box's full placement transform. colocate() clones solid.location directly,
-        # so it also carries plane-constructed orientation that self._orientation doesn't track
-        # (e.g. a box from with_top()); both share the same base-centred canonical geometry.
-        result.colocate(self)
-        result.bed_orientation = self.bed_orientation
-        return result
-
-    def with_top(self, direction: Direction, label: str = None) -> 'SmartBox':
-        """Return a new SmartBox occupying the exact same space as this one, but re-framed so
-        the face on the given Direction is its top (local +Z / height axis). The geometry does
-        not move — that face still points the same way in the world; we only rename which face
-        the box calls "top", reassigning length/width/height and the construction plane to match.
-
-        Non-tapered, axis-aligned boxes only — a tapered box's taper is tied to its Z axis and
-        can't be re-pointed at another face.
-
-        Note: operations keyed to world +Z (`create_offset(up/down)`, `add_cutout`, `z_max`,
-        `bed_orientation`) still act on the world top — the renamed top is what plane-aware
-        methods and the box's own length/width/height see.
-
-        Example: a 10×20×30 (L×W×H) box `.with_top(Direction.N)` stays exactly in place but now
-        reports height 20 (the Y extent) with its +Y face as the top.
-        """
-        assert not self.tapered, "with_top only works on non-tapered boxes"
-        bb = self.bound_box
-        aabb_volume = bb.size.X * bb.size.Y * bb.size.Z
-        assert abs(aabb_volume - self.solid.volume) < 1e-6 * aabb_volume, "with_top requires an axis-aligned box"
-
-        # local +Z (the new top/height axis) points along `direction`; the box keeps its world
-        # occupancy, so build it in a plane rotated to that frame, anchored at the opposite face.
-        n = direction.value
-        x_dir = Vector(1, 0, 0) if abs(n.X) < 0.5 else Vector(0, 1, 0)   # a world axis in the new base plane
-        y_dir = n.cross(x_dir)
-        project = lambda axis: abs(bb.size.X * axis.X) + abs(bb.size.Y * axis.Y) + abs(bb.size.Z * axis.Z)
-        height = project(n)
-        # Build in a plane anchored at the world origin (keeps solid.location honest), then
-        # translate the base-face centre to where it belongs — the opposite face from `direction`.
-        result = SmartBox(project(x_dir), project(y_dir), height, plane=Plane(origin=(0, 0, 0), x_dir=x_dir, z_dir=n), label=label or self.label)
-        result.move_vector(Vector(bb.center()) - n * (height / 2))
-        return result
 
     def create_offset(self, offset: float, north: float = None, south: float = None, east: float = None, west: float = None, up: float = None, down: float = None, label: str = None) -> 'SmartBox':
         """

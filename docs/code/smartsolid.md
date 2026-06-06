@@ -267,22 +267,46 @@ connector.cut_z(cut=connector.z_size - target.z_size)
 
 ## Bevel
 
-Shave one side face at an angle, by intersecting the solid with its bounding box tapered on that face. `side` is the world face to cut; `direction` is the (perpendicular) world axis the cut tilts along; `angle` is the wall angle from horizontal (90° = vertical = no cut, smaller = steeper bevel). Works on any solid, not just boxes.
+Shave one side face with a planar cut. `side` is the world face to cut; `direction` is the (perpendicular) world axis the cut tilts along; `angle` is the wall angle from horizontal (90° = vertical = no cut, smaller = steeper bevel). The cut plane hinges on the side face's edge opposite to `direction`; `offset` slides it along the side's outward normal — negative cuts deeper, positive leaves material near the hinge. Works on any solid, not just boxes, and at any angle/height combination (a 45° bevel of a tall thin solid is fine).
 
 ```python
-solid.bevel(side, direction, angle)              # mutates in place, returns self
-result = solid.beveled(side, direction, angle)   # non-mutating copy
+solid.bevel(side, direction, angle)                        # mutates in place, returns self
+result = solid.beveled(side, direction, angle)             # non-mutating copy
+solid.bevel(side, direction, angle, offset=-2)             # same plane, slid 2 deeper
 ```
 
 ```python
-# Chamfer the east face so it leans inward toward the top
+# Slant the east face so it leans inward toward the top
 solid.bevel(Direction.E, Direction.U, 45)
 
 # Miter the end of a channel for a right-angle corner join
 channel.bevel(Direction.E, Direction.S, 45)
+
+# Retreat a lap-joint seam: same plane, slid deeper into the part (see cablechannel.bend_right)
+channel.bevel(Direction.E, Direction.S, 45, offset=-lap)
 ```
 
 `side` must be perpendicular to `direction` (you can't tilt a face along its own normal).
+
+## Bevel edge
+
+Cut a flat wedge off the bound-box edge where two faces meet — a chamfer-like corner break sized by its legs instead of an angle. Each size is the leg the cut spans on that face, measured from the edge (`size_a` lies on the `side_a` face); equal legs give a 45° break. `size_b` defaults to `size_a`.
+
+```python
+solid.bevel_edge(side_a, side_b, size)                     # mutates in place, returns self
+result = solid.beveled_edge(side_a, side_b, size)          # non-mutating copy
+solid.bevel_edge(side_a, side_b, size_a, size_b)           # asymmetric legs
+```
+
+```python
+# Break the top-east corner 45°, 2 mm along each face
+solid.bevel_edge(Direction.E, Direction.U, 2)
+
+# Steeper break: 2 mm down the east face, 5 mm across the top
+solid.bevel_edge(Direction.E, Direction.U, 2, 5)
+```
+
+The sides must be perpendicular (parallel faces share no edge). Unlike build123d's topological `chamfer`, this cuts relative to the bounding box, so it works on any solid regardless of its actual edges.
 
 ## Filleting
 
