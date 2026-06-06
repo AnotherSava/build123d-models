@@ -16,7 +16,8 @@
 - [reference_alignment_builder_defaults.md](reference_alignment_builder_defaults.md) — `align()` chain silently re-centres any axis not explicitly set via `.x()/.y()/.z()`
 - [reference_smartsolid_invariant.md](reference_smartsolid_invariant.md) — Two SmartSolid invariants (origin/location, _orientation/solid.orientation); _reanchor + _apply_tracked_transforms restore after ops
 - [reference_arrange_scene_pattern.md](reference_arrange_scene_pattern.md) — Multi-part export: assembled 3MF scene first, then `clear()`, then STL (applies `bed_orientation`); tray.py/splitter.py are the correct examples
-- [reference_slice_verification.md](reference_slice_verification.md) — Verify geometry via thin-Box slices (area/bbox/probe strips); baseline contradictory probes against HEAD via git stash
+- [reference_slice_verification.md](reference_slice_verification.md) — Verify geometry: thin-Box slices, refactor equivalence (volume/bbox, relative tolerances), intersect-volume fit checks
+- [reference_extrude_winding_direction.md](reference_extrude_winding_direction.md) — extrude(face, h) follows the face normal, which flips with polygon winding; position cutter prisms by recentering, never by assuming +normal
 
 # Feedback
 - [feedback_visualization_orientation.md](feedback_visualization_orientation.md) — Build models in scene/visualization orientation, NOT print; use `SmartSolid.bed_orientation` for print pose (applied only at STL export). Reverses the old "build in print orientation" guidance
