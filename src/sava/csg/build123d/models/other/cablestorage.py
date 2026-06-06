@@ -1,23 +1,22 @@
-import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from math import radians, tan
-from collections.abc import Callable
 
 from build123d import Axis, Plane
 
 from sava.common.advanced_math import COS_45
-from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl, show_red, show_blue
+from sava.csg.build123d.common.edgefilters import AXIS_Z, AxisFilter, PositionalFilter
+from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
-from sava.csg.build123d.common.edgefilters import PositionalFilter, AXIS_Z, AxisFilter
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 class ConnectorRecesses:
-    def __init__(self, dim: 'CableStorageDimensions'):
+    def __init__(self, dim: 'CableStorageDimensions') -> None:
         self.dim = dim
 
     def generic(self, length: float, width: float, height: float) -> tuple[SmartSolid, SmartBox]:
@@ -85,7 +84,7 @@ class CableStorageDimensions:
     railing_gap: float = 0.05
 
 class CableStorage:
-    def __init__(self, dim: CableStorageDimensions):
+    def __init__(self, dim: CableStorageDimensions) -> None:
         self.dim = dim
 
     def create_top_surface(self, length: float) -> SmartSolid:

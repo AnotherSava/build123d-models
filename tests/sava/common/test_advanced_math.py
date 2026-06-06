@@ -51,7 +51,7 @@ class TestAdvancedMod(unittest.TestCase):
         # Angle normalization
         (326.60151153201275, 360, -180, 180, -33.39848846798725),
     ])
-    def test_advanced_mod(self, x, div, min_value, max_value, expected):
+    def test_advanced_mod(self, x, div, min_value, max_value, expected) -> None:
         """Test advanced_mod with various inputs"""
         result = advanced_mod(x, div, min_value=min_value, max_value=max_value)
         if isinstance(expected, float):
@@ -66,7 +66,7 @@ class TestAdvancedMod(unittest.TestCase):
         (4, 5, 0, 3),  # range [0,3), div=5, x=4 -> mod=4, no value in range has mod 4
         (5, 10, 10, 12),  # range [10,12), div=10, x=5 -> mod=5, no value in range has mod 5
     ])
-    def test_advanced_mod_impossible(self, x, div, min_value, max_value):
+    def test_advanced_mod_impossible(self, x, div, min_value, max_value) -> None:
         """Test advanced_mod with impossible constraints"""
         with self.assertRaises(ValueError):
             advanced_mod(x, div, min_value=min_value, max_value=max_value)

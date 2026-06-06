@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from build123d import Plane, Shape
+from build123d import Plane
 
 from sava.csg.build123d.common.geometry import Alignment
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 class AlignmentBuilder:
     """Fluent builder for chaining alignment operations on a SmartSolid."""
 
-    def __init__(self, target: 'SmartSolid', reference: 'SmartSolid | None', plane: Plane = Plane.XY):
+    def __init__(self, target: 'SmartSolid', reference: 'SmartSolid | None', plane: Plane = Plane.XY) -> None:
         self.target = target
         self.reference = reference
         self.plane = plane

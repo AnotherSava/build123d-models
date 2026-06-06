@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from math import radians, degrees, sin, cos, tan, atan
+from math import atan, cos, degrees, radians, sin, tan
 from typing import TYPE_CHECKING
 
-from build123d import Vector, ThreePointArc, Line, Face, extrude, Wire, Plane, Location, mirror, Axis, revolve, VectorLike, Edge
+from build123d import Axis, Edge, Face, Line, Location, Plane, ThreePointArc, Vector, VectorLike, Wire, extrude, mirror
 
 from sava.common.advanced_math import advanced_mod
-from sava.csg.build123d.common.geometry import shift_vector, get_angle, to_vector, validate_points_unique, snap_to, get_angle_between
+from sava.csg.build123d.common.geometry import get_angle, get_angle_between, shift_vector, snap_to, to_vector, validate_points_unique
 
 
 def _param_at_arc_length(edge: Edge, target_length: float, from_end: bool = False) -> float:
@@ -26,8 +26,8 @@ def _param_at_arc_length(edge: Edge, target_length: float, from_end: bool = Fals
 
 # TYPE_CHECKING import for type hints only; runtime import is lazy to avoid circular dependency
 if TYPE_CHECKING:
-    from sava.csg.build123d.common.smartsolid import SmartSolid
     from sava.csg.build123d.common.smartrevolve import SmartRevolve
+    from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 def _reconstruct_edge(edge: Edge) -> Edge:
@@ -58,7 +58,7 @@ def _reconstruct_edge(edge: Edge) -> Edge:
 
 
 class Pencil:
-    def __init__(self, plane: Plane = Plane.XY, start: VectorLike = (0, 0)):
+    def __init__(self, plane: Plane = Plane.XY, start: VectorLike = (0, 0)) -> None:
         self.curves = []
         self._fillet_pending: bool = False
         self._last_fillet_radius: float | None = None
@@ -161,7 +161,7 @@ class Pencil:
         curves.append(curve)
         return curves
 
-    def double_arc(self, destination: VectorLike, shift_coefficient: float = 0.5, angle: float = None):
+    def double_arc(self, destination: VectorLike, shift_coefficient: float = 0.5, angle: float = None) -> 'Pencil':
         """Draw two symmetric arcs to reach the destination.
 
         Creates a smooth S-curve by drawing two arcs with opposite curvatures. The first arc
@@ -264,7 +264,7 @@ class Pencil:
         intermediate_abs = [self.location + to_vector(pt) for pt in intermediate_points or []]
         return self.spline_abs(self.location + to_vector(destination), destination_tangent, intermediate_abs, start_tangent)
 
-    def arc_with_radius(self, radius: float, centre_angle: float, arc_degrees: float):
+    def arc_with_radius(self, radius: float, centre_angle: float, arc_degrees: float) -> 'Pencil':
         centre = shift_vector(self.location, radius, centre_angle)
         degrees_destination_from_centre = ((arc_degrees + centre_angle + 180) % 360)
         degrees_middle_from_centre = ((arc_degrees / 2 + centre_angle + 180) % 360)
@@ -272,77 +272,77 @@ class Pencil:
         middle = shift_vector(centre, radius, degrees_middle_from_centre)
         return self.arc_abs(middle, destination)
 
-    def arc_abs(self, midpoint_abs: VectorLike, destination_abs: VectorLike):
+    def arc_abs(self, midpoint_abs: VectorLike, destination_abs: VectorLike) -> 'Pencil':
         midpoint_abs = self.process_vector_input(midpoint_abs)
         destination_abs = self.process_vector_input(destination_abs)
         self._add_curve(ThreePointArc(self.location, midpoint_abs, destination_abs))
         self.location = destination_abs
         return self
 
-    def arc(self, midpoint_vector: VectorLike, destination_vector: VectorLike):
+    def arc(self, midpoint_vector: VectorLike, destination_vector: VectorLike) -> 'Pencil':
         return self.arc_abs(self.location + to_vector(midpoint_vector), self.location + to_vector(destination_vector))
 
-    def arc_with_vector_to_intersection(self, vector_to_tangents_intersection: Vector, angle: float):
+    def arc_with_vector_to_intersection(self, vector_to_tangents_intersection: Vector, angle: float) -> 'Pencil':
         direction_to_centre = get_angle(vector_to_tangents_intersection) + 90 * (-1 if angle % 360 < 180 else 1)
         radius = vector_to_tangents_intersection.length * tan(radians(angle / 2))
         return self.arc_with_radius(radius, direction_to_centre, angle - 180)
 
     # create arc with specific destination and angle measure
-    def arc_with_destination_abs(self, destination_abs: Vector, angle: float):
+    def arc_with_destination_abs(self, destination_abs: Vector, angle: float) -> 'Pencil':
         # Calculate chord (straight line distance between start and end)
         destination_abs = self.process_vector_input(destination_abs)
         chord = destination_abs - self.location
         chord_length = chord.length
-        
+
         chord_midpoint_abs = (self.location + destination_abs) / 2
-        
+
         # Calculate radius using chord length and arc angle
         # For an arc with angle θ, radius = chord_length / (2 * sin(θ/2))
         half_angle_rad = radians(abs(angle) / 2)
         if half_angle_rad == 0:
             return self.jump_to(destination_abs)  # Straight line for 0° angle
-            
+
         radius = chord_length / (2 * sin(half_angle_rad))
-        
+
         # Distance from chord midpoint to arc center
         center_distance = radius * cos(half_angle_rad)
-        
+
         # Direction perpendicular to chord (for center calculation)
         # Positive angle goes counter-clockwise (left side of chord)
         perp_direction = Vector(-chord.Y, chord.X).normalized()
         if angle < 0:
             perp_direction = -perp_direction  # Clockwise for negative angles
-            
+
         center_abs = chord_midpoint_abs + perp_direction * center_distance
-        
+
         # Calculate midpoint of arc for Part.Arc
         # The arc midpoint is on the arc, perpendicular to the chord at center
         arc_midpoint = self.process_vector_input(center_abs - perp_direction * radius)
-        
+
         return self.arc_abs(arc_midpoint, destination_abs)
 
     # create arc with specific destination and angle measure
-    def arc_with_destination(self, destination: VectorLike, angle: float):
+    def arc_with_destination(self, destination: VectorLike, angle: float) -> 'Pencil':
         destination = to_vector(destination)
         return self.arc_with_destination_abs(destination + self.location, angle)
 
-    def jump_to(self, destination_abs: VectorLike):
+    def jump_to(self, destination_abs: VectorLike) -> 'Pencil':
         destination_abs = self.process_vector_input(destination_abs)
         self._add_curve(Line(self.location, destination_abs))
         self.location = destination_abs
         return self
 
-    def jump(self, destination: VectorLike):
+    def jump(self, destination: VectorLike) -> 'Pencil':
         return self.jump_to(to_vector(destination) + self.location)
 
-    def draw(self, length: float, angle: float):
+    def draw(self, length: float, angle: float) -> 'Pencil':
         abs_destination = shift_vector(self.location, length, angle)
         return self.jump_to(abs_destination)
 
-    def y_to(self, y_pos: float):
+    def y_to(self, y_pos: float) -> 'Pencil':
         return self.jump_to((self.location.X, y_pos))
 
-    def up_to(self, y_pos: float, angle: float = None):
+    def up_to(self, y_pos: float, angle: float = None) -> 'Pencil':
         assert y_pos > self.location.Y
         if angle is None:
             return self.y_to(y_pos)
@@ -350,11 +350,11 @@ class Pencil:
         assert cos_a > 0, f"up_to with angle {angle}° requires cos(angle) > 0 (+Y component)"
         return self.draw((y_pos - self.location.Y) / cos_a, angle)
 
-    def up(self, length: float = None):
+    def up(self, length: float = None) -> 'Pencil':
         assert length is None or length > 0
         return self.y_to(0 if length is None else self.location.Y + length)
 
-    def down_to(self, y_pos: float, angle: float = None):
+    def down_to(self, y_pos: float, angle: float = None) -> 'Pencil':
         assert y_pos < self.location.Y
         if angle is None:
             return self.y_to(y_pos)
@@ -362,14 +362,14 @@ class Pencil:
         assert cos_a < 0, f"down_to with angle {angle}° requires cos(angle) < 0 (-Y component)"
         return self.draw((y_pos - self.location.Y) / cos_a, angle)
 
-    def down(self, length: float = None):
+    def down(self, length: float = None) -> 'Pencil':
         assert length is None or length > 0
         return self.y_to(0 if length is None else self.location.Y - length)
 
-    def x_to(self, x_pos: float):
+    def x_to(self, x_pos: float) -> 'Pencil':
         return self.jump_to((x_pos, self.location.Y))
 
-    def right_to(self, x_pos: float, angle: float = None):
+    def right_to(self, x_pos: float, angle: float = None) -> 'Pencil':
         assert x_pos > self.location.X
         if angle is None:
             return self.x_to(x_pos)
@@ -377,10 +377,10 @@ class Pencil:
         assert sin_a < 0, f"right_to with angle {angle}° requires sin(angle) < 0 (+X component)"
         return self.draw((self.location.X - x_pos) / sin_a, angle)
 
-    def right(self, length: float = None):
+    def right(self, length: float = None) -> 'Pencil':
         return self.x_to(0 if length is None else self.location.X + length)
 
-    def left_to(self, x_pos: float, angle: float = None):
+    def left_to(self, x_pos: float, angle: float = None) -> 'Pencil':
         assert x_pos < self.location.X
         if angle is None:
             return self.x_to(x_pos)
@@ -388,7 +388,7 @@ class Pencil:
         assert sin_a > 0, f"left_to with angle {angle}° requires sin(angle) > 0 (-X component)"
         return self.draw((self.location.X - x_pos) / sin_a, angle)
 
-    def left(self, length: float = None):
+    def left(self, length: float = None) -> 'Pencil':
         return self.x_to(0 if length is None else self.location.X - length)
 
     def extrude(self, height: float, label: str = None) -> SmartSolid:

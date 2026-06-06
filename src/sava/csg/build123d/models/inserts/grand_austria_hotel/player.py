@@ -24,7 +24,7 @@ class PlayerComponentsDimensions:
 
 
 class PlayerComponents(SmartBox):
-    def __init__(self, dim: PlayerComponentsDimensions):
+    def __init__(self, dim: PlayerComponentsDimensions) -> None:
         super().__init__(dim.length, dim.width, dim.height)
         self.dim = dim
 

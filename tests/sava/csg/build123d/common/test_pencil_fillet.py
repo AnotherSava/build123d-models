@@ -9,7 +9,7 @@ from sava.csg.build123d.common.pencil import Pencil
 class TestPencilFillet(unittest.TestCase):
     """Test the fillet functionality of the Pencil class."""
 
-    def test_fillet_basic(self):
+    def test_fillet_basic(self) -> None:
         """Test basic fillet on a simple L-shape."""
         pencil = Pencil()
         wire = pencil.right(10).fillet(2).up(10).create_wire()
@@ -21,14 +21,14 @@ class TestPencilFillet(unittest.TestCase):
         wire_no_fillet = Pencil().right(10).up(10).create_wire()
         self.assertGreater(len(wire.edges()), len(wire_no_fillet.edges()))
 
-    def test_fillet_error_at_start(self):
+    def test_fillet_error_at_start(self) -> None:
         """Test that fillet raises error when called before any curves."""
         pencil = Pencil()
         with self.assertRaises(ValueError) as context:
             pencil.fillet(1)
         self.assertIn("no previous curve", str(context.exception))
 
-    def test_fillet_error_no_radius_without_previous(self):
+    def test_fillet_error_no_radius_without_previous(self) -> None:
         """Test that fillet() without radius raises error when no previous radius exists."""
         pencil = Pencil()
         pencil.right(10)
@@ -36,7 +36,7 @@ class TestPencilFillet(unittest.TestCase):
             pencil.fillet()
         self.assertIn("No fillet radius specified", str(context.exception))
 
-    def test_fillet_reuse_last_radius(self):
+    def test_fillet_reuse_last_radius(self) -> None:
         """Test that fillet() without radius reuses the last radius."""
         pencil = Pencil()
         wire = pencil.right(10).fillet(2).up(10).fillet().left(10).create_wire()
@@ -48,7 +48,7 @@ class TestPencilFillet(unittest.TestCase):
         wire_explicit = Pencil().right(10).fillet(2).up(10).fillet(2).left(10).create_wire()
         self.assertEqual(len(wire.edges()), len(wire_explicit.edges()))
 
-    def test_fillet_reuse_overwrites_with_new_radius(self):
+    def test_fillet_reuse_overwrites_with_new_radius(self) -> None:
         """Test that specifying a new radius updates the last radius for future reuse."""
         pencil = Pencil()
         # First fillet with radius 2, second with radius 3, third reuses 3
@@ -60,7 +60,7 @@ class TestPencilFillet(unittest.TestCase):
         wire_explicit = Pencil().right(10).fillet(2).up(10).fillet(3).left(10).fillet(3).down(10).create_wire()
         self.assertEqual(len(wire.edges()), len(wire_explicit.edges()))
 
-    def test_fillet_multiple_corners(self):
+    def test_fillet_multiple_corners(self) -> None:
         """Test filleting multiple corners with different radii."""
         pencil = Pencil()
         wire = pencil.right(10).fillet(1).up(10).fillet(2).left(10).create_wire()
@@ -68,7 +68,7 @@ class TestPencilFillet(unittest.TestCase):
         # Should create a valid wire
         self.assertTrue(wire.is_valid)
 
-    def test_fillet_same_radius_multiple_corners(self):
+    def test_fillet_same_radius_multiple_corners(self) -> None:
         """Test filleting multiple corners with same radius."""
         pencil = Pencil()
         wire = pencil.right(10).fillet(1).up(10).fillet(1).left(10).create_wire()
@@ -76,7 +76,7 @@ class TestPencilFillet(unittest.TestCase):
         # Should create a valid wire
         self.assertTrue(wire.is_valid)
 
-    def test_fillet_position(self):
+    def test_fillet_position(self) -> None:
         """Test that fillet is applied at the correct position."""
         pencil = Pencil()
         # Fillet at (10, 0)
@@ -93,27 +93,27 @@ class TestPencilFillet(unittest.TestCase):
                 f"Vertex at {pos} should not exist after fillet"
             )
 
-    def test_fillet_creates_face(self):
+    def test_fillet_creates_face(self) -> None:
         """Test that filleted wire can create a valid face."""
         pencil = Pencil()
         face = pencil.right(10).fillet(2).up(10).create_face()
 
         self.assertTrue(face.is_valid)
 
-    def test_fillet_extrude(self):
+    def test_fillet_extrude(self) -> None:
         """Test that filleted pencil can be extruded."""
         pencil = Pencil()
         solid = pencil.right(10).fillet(2).up(10).extrude(5)
 
         self.assertTrue(solid.solid.is_valid)
 
-    def test_fillet_method_chaining(self):
+    def test_fillet_method_chaining(self) -> None:
         """Test that fillet returns self for method chaining."""
         pencil = Pencil()
         result = pencil.right(10).fillet(2)
         self.assertIs(result, pencil)
 
-    def test_fillet_120_degree_angle(self):
+    def test_fillet_120_degree_angle(self) -> None:
         """Test fillet at a 120° corner (60° left turn)."""
         pencil = Pencil()
         # First edge horizontal, second edge at 120° = 60° left turn
@@ -122,7 +122,7 @@ class TestPencilFillet(unittest.TestCase):
         # Should have 3 edges: trimmed first, arc, trimmed second
         self.assertEqual(len(wire.edges()), 3)
 
-    def test_fillet_240_degree_angle(self):
+    def test_fillet_240_degree_angle(self) -> None:
         """Test fillet at a 240° corner (60° right turn, or 120° exterior angle)."""
         pencil = Pencil()
         # First edge horizontal, second edge at -60° = 60° right turn
@@ -131,21 +131,21 @@ class TestPencilFillet(unittest.TestCase):
         # Should have 3 edges: trimmed first, arc, trimmed second
         self.assertEqual(len(wire.edges()), 3)
 
-    def test_fillet_30_degree_angle(self):
+    def test_fillet_30_degree_angle(self) -> None:
         """Test fillet at a sharp 30° corner (150° left turn)."""
         pencil = Pencil()
         # First edge horizontal, second edge at 30° from horizontal
         wire = pencil.draw(10, 0).fillet(1).draw(10, 30).create_wire(enclose=False)
         self.assertTrue(wire.is_valid)
 
-    def test_fillet_150_degree_angle(self):
+    def test_fillet_150_degree_angle(self) -> None:
         """Test fillet at an obtuse 150° corner (30° left turn)."""
         pencil = Pencil()
         # First edge horizontal, second edge at 150° from horizontal
         wire = pencil.draw(10, 0).fillet(1).draw(10, 150).create_wire(enclose=False)
         self.assertTrue(wire.is_valid)
 
-    def test_fillet_diagonal_jump_then_up(self):
+    def test_fillet_diagonal_jump_then_up(self) -> None:
         """Test fillet after a diagonal jump followed by vertical line (like railing example)."""
         pencil = Pencil(Plane.YZ)
         pencil.right(5)
@@ -157,7 +157,7 @@ class TestPencilFillet(unittest.TestCase):
         # Should have 4 edges: horizontal, diagonal, arc, vertical
         self.assertEqual(len(wire.edges()), 4)
 
-    def test_fillet_up_then_diagonal_jump(self):
+    def test_fillet_up_then_diagonal_jump(self) -> None:
         """Test fillet after vertical line followed by diagonal jump."""
         pencil = Pencil(Plane.YZ)
         pencil.up(5)
@@ -166,7 +166,7 @@ class TestPencilFillet(unittest.TestCase):
         wire = pencil.create_wire(enclose=False)
         self.assertTrue(wire.is_valid)
 
-    def test_fillet_arc_direction_left_turn(self):
+    def test_fillet_arc_direction_left_turn(self) -> None:
         """Test that fillet arc curves in the correct direction for a left turn.
 
         For right(10).fillet(2).up(10), the path turns left at (10, 0).
@@ -197,7 +197,7 @@ class TestPencilFillet(unittest.TestCase):
         self.assertLess(arc_mid.X, 10, f"Arc midpoint X={arc_mid.X} should be < 10 (inside the turn)")
         self.assertGreater(arc_mid.Y, 0, f"Arc midpoint Y={arc_mid.Y} should be > 0 (inside the turn)")
 
-    def test_fillet_arc_direction_right_turn(self):
+    def test_fillet_arc_direction_right_turn(self) -> None:
         """Test that fillet arc curves in the correct direction for a right turn.
 
         For right(10).fillet(2).down(10), the path turns right at (10, 0).
@@ -222,14 +222,14 @@ class TestPencilFillet(unittest.TestCase):
         self.assertLess(arc_mid.X, 10, f"Arc midpoint X={arc_mid.X} should be < 10")
         self.assertLess(arc_mid.Y, 0, f"Arc midpoint Y={arc_mid.Y} should be < 0")
 
-    def test_fillet_railing_pattern(self):
+    def test_fillet_railing_pattern(self) -> None:
         """Test fillet pattern similar to railing example: diagonal jump then vertical."""
         pencil = Pencil(Plane.YZ)
         # Similar to: right(gap).jump((offset, offset)).fillet(r).up_to(height)
         pencil.right(5)
-        corner_before_fillet = Vector(pencil.location.X, pencil.location.Y, 0)
+        Vector(pencil.location.X, pencil.location.Y, 0)
         pencil.jump((2, 2))  # diagonal at 45°
-        fillet_corner = Vector(pencil.location.X, pencil.location.Y, 0)
+        Vector(pencil.location.X, pencil.location.Y, 0)
         pencil.fillet(0.5)
         pencil.up(5)
 
@@ -246,9 +246,9 @@ class TestPencilFillet(unittest.TestCase):
         self.assertIsNotNone(arc_edge, "Should have an arc edge")
 
         # Get arc endpoints and midpoint
-        arc_start = arc_edge.position_at(0)
-        arc_mid = arc_edge.position_at(0.5)
-        arc_end = arc_edge.position_at(1)
+        arc_edge.position_at(0)
+        arc_edge.position_at(0.5)
+        arc_edge.position_at(1)
 
         # The diagonal goes from (5,0) to (7,2) - direction (1,1)/sqrt(2)
         # The vertical goes from (7,2+trim) upward - direction (0,1)
@@ -259,7 +259,7 @@ class TestPencilFillet(unittest.TestCase):
 class TestPencilFilletAutoClose(unittest.TestCase):
     """Test that a trailing fillet applies to the implicit auto-close segment."""
 
-    def test_trailing_fillet_applies_to_auto_close(self):
+    def test_trailing_fillet_applies_to_auto_close(self) -> None:
         """A fillet pending at create_wire time rounds the corner with the closing line."""
         pencil = Pencil()
         wire = pencil.right(10).up(10).fillet(2).create_wire()
@@ -272,7 +272,7 @@ class TestPencilFilletAutoClose(unittest.TestCase):
         for v in wire.vertices():
             self.assertFalse(abs(v.X - 10) < 0.01 and abs(v.Y - 10) < 0.01, f"Vertex at ({v.X}, {v.Y}) should not exist after fillet")
 
-    def test_trailing_fillet_create_wire_idempotent(self):
+    def test_trailing_fillet_create_wire_idempotent(self) -> None:
         """Repeated create_wire calls produce the same result (pending fillet not consumed)."""
         pencil = Pencil()
         pencil.right(10).up(10).fillet(2)
@@ -281,13 +281,13 @@ class TestPencilFilletAutoClose(unittest.TestCase):
         second = pencil.create_wire()
         self.assertEqual(len(first.edges()), len(second.edges()))
 
-    def test_trailing_fillet_extrude(self):
+    def test_trailing_fillet_extrude(self) -> None:
         """A trailing fillet survives through create_face/extrude."""
         pencil = Pencil()
         solid = pencil.right(10).up(10).fillet(2).extrude(5)
         self.assertTrue(solid.solid.is_valid)
 
-    def test_trailing_fillet_no_enclose_unaffected(self):
+    def test_trailing_fillet_no_enclose_unaffected(self) -> None:
         """Without enclosing there is no closure corner, so no arc is added."""
         pencil = Pencil()
         wire = pencil.right(10).up(10).fillet(2).create_wire(enclose=False)
@@ -297,7 +297,7 @@ class TestPencilFilletAutoClose(unittest.TestCase):
 class TestPencilFilletMirrored(unittest.TestCase):
     """Test fillet functionality with mirrored wires."""
 
-    def test_fillet_mirrored_x_point_on_axis_skipped(self):
+    def test_fillet_mirrored_x_point_on_axis_skipped(self) -> None:
         """Test that fillet point on the mirror axis is skipped (no crash)."""
         pencil = Pencil()
         # Fillet at (10, 0) is on Y=0 mirror axis - should be skipped
@@ -306,7 +306,7 @@ class TestPencilFilletMirrored(unittest.TestCase):
         # Should create a valid wire (no fillet applied, but no crash)
         self.assertTrue(wire.is_valid)
 
-    def test_fillet_mirrored_x_point_off_axis(self):
+    def test_fillet_mirrored_x_point_off_axis(self) -> None:
         """Test fillet on a wire mirrored around X axis with fillet point NOT on mirror axis."""
         pencil = Pencil()
         # Fillet at (10, 5) - actual corner between vertical and horizontal edges
@@ -319,7 +319,7 @@ class TestPencilFilletMirrored(unittest.TestCase):
         wire_no_fillet = Pencil().up(5).right(10).up(5).create_mirrored_wire_x()
         self.assertGreater(len(wire.edges()), len(wire_no_fillet.edges()))
 
-    def test_fillet_mirrored_y_point_on_axis_skipped(self):
+    def test_fillet_mirrored_y_point_on_axis_skipped(self) -> None:
         """Test that fillet point on the Y-mirror axis is skipped (no crash)."""
         pencil = Pencil()
         # Fillet at (0, 10) is on X=0 mirror axis - should be skipped
@@ -328,7 +328,7 @@ class TestPencilFilletMirrored(unittest.TestCase):
         # Should create a valid wire
         self.assertTrue(wire.is_valid)
 
-    def test_fillet_mirrored_y_point_off_axis(self):
+    def test_fillet_mirrored_y_point_off_axis(self) -> None:
         """Test fillet on a wire mirrored around Y axis with fillet point NOT on mirror axis."""
         pencil = Pencil()
         # Fillet at (5, 10) is NOT on X=0 mirror axis - should be filleted on both sides
@@ -337,7 +337,7 @@ class TestPencilFilletMirrored(unittest.TestCase):
         # Should create a valid wire
         self.assertTrue(wire.is_valid)
 
-    def test_fillet_mirrored_face_x(self):
+    def test_fillet_mirrored_face_x(self) -> None:
         """Test filleted mirrored face around X axis can be extruded."""
         pencil = Pencil()
         # Fillet at (10, 5) - actual corner, not on mirror axis
@@ -346,7 +346,7 @@ class TestPencilFilletMirrored(unittest.TestCase):
 
         self.assertTrue(solid.solid.is_valid)
 
-    def test_fillet_mirrored_face_y(self):
+    def test_fillet_mirrored_face_y(self) -> None:
         """Test filleted mirrored face around Y axis can be extruded."""
         pencil = Pencil()
         # Fillet at (5, 10) - actual corner, not on mirror axis
@@ -355,7 +355,7 @@ class TestPencilFilletMirrored(unittest.TestCase):
 
         self.assertTrue(solid.solid.is_valid)
 
-    def test_fillet_extrude_mirrored_x(self):
+    def test_fillet_extrude_mirrored_x(self) -> None:
         """Test extruding a filleted mirrored face around X axis."""
         pencil = Pencil()
         # Fillet at (10, 5) - actual corner, not on mirror axis
@@ -363,7 +363,7 @@ class TestPencilFilletMirrored(unittest.TestCase):
 
         self.assertTrue(solid.solid.is_valid)
 
-    def test_fillet_extrude_mirrored_y(self):
+    def test_fillet_extrude_mirrored_y(self) -> None:
         """Test extruding a filleted mirrored face around Y axis."""
         pencil = Pencil()
         # Fillet at (5, 10) - actual corner, not on mirror axis
@@ -382,7 +382,7 @@ class TestPencilFilletInCustomPlane(unittest.TestCase):
         ("tilted_45y", Plane.XY.rotated((0, 45, 0))),
         ("tilted_diagonal", Plane.XY.rotated((30, 45, 15))),
     ])
-    def test_fillet_various_planes(self, name, plane):
+    def test_fillet_various_planes(self, name, plane) -> None:
         """Test filleting in various plane orientations."""
         pencil = Pencil(plane)
         wire = pencil.right(10).fillet(2).up(10).create_wire()
@@ -394,7 +394,7 @@ class TestPencilFilletInCustomPlane(unittest.TestCase):
         ("xz_plane", Plane.XZ),
         ("tilted_45y", Plane.XY.rotated((0, 45, 0))),
     ])
-    def test_fillet_mirrored_various_planes(self, name, plane):
+    def test_fillet_mirrored_various_planes(self, name, plane) -> None:
         """Test filleted mirrored wire in various plane orientations."""
         pencil = Pencil(plane)
         # Fillet at (10, 5) - actual corner, not on mirror axis Y=0

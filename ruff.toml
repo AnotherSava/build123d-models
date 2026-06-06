@@ -1,0 +1,46 @@
+# Mechanical hygiene checks; judgment-level cleanup (dead methods, duplication,
+# visibility naming) stays with the /clean-code skill.
+include = ["src/**/*.py", "tests/**/*.py"]
+# Emitted-code fixtures: byte-compared against emitter output, so their fixed
+# import headers must stay exactly as the emitter writes them
+exclude = ["tests/sava/csg/build123d/reconstruct/data/*"]
+# First-party package roots, so isort classifies `sava` imports correctly
+src = ["src", "tests"]
+# This project prefers long single-line expressions (see CLAUDE.md); the high cap
+# keeps isort fixes single-line and turns E501 into a tripwire for pathological
+# lines only (longest intentional line is 284)
+line-length = 320
+
+[lint]
+# F      pyflakes: undefined names, unused imports/locals, redefinitions
+# E4/7/9 pycodestyle errors: import placement, comparison pitfalls, syntax
+# B      bugbear: mutable/call defaults, assert False, loop variable misuse
+# I      isort: stdlib / third-party / local import groups (the CLAUDE.md rule)
+# W      whitespace hygiene incl. W292 newline at end of file (the CLAUDE.md rule)
+# ANN    type-annotation coverage: parameter and return types (the CLAUDE.md rule)
+# SLF    private member accessed from outside its class; ruff exempts only literal
+#        self/cls, so the idiomatic sibling-instance access surface (copy()/colocate()
+#        fields, classmethod constructors, same-module collaborators) is whitelisted
+#        by member name below — anything else still flags
+#
+# Deliberately NOT enabled:
+# - E501 line length / formatter: this project prefers long single-line expressions
+# - ANN401: honest `Any` is allowed where code is genuinely dynamic (exporter)
+select = ["F", "E4", "E501", "E7", "E9", "B", "I", "W", "ANN", "SLF"]
+ignore = ["ANN401"]
+
+[lint.isort]
+# Re-join wrapped import blocks instead of keeping them multi-line forever:
+# a trailing comma should not pin imports into the parenthesized form
+split-on-trailing-comma = false
+
+[lint.flake8-self]
+# The friend-access surface: private members legitimately touched on sibling
+# instances or by same-module collaborators (TurnBuilder -> CableChannel)
+extend-ignore-names = ["_build", "_top", "_inner_mode", "_orientation", "_proj_range", "_original_plane_path", "_create_straight_channel", "_create_straight_cap", "_aligned_cover_rotation"]
+
+[lint.per-file-ignores]
+# Test arguments are dominated by parameterized-injected values; annotating each
+# expansion row's params is churn. Return types stay enforced. Tests may also
+# reach into internals by design.
+"tests/**" = ["ANN001", "ANN002", "ANN003", "SLF001"]

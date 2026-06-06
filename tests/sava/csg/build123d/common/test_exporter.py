@@ -5,19 +5,16 @@ from pathlib import Path
 from build123d import Box
 from parameterized import parameterized
 
-from sava.csg.build123d.common.exporter import (
-    export, clear, show_red, show_blue, show_green, save_3mf, save_stl,
-    _shapes, _label_colors, _get_color_for_label, _prepare_shape, _is_valid_color, BASIC_COLORS
-)
+from sava.csg.build123d.common.exporter import BASIC_COLORS, _get_color_for_label, _is_valid_color, _label_colors, _prepare_shape, _shapes, clear, export, save_3mf, save_stl, show_blue, show_green, show_red
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 class TestExport(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         clear()
 
-    def test_export_default_label(self):
+    def test_export_default_label(self) -> None:
         """Test export with default auto-generated label"""
         box = Box(10, 10, 10)
         box.label = None  # Ensure label is None to trigger auto-generation
@@ -26,7 +23,7 @@ class TestExport(unittest.TestCase):
         self.assertIn("shape_1", _shapes)
         self.assertEqual(len(_shapes["shape_1"]), 1)
 
-    def test_export_custom_label(self):
+    def test_export_custom_label(self) -> None:
         """Test export with custom label"""
         box = Box(10, 10, 10)
         export(box, label="custom")
@@ -34,14 +31,14 @@ class TestExport(unittest.TestCase):
         self.assertIn("custom", _shapes)
         self.assertEqual(len(_shapes["custom"]), 1)
 
-    def test_export_multiple_shapes_same_label(self):
+    def test_export_multiple_shapes_same_label(self) -> None:
         """Test exporting multiple shapes with the same label"""
         export(Box(10, 10, 10), label="parts")
         export(Box(5, 5, 5), label="parts")
 
         self.assertEqual(len(_shapes["parts"]), 2)
 
-    def test_export_multiple_labels(self):
+    def test_export_multiple_labels(self) -> None:
         """Test exporting shapes with different labels"""
         export(Box(10, 10, 10), label="body")
         export(Box(5, 5, 5), label="screw")
@@ -54,10 +51,10 @@ class TestExport(unittest.TestCase):
 
 class TestShowColorFunctions(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         clear()
 
-    def test_show_red(self):
+    def test_show_red(self) -> None:
         """Test show_red exports with 'red' label"""
         box = Box(10, 10, 10)
         show_red(box)
@@ -65,14 +62,14 @@ class TestShowColorFunctions(unittest.TestCase):
         self.assertIn("red", _shapes)
         self.assertEqual(len(_shapes["red"]), 1)
 
-    def test_show_blue(self):
+    def test_show_blue(self) -> None:
         """Test show_blue exports with 'blue' label"""
         box = Box(10, 10, 10)
         show_blue(box)
 
         self.assertIn("blue", _shapes)
 
-    def test_show_green(self):
+    def test_show_green(self) -> None:
         """Test show_green exports with 'green' label"""
         box = Box(10, 10, 10)
         show_green(box)
@@ -82,7 +79,7 @@ class TestShowColorFunctions(unittest.TestCase):
 
 class TestGetColorForLabel(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         clear()
 
     @parameterized.expand([
@@ -91,29 +88,29 @@ class TestGetColorForLabel(unittest.TestCase):
         ("green",),
         ("yellow",),
     ])
-    def test_valid_color_label_returns_itself(self, color):
+    def test_valid_color_label_returns_itself(self, color) -> None:
         """Test that valid color names are returned as-is"""
         result = _get_color_for_label(color)
         self.assertEqual(result, color)
 
-    def test_custom_label_gets_assigned_color(self):
+    def test_custom_label_gets_assigned_color(self) -> None:
         """Test that custom labels get assigned colors from BASIC_COLORS"""
         result = _get_color_for_label("custom_label")
         self.assertIn(result, BASIC_COLORS)
 
-    def test_same_label_gets_same_color(self):
+    def test_same_label_gets_same_color(self) -> None:
         """Test that the same label always returns the same color"""
         color1 = _get_color_for_label("my_label")
         color2 = _get_color_for_label("my_label")
         self.assertEqual(color1, color2)
 
-    def test_different_labels_get_different_colors(self):
+    def test_different_labels_get_different_colors(self) -> None:
         """Test that different labels get different colors"""
         color1 = _get_color_for_label("label1")
         color2 = _get_color_for_label("label2")
         self.assertNotEqual(color1, color2)
 
-    def test_exhaust_colors_raises_error(self):
+    def test_exhaust_colors_raises_error(self) -> None:
         """Test that exhausting all colors raises RuntimeError"""
         for i in range(len(BASIC_COLORS)):
             _get_color_for_label(f"label_{i}")
@@ -123,7 +120,7 @@ class TestGetColorForLabel(unittest.TestCase):
 
         self.assertIn("exhausted", str(context.exception))
 
-    def test_all_basic_colors_are_valid_build123d_colors(self):
+    def test_all_basic_colors_are_valid_build123d_colors(self) -> None:
         """Test that all BASIC_COLORS are recognized by build123d's Color class"""
         for color_name in BASIC_COLORS:
             with self.subTest(color=color_name):
@@ -135,10 +132,10 @@ class TestGetColorForLabel(unittest.TestCase):
 
 class TestPrepareShape(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         clear()
 
-    def test_prepare_shape_assigns_label(self):
+    def test_prepare_shape_assigns_label(self) -> None:
         """Test that _prepare_shape assigns label to shape"""
         box = Box(10, 10, 10)
         prepared = _prepare_shape(box, "test_label")
@@ -146,7 +143,7 @@ class TestPrepareShape(unittest.TestCase):
         self.assertEqual(len(prepared), 1)
         self.assertEqual(prepared[0].label, "test_label")
 
-    def test_prepare_shape_with_prepare_for_stl_skips_color(self):
+    def test_prepare_shape_with_prepare_for_stl_skips_color(self) -> None:
         """Test that prepare_for_stl=True skips color assignment but still assigns label"""
         box = Box(10, 10, 10)
         prepared = _prepare_shape(box, "test_label", prepare_for_stl=True)
@@ -155,7 +152,7 @@ class TestPrepareShape(unittest.TestCase):
         self.assertEqual(prepared[0].label, "test_label")
         self.assertIsNone(prepared[0].color)
 
-    def test_prepare_shape_with_prepare_for_stl_applies_bed_orientation(self):
+    def test_prepare_shape_with_prepare_for_stl_applies_bed_orientation(self) -> None:
         """Test that prepare_for_stl=True applies bed_orientation when set on a SmartSolid"""
         solid = SmartSolid(Box(10, 20, 30))
         solid.bed_orientation = (90, 0, 0)
@@ -168,7 +165,7 @@ class TestPrepareShape(unittest.TestCase):
         self.assertAlmostEqual(bbox.size.Y, 30, places=1)
         self.assertAlmostEqual(bbox.size.Z, 20, places=1)
 
-    def test_prepare_shape_assigns_color_for_color_label(self):
+    def test_prepare_shape_assigns_color_for_color_label(self) -> None:
         """Test that color labels get their color assigned"""
         box = Box(10, 10, 10)
         prepared = _prepare_shape(box, "red")
@@ -178,10 +175,10 @@ class TestPrepareShape(unittest.TestCase):
 
 class TestClear(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         clear()
 
-    def test_clear_removes_shapes(self):
+    def test_clear_removes_shapes(self) -> None:
         """Test that clear removes all stored shapes"""
         export(Box(10, 10, 10), label="test")
         self.assertEqual(len(_shapes), 1)
@@ -189,7 +186,7 @@ class TestClear(unittest.TestCase):
         clear()
         self.assertEqual(len(_shapes), 0)
 
-    def test_clear_removes_color_assignments(self):
+    def test_clear_removes_color_assignments(self) -> None:
         """Test that clear removes color assignments"""
         _get_color_for_label("custom")
         self.assertEqual(len(_label_colors), 1)
@@ -200,10 +197,10 @@ class TestClear(unittest.TestCase):
 
 class TestSave3mf(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         clear()
 
-    def test_save_3mf_creates_file(self):
+    def test_save_3mf_creates_file(self) -> None:
         """Test that save_3mf creates a file at the specified location"""
         export(Box(10, 10, 10))
 
@@ -213,7 +210,7 @@ class TestSave3mf(unittest.TestCase):
 
             self.assertTrue(Path(filepath).exists())
 
-    def test_save_3mf_with_multiple_labels(self):
+    def test_save_3mf_with_multiple_labels(self) -> None:
         """Test that save_3mf works with multiple labels"""
         export(Box(10, 10, 10), label="body")
         export(Box(5, 5, 5), label="screw")
@@ -228,10 +225,10 @@ class TestSave3mf(unittest.TestCase):
 
 class TestSaveStl(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         clear()
 
-    def test_save_stl_creates_files_per_label(self):
+    def test_save_stl_creates_files_per_label(self) -> None:
         """Test that save_stl creates separate files for each label"""
         export(Box(10, 10, 10), label="body")
         export(Box(5, 5, 5), label="screw")
@@ -242,7 +239,7 @@ class TestSaveStl(unittest.TestCase):
             self.assertTrue((Path(tmpdir) / "body.stl").exists())
             self.assertTrue((Path(tmpdir) / "screw.stl").exists())
 
-    def test_save_stl_single_label(self):
+    def test_save_stl_single_label(self) -> None:
         """Test that save_stl works with a single label"""
         export(Box(10, 10, 10), label="model")
 

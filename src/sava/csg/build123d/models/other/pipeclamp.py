@@ -25,7 +25,7 @@ class PipeClampDimensions:
     bumo_thickness: float = 1.5
 
 class PipeClamp:
-    def __init__(self, dim: PipeClampDimensions):
+    def __init__(self, dim: PipeClampDimensions) -> None:
         self.dim = dim
 
     def create_outer_cylinder(self, width: float, angle: float) -> SmartSolid:

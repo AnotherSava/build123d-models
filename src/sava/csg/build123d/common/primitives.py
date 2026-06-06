@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from math import tan, radians
 
-from build123d import Location, fillet, Wire, Solid, VectorLike, Axis, Vector, Edge, Face
+from build123d import Axis, Edge, Location, Vector, VectorLike, Wire
 
-from sava.csg.build123d.common.geometry import to_vector, rotate_vector, get_angle, create_vector
+from sava.csg.build123d.common.geometry import create_vector, get_angle, rotate_vector, to_vector
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartloft import SmartLoft

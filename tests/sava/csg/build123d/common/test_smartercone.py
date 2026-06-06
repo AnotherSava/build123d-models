@@ -10,7 +10,7 @@ from tests.sava.csg.build123d.test_utils import assertVectorAlmostEqual
 
 class TestSmarterConeShell(unittest.TestCase):
 
-    def test_shell_positive_creates_correct_geometry(self):
+    def test_shell_positive_creates_correct_geometry(self) -> None:
         """Test that positive thickness creates outer shell with correct sections"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         shell = cone.create_shell(2)
@@ -21,7 +21,7 @@ class TestSmarterConeShell(unittest.TestCase):
         self.assertAlmostEqual(shell.sections[1].inner_radius, 30, places=5)
         self.assertAlmostEqual(shell.height, 100)
 
-    def test_shell_negative_creates_correct_geometry(self):
+    def test_shell_negative_creates_correct_geometry(self) -> None:
         """Test shell with negative thickness (inner shell)"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         shell = cone.create_shell(-2)
@@ -32,7 +32,7 @@ class TestSmarterConeShell(unittest.TestCase):
         self.assertAlmostEqual(shell.sections[1].inner_radius, 28, places=5)
         self.assertAlmostEqual(shell.height, 100)
 
-    def test_shell_prevents_double_shelling(self):
+    def test_shell_prevents_double_shelling(self) -> None:
         """Test that shell cannot be called on already hollow cone"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         shell = cone.create_shell(2)
@@ -42,7 +42,7 @@ class TestSmarterConeShell(unittest.TestCase):
 
         self.assertIn("already hollow", str(context.exception).lower())
 
-    def test_shell_requires_nonzero_thickness(self):
+    def test_shell_requires_nonzero_thickness(self) -> None:
         """Test that thickness must be non-zero"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
 
@@ -57,7 +57,7 @@ class TestSmarterConeShell(unittest.TestCase):
         (5,),
         (-4,),
     ])
-    def test_shell_valid_combinations(self, thickness):
+    def test_shell_valid_combinations(self, thickness) -> None:
         """Test shell with various valid thickness values produces correct wall thickness"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         shell = cone.create_shell(thickness)
@@ -65,21 +65,21 @@ class TestSmarterConeShell(unittest.TestCase):
         for s in shell.sections:
             self.assertAlmostEqual(s.radius - s.inner_radius, abs(thickness), places=5)
 
-    def test_shell_returns_new_instance(self):
+    def test_shell_returns_new_instance(self) -> None:
         """Test that shell returns new instance, not self"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         shell = cone.create_shell(2)
         self.assertIsNot(shell, cone)
         self.assertIsInstance(shell, SmarterCone)
 
-    def test_shell_inherits_plane_and_angle(self):
+    def test_shell_inherits_plane_and_angle(self) -> None:
         """Test that shell inherits plane and angle"""
         cone = SmarterCone.base(50, plane=Plane.XZ, angle=180).extend(radius=30, height=100)
         shell = cone.create_shell(2)
         self.assertEqual(shell.plane, Plane.XZ)
         self.assertEqual(shell.angle, 180)
 
-    def test_copy_returns_smartercone(self):
+    def test_copy_returns_smartercone(self) -> None:
         """Test that copy() returns a SmarterCone instance"""
         cone = SmarterCone.base(50, plane=Plane.XZ, angle=180).extend(radius=30, height=100)
         copied = cone.copy()
@@ -94,7 +94,7 @@ class TestSmarterConeShell(unittest.TestCase):
 
 class TestSmarterConeCreateOffset(unittest.TestCase):
 
-    def test_create_offset_positive_radius(self):
+    def test_create_offset_positive_radius(self) -> None:
         """Test creating offset cone with positive radial thickness"""
         original = SmarterCone.base(50).extend(radius=30, height=100)
         offset = original.create_offset(2)
@@ -103,7 +103,7 @@ class TestSmarterConeCreateOffset(unittest.TestCase):
         self.assertAlmostEqual(offset.top_radius, 32, places=5)
         self.assertEqual(offset.height, 100)
 
-    def test_create_offset_negative_radius(self):
+    def test_create_offset_negative_radius(self) -> None:
         """Test creating offset cone with negative radial thickness"""
         original = SmarterCone.base(50).extend(radius=30, height=100)
         offset = original.create_offset(-2)
@@ -112,41 +112,41 @@ class TestSmarterConeCreateOffset(unittest.TestCase):
         self.assertAlmostEqual(offset.top_radius, 28, places=5)
         self.assertEqual(offset.height, 100)
 
-    def test_create_offset_zero_allowed(self):
+    def test_create_offset_zero_allowed(self) -> None:
         """Test that zero offset is allowed"""
         original = SmarterCone.base(50).extend(radius=30, height=100)
         offset = original.create_offset(0)
         self.assertAlmostEqual(offset.base_radius, 50, places=5)
         self.assertAlmostEqual(offset.top_radius, 30, places=5)
 
-    def test_create_offset_inherits_plane_and_angle(self):
+    def test_create_offset_inherits_plane_and_angle(self) -> None:
         """Test that offset cone inherits plane and angle"""
         original = SmarterCone.base(50, plane=Plane.XZ, angle=180).extend(radius=30, height=100)
         offset = original.create_offset(2)
         self.assertEqual(offset.plane, Plane.XZ)
         self.assertEqual(offset.angle, 180)
 
-    def test_create_offset_returns_smartercone(self):
+    def test_create_offset_returns_smartercone(self) -> None:
         """Test that create_offset returns SmarterCone instance"""
         original = SmarterCone.base(50).extend(radius=30, height=100)
         offset = original.create_offset(2)
         self.assertIsInstance(offset, SmarterCone)
 
-    def test_create_offset_inverted_cone(self):
+    def test_create_offset_inverted_cone(self) -> None:
         """Test create_offset on inverted cone (top > base)"""
         original = SmarterCone.base(30).extend(radius=50, height=100)
         offset = original.create_offset(2)
         self.assertAlmostEqual(offset.base_radius, 32, places=5)
         self.assertAlmostEqual(offset.top_radius, 52, places=5)
 
-    def test_create_offset_positioning(self):
+    def test_create_offset_positioning(self) -> None:
         """Test that offset cone is colocated with original"""
         original = SmarterCone.base(50).extend(radius=30, height=100)
         offset = original.create_offset(2)
         self.assertAlmostEqual(offset.z_min, original.z_min, places=3)
         self.assertAlmostEqual(offset.z_max, original.z_max, places=3)
 
-    def test_create_offset_with_inner_radius(self):
+    def test_create_offset_with_inner_radius(self) -> None:
         """Test that create_offset adjusts both outer and inner radii"""
         original = SmarterCone.base(50).inner(40).extend(radius=30, height=100)
         offset = original.create_offset(3)
@@ -155,7 +155,7 @@ class TestSmarterConeCreateOffset(unittest.TestCase):
         self.assertAlmostEqual(offset.sections[1].radius, 33, places=5)
         self.assertAlmostEqual(offset.sections[1].inner_radius, 23, places=5)
 
-    def test_create_offset_negative_rejects_too_small_radius(self):
+    def test_create_offset_negative_rejects_too_small_radius(self) -> None:
         """Test that negative offset raising assertion when outer radius would go negative"""
         original = SmarterCone.base(50).extend(radius=30, height=100)
         with self.assertRaises(AssertionError):
@@ -164,7 +164,7 @@ class TestSmarterConeCreateOffset(unittest.TestCase):
 
 class TestSmarterConeShift(unittest.TestCase):
 
-    def test_shifted_cone_bounding_box(self):
+    def test_shifted_cone_bounding_box(self) -> None:
         """Test that shifted cone has correct bounding box"""
         cone = SmarterCone.base(20).extend(radius=20, height=100, shift_x=30)
         self.assertAlmostEqual(cone.x_min, -20, places=1)
@@ -172,13 +172,13 @@ class TestSmarterConeShift(unittest.TestCase):
         self.assertAlmostEqual(cone.z_min, 0, places=1)
         self.assertAlmostEqual(cone.z_max, 100, places=1)
 
-    def test_shifted_cone_partial_sector(self):
+    def test_shifted_cone_partial_sector(self) -> None:
         """Test that shifted cone with angle < 360 creates valid geometry"""
         cone = SmarterCone.base(30, angle=180).extend(radius=20, height=80, shift_x=10)
         self.assertAlmostEqual(cone.z_min, 0, places=1)
         self.assertAlmostEqual(cone.z_max, 80, places=1)
 
-    def test_shifted_cone_zero_top_radius(self):
+    def test_shifted_cone_zero_top_radius(self) -> None:
         """Test shifted cone with radius approaching 0"""
         cone = SmarterCone.base(30).extend(radius=0.001, height=100, shift_x=15)
         self.assertAlmostEqual(cone.z_min, 0, places=1)
@@ -189,13 +189,13 @@ class TestSmarterConeShift(unittest.TestCase):
         (0.5, Vector(5, 2.5, 50)),
         (1.0, Vector(10, 5, 100)),
     ])
-    def test_center_interpolates_shift(self, position, expected):
+    def test_center_interpolates_shift(self, position, expected) -> None:
         """Test that center() interpolates shift correctly"""
         cone = SmarterCone.base(30).extend(radius=20, height=100, shift_x=10, shift_y=5)
         result = cone.center(position)
         self.assertTrue(are_points_too_close(result, expected), f"Expected {expected}, got {result}")
 
-    def test_copy_preserves_sections(self):
+    def test_copy_preserves_sections(self) -> None:
         """Test that copy() preserves sections including shifts"""
         cone = SmarterCone.base(50).extend(radius=30, height=100, shift_x=10, shift_y=5)
         copied = cone.copy()
@@ -204,14 +204,14 @@ class TestSmarterConeShift(unittest.TestCase):
         self.assertAlmostEqual(copied.sections[1].shift_y, 5)
         self.assertIsInstance(copied, SmarterCone)
 
-    def test_create_offset_with_shift(self):
+    def test_create_offset_with_shift(self) -> None:
         """Test create_offset preserves shift in sections"""
         cone = SmarterCone.base(50).extend(radius=30, height=100, shift_x=20)
         offset = cone.create_offset(2)
         self.assertAlmostEqual(offset.sections[1].shift_x, 20)
         self.assertGreater(offset.base_radius, cone.base_radius)
 
-    def test_angle_with_shift_raises(self):
+    def test_angle_with_shift_raises(self) -> None:
         """Test that combining angle with shift raises AssertionError"""
         with self.assertRaises(AssertionError):
             SmarterCone.base(50).extend(angle=45, height=50, shift_x=10)
@@ -219,60 +219,60 @@ class TestSmarterConeShift(unittest.TestCase):
 
 class TestSmarterConeInnerRadius(unittest.TestCase):
 
-    def test_base_with_inner_radius(self):
+    def test_base_with_inner_radius(self) -> None:
         """Test that base().inner() creates section with inner_radius"""
         cone = SmarterCone.base(50).inner(40)
         self.assertAlmostEqual(cone.sections[0].inner_radius, 40)
         self.assertTrue(cone.has_inner)
 
-    def test_cylinder_with_inner_radius(self):
+    def test_cylinder_with_inner_radius(self) -> None:
         """Test that cylinder().inner() creates last section with inner_radius"""
         cone = SmarterCone.cylinder(50, 100).inner(40)
         self.assertAlmostEqual(cone.sections[1].inner_radius, 40)
         self.assertTrue(cone.has_inner)
 
-    def test_cylinder_inner_radius_kwarg(self):
+    def test_cylinder_inner_radius_kwarg(self) -> None:
         """Test that cylinder(inner_radius=...) creates a hollow cylinder directly"""
         cone = SmarterCone.cylinder(50, 100, inner_radius=40)
         self.assertAlmostEqual(cone.sections[0].inner_radius, 40)
         self.assertAlmostEqual(cone.sections[1].inner_radius, 40)
         self.assertTrue(cone.has_inner)
 
-    def test_extend_auto_propagates_inner_radius(self):
+    def test_extend_auto_propagates_inner_radius(self) -> None:
         """Test that extend auto-propagates inner_radius maintaining wall thickness"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100)
         # Wall thickness = 50 - 40 = 10, so inner_radius = 30 - 10 = 20
         self.assertAlmostEqual(cone.sections[1].inner_radius, 20)
 
-    def test_inner_overrides_auto_propagation(self):
+    def test_inner_overrides_auto_propagation(self) -> None:
         """Test that inner() overrides auto-propagated inner_radius"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100).inner(25)
         self.assertAlmostEqual(cone.sections[1].inner_radius, 25)
 
-    def test_inner_zero_stops_propagation(self):
+    def test_inner_zero_stops_propagation(self) -> None:
         """Test that inner(0) stops propagation"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100).inner(0)
         self.assertIsNone(cone.sections[1].inner_radius)
 
-    def test_extend_no_propagation_without_prior_inner(self):
+    def test_extend_no_propagation_without_prior_inner(self) -> None:
         """Test that extend without prior inner_radius leaves it as None"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         self.assertIsNone(cone.sections[1].inner_radius)
 
-    def test_chained_extends_propagate_inner_radius(self):
+    def test_chained_extends_propagate_inner_radius(self) -> None:
         """Test that chained extends all propagate inner_radius"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100).extend(radius=20, height=100)
         # Wall thickness = 10 throughout
         self.assertAlmostEqual(cone.sections[1].inner_radius, 20)  # 30 - 10
         self.assertAlmostEqual(cone.sections[2].inner_radius, 10)  # 20 - 10
 
-    def test_extend_auto_propagate_clamps_to_min(self):
+    def test_extend_auto_propagate_clamps_to_min(self) -> None:
         """Test that auto-propagation clamps inner_radius to OCCT_MIN_SIZE"""
         # Wall thickness = 50 - 40 = 10, new radius = 8, so inner would be -2 → clamped
         cone = SmarterCone.base(50).inner(40).extend(radius=8, height=100)
         self.assertAlmostEqual(cone.sections[1].inner_radius, MIN_SIZE_OCCT)
 
-    def test_fillet_sections_propagate_inner_radius(self):
+    def test_fillet_sections_propagate_inner_radius(self) -> None:
         """Test that fillet sections get inner_radius when junction has it"""
         cone = SmarterCone.base(50).inner(40).extend(radius=50, height=50).extend(radius=30, height=50, fillet=5)
         # All sections should have inner_radius (base has it, so it propagates everywhere)
@@ -280,7 +280,7 @@ class TestSmarterConeInnerRadius(unittest.TestCase):
             self.assertIsNotNone(s.inner_radius, f"Section {i} should have inner_radius")
             self.assertGreater(s.inner_radius, 0, f"Section {i} inner_radius should be > 0")
 
-    def test_fillet_sections_no_inner_without_junction_inner(self):
+    def test_fillet_sections_no_inner_without_junction_inner(self) -> None:
         """Test that fillet sections don't get inner_radius when junction has none"""
         cone = SmarterCone.base(50).extend(radius=50, height=50).extend(radius=30, height=50, fillet=5)
         for s in cone.sections:
@@ -289,12 +289,12 @@ class TestSmarterConeInnerRadius(unittest.TestCase):
 
 class TestSmarterConeInner(unittest.TestCase):
 
-    def test_inner_sets_inner_radius_on_last_section(self):
+    def test_inner_sets_inner_radius_on_last_section(self) -> None:
         """Test that inner() sets inner_radius on the last section"""
         cone = SmarterCone.base(50).extend(radius=30, height=100).inner(20)
         self.assertAlmostEqual(cone.sections[-1].inner_radius, 20)
 
-    def test_inner_zero_clears_all_inner_properties(self):
+    def test_inner_zero_clears_all_inner_properties(self) -> None:
         """Test that inner(0) clears inner_radius and inner shifts"""
         cone = SmarterCone.base(50).extend(radius=30, height=100).inner(20, shift_x=5, shift_y=3)
         cone.inner(0)
@@ -302,26 +302,26 @@ class TestSmarterConeInner(unittest.TestCase):
         self.assertIsNone(cone.sections[-1].inner_shift_x)
         self.assertIsNone(cone.sections[-1].inner_shift_y)
 
-    def test_inner_with_shifts(self):
+    def test_inner_with_shifts(self) -> None:
         """Test that inner() sets shift_x and shift_y"""
         cone = SmarterCone.base(50).extend(radius=30, height=100).inner(20, shift_x=5, shift_y=3)
         self.assertAlmostEqual(cone.sections[-1].inner_radius, 20)
         self.assertAlmostEqual(cone.sections[-1].inner_shift_x, 5)
         self.assertAlmostEqual(cone.sections[-1].inner_shift_y, 3)
 
-    def test_inner_returns_self(self):
+    def test_inner_returns_self(self) -> None:
         """Test that inner() returns self for chaining"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         result = cone.inner(20)
         self.assertIs(result, cone)
 
-    def test_inner_on_base_section(self):
+    def test_inner_on_base_section(self) -> None:
         """Test that inner() works on base section"""
         cone = SmarterCone.base(50).inner(40)
         self.assertAlmostEqual(cone.sections[0].inner_radius, 40)
         self.assertTrue(cone.has_inner)
 
-    def test_inner_propagates_through_extend(self):
+    def test_inner_propagates_through_extend(self) -> None:
         """Test that inner radius and shifts propagate through extend"""
         cone = SmarterCone.base(50).extend(radius=50, height=50).inner(40, shift_x=5, shift_y=3).extend(radius=30, height=50)
         # Wall thickness = 50 - 40 = 10, so inner = 30 - 10 = 20
@@ -330,31 +330,31 @@ class TestSmarterConeInner(unittest.TestCase):
         self.assertAlmostEqual(cone.sections[-1].inner_shift_x, 5)
         self.assertAlmostEqual(cone.sections[-1].inner_shift_y, 3)
 
-    def test_none_inner_shifts_stay_none_through_propagation(self):
+    def test_none_inner_shifts_stay_none_through_propagation(self) -> None:
         """Test that None inner shifts stay None through propagation"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100)
         self.assertIsNone(cone.sections[-1].inner_shift_x)
         self.assertIsNone(cone.sections[-1].inner_shift_y)
 
-    def test_inner_zero_stops_propagation_through_chain(self):
+    def test_inner_zero_stops_propagation_through_chain(self) -> None:
         """Test that inner(0) stops propagation through chained extends"""
         cone = SmarterCone.base(50).inner(40).extend(radius=50, height=50).inner(0).extend(radius=30, height=50)
         self.assertIsNone(cone.sections[-1].inner_radius)
 
-    def test_inner_invalid_radius_raises(self):
+    def test_inner_invalid_radius_raises(self) -> None:
         """Test that inner_radius >= outer radius raises AssertionError"""
         with self.assertRaises(AssertionError):
             SmarterCone.base(50).extend(radius=30, height=100).inner(30)
         with self.assertRaises(AssertionError):
             SmarterCone.base(50).extend(radius=30, height=100).inner(35)
 
-    def test_eccentric_hole_creates_valid_solid(self):
+    def test_eccentric_hole_creates_valid_solid(self) -> None:
         """Test that eccentric inner hole creates a valid solid"""
         cone = SmarterCone.base(50).extend(radius=50, height=100).inner(20, shift_x=10)
         cone.assert_valid()
         self.assertTrue(cone.has_inner)
 
-    def test_inner_shift_offset_propagates_through_fillet(self):
+    def test_inner_shift_offset_propagates_through_fillet(self) -> None:
         """Test that inner shift offsets propagate through fillet sections"""
         cone = SmarterCone.base(50).inner(40).extend(radius=50, height=50).inner(40, shift_x=5).extend(radius=30, height=50, fillet=5)
         # Sections after the first (which has no shift) should have inner_shift_x
@@ -366,7 +366,7 @@ class TestSmarterConeInner(unittest.TestCase):
 
 class TestSmarterConeGetOuterInnerCone(unittest.TestCase):
 
-    def test_get_outer_cone_strips_inner(self):
+    def test_get_outer_cone_strips_inner(self) -> None:
         """Test that get_outer_cone returns solid cone without inner radii"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100)
         outer = cone.get_outer_cone()
@@ -375,20 +375,20 @@ class TestSmarterConeGetOuterInnerCone(unittest.TestCase):
         self.assertAlmostEqual(outer.top_radius, 30)
         self.assertAlmostEqual(outer.height, 100)
 
-    def test_get_outer_cone_preserves_shifts(self):
+    def test_get_outer_cone_preserves_shifts(self) -> None:
         """Test that get_outer_cone preserves shift_x/shift_y"""
         cone = SmarterCone.base(50).extend(radius=30, height=100, shift_x=10).inner(20)
         outer = cone.get_outer_cone()
         self.assertAlmostEqual(outer.sections[1].shift_x, 10)
 
-    def test_get_outer_cone_on_solid_cone(self):
+    def test_get_outer_cone_on_solid_cone(self) -> None:
         """Test that get_outer_cone works on cone without inner (identity-like)"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         outer = cone.get_outer_cone()
         self.assertFalse(outer.has_inner)
         self.assertAlmostEqual(outer.base_radius, 50)
 
-    def test_get_inner_cone_uses_inner_radii(self):
+    def test_get_inner_cone_uses_inner_radii(self) -> None:
         """Test that get_inner_cone uses inner_radius as radius"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100)
         inner = cone.get_inner_cone()
@@ -397,26 +397,26 @@ class TestSmarterConeGetOuterInnerCone(unittest.TestCase):
         self.assertAlmostEqual(inner.top_radius, 20)  # wall=10, 30-10=20
         self.assertAlmostEqual(inner.height, 100)
 
-    def test_get_inner_cone_uses_inner_shifts(self):
+    def test_get_inner_cone_uses_inner_shifts(self) -> None:
         """Test that get_inner_cone uses inner_shift as shift"""
         cone = SmarterCone.base(50).extend(radius=50, height=100).inner(30, shift_x=5, shift_y=3)
         inner = cone.get_inner_cone()
         self.assertAlmostEqual(inner.sections[1].shift_x, 5)
         self.assertAlmostEqual(inner.sections[1].shift_y, 3)
 
-    def test_get_inner_cone_falls_back_to_outer_shift(self):
+    def test_get_inner_cone_falls_back_to_outer_shift(self) -> None:
         """Test that get_inner_cone uses outer shift when inner shift is None"""
         cone = SmarterCone.base(50).inner(40).extend(radius=50, height=100, shift_x=10)
         inner = cone.get_inner_cone()
         self.assertAlmostEqual(inner.sections[1].shift_x, 10)
 
-    def test_get_inner_cone_requires_inner(self):
+    def test_get_inner_cone_requires_inner(self) -> None:
         """Test that get_inner_cone raises on cone without inner"""
         cone = SmarterCone.base(50).extend(radius=30, height=100)
         with self.assertRaises(AssertionError):
             cone.get_inner_cone()
 
-    def test_get_outer_and_inner_colocated(self):
+    def test_get_outer_and_inner_colocated(self) -> None:
         """Test that outer and inner cones are colocated with original"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100)
         outer = cone.get_outer_cone()
@@ -429,20 +429,20 @@ class TestSmarterConeGetOuterInnerCone(unittest.TestCase):
 
 class TestSmarterConeNegativeHeight(unittest.TestCase):
 
-    def test_negative_height_basic(self):
+    def test_negative_height_basic(self) -> None:
         """Test basic cone with negative height"""
         cone = SmarterCone.base(50).extend(radius=30, height=-100)
         self.assertAlmostEqual(cone.height, -100)
         self.assertAlmostEqual(cone.base_radius, 50)
         self.assertAlmostEqual(cone.top_radius, 30)
 
-    def test_negative_height_bounding_box(self):
+    def test_negative_height_bounding_box(self) -> None:
         """Test that negative-height cone extends in -Z direction"""
         cone = SmarterCone.base(50).extend(radius=30, height=-100)
         self.assertAlmostEqual(cone.z_min, -100, places=1)
         self.assertAlmostEqual(cone.z_max, 0, places=1)
 
-    def test_negative_height_with_angle(self):
+    def test_negative_height_with_angle(self) -> None:
         """Test negative height combined with angle computes correct radius"""
         # angle=-45 outward: radius_change = 100 / tan(45) = 100, so radius = 50 + 100 = 150
         cone = SmarterCone.base(50).extend(height=-100, angle=-45)
@@ -451,7 +451,7 @@ class TestSmarterConeNegativeHeight(unittest.TestCase):
         cone2 = SmarterCone.base(50).extend(height=-20, angle=45)
         self.assertAlmostEqual(cone2.top_radius, 30, places=3)
 
-    def test_negative_height_chained_extends(self):
+    def test_negative_height_chained_extends(self) -> None:
         """Test multiple extends all going negative"""
         cone = SmarterCone.base(50).extend(radius=40, height=-50).extend(radius=30, height=-50)
         self.assertAlmostEqual(cone.height, -100)
@@ -459,31 +459,31 @@ class TestSmarterConeNegativeHeight(unittest.TestCase):
         self.assertAlmostEqual(cone.z_min, -100, places=1)
         self.assertAlmostEqual(cone.z_max, 0, places=1)
 
-    def test_mixed_height_direction_raises(self):
+    def test_mixed_height_direction_raises(self) -> None:
         """Test that mixing positive and negative height raises"""
         with self.assertRaises(AssertionError):
             SmarterCone.base(50).extend(radius=40, height=-50).extend(radius=30, height=30)
 
-    def test_zero_height_extend_raises(self):
+    def test_zero_height_extend_raises(self) -> None:
         """Test that extend(height=0) raises"""
         with self.assertRaises(AssertionError):
             SmarterCone.base(50).extend(height=0)
 
-    def test_negative_height_cylinder(self):
+    def test_negative_height_cylinder(self) -> None:
         """Test cylinder with negative height"""
         cone = SmarterCone.cylinder(50, -100)
         self.assertAlmostEqual(cone.height, -100)
         self.assertAlmostEqual(cone.z_min, -100, places=1)
         self.assertAlmostEqual(cone.z_max, 0, places=1)
 
-    def test_negative_height_shell(self):
+    def test_negative_height_shell(self) -> None:
         """Test shell on negative-height cone"""
         cone = SmarterCone.base(50).extend(radius=30, height=-100)
         shell = cone.create_shell(2)
         self.assertTrue(shell.has_inner)
         self.assertAlmostEqual(shell.height, -100)
 
-    def test_negative_height_offset(self):
+    def test_negative_height_offset(self) -> None:
         """Test create_offset on negative-height cone"""
         cone = SmarterCone.base(50).extend(radius=30, height=-100)
         offset = cone.create_offset(2)
@@ -491,7 +491,7 @@ class TestSmarterConeNegativeHeight(unittest.TestCase):
         self.assertAlmostEqual(offset.top_radius, 32, places=5)
         self.assertAlmostEqual(offset.height, -100)
 
-    def test_negative_height_center_interpolation(self):
+    def test_negative_height_center_interpolation(self) -> None:
         """Test center() returns correct points for negative-height cone"""
         cone = SmarterCone.base(30).extend(radius=20, height=-100, shift_x=10, shift_y=5)
         base_center = cone.center(0.0)
@@ -499,27 +499,27 @@ class TestSmarterConeNegativeHeight(unittest.TestCase):
         self.assertTrue(are_points_too_close(base_center, Vector(0, 0, 0)))
         self.assertTrue(are_points_too_close(top_center, Vector(10, 5, -100)))
 
-    def test_negative_height_angle_radius_follows_direction(self):
+    def test_negative_height_angle_radius_follows_direction(self) -> None:
         """Test that angle+radius extend follows negative direction"""
         # radius change = 40 - 30 = 10, height change = 10 / tan(45) = 10
         cone = SmarterCone.base(50).extend(radius=40, height=-50).extend(angle=45, radius=30)
         self.assertAlmostEqual(cone.height, -60, places=3)
 
-    def test_radius_only_extend(self):
+    def test_radius_only_extend(self) -> None:
         """Test extend with only radius creates radius-step section at same height"""
         cone = SmarterCone.base(50).extend(radius=40, height=50).extend(radius=30)
         self.assertEqual(len(cone.sections), 3)
         self.assertAlmostEqual(cone.sections[2].radius, 30)
         self.assertAlmostEqual(cone.sections[2].height, cone.sections[1].height)
 
-    def test_radius_only_extend_negative_direction(self):
+    def test_radius_only_extend_negative_direction(self) -> None:
         """Test extend with only radius creates radius-step at same height in negative cone"""
         cone = SmarterCone.base(50).extend(radius=40, height=-50).extend(radius=30)
         self.assertEqual(len(cone.sections), 3)
         self.assertAlmostEqual(cone.sections[2].radius, 30)
         self.assertAlmostEqual(cone.sections[2].height, cone.sections[1].height)
 
-    def test_radius_step_skipped_in_geometry(self):
+    def test_radius_step_skipped_in_geometry(self) -> None:
         """Test that radius-step section becomes epsilon segment in geometry"""
         cone = SmarterCone.base(50).extend(radius=30).extend(radius=20, height=100)
         self.assertEqual(len(cone.sections), 3)
@@ -532,7 +532,7 @@ class TestSmarterConeNegativeHeight(unittest.TestCase):
         self.assertAlmostEqual(cone.z_min, 0, places=1)
         self.assertAlmostEqual(cone.z_max, 100, places=1)
 
-    def test_radius_step_preserves_previous_segment(self):
+    def test_radius_step_preserves_previous_segment(self) -> None:
         """Test that radius step doesn't alter the end radius of the previous segment"""
         cone = SmarterCone.base(50).extend(radius=40, height=50).extend(radius=30).extend(height=50)
         self.assertEqual(len(cone.sections), 4)
@@ -544,7 +544,7 @@ class TestSmarterConeNegativeHeight(unittest.TestCase):
         self.assertAlmostEqual(geo[1].radius, 40)  # previous segment end preserved
         self.assertAlmostEqual(geo[2].radius, 30)  # step starts new radius
 
-    def test_consecutive_radius_steps_monotonic_geometry(self):
+    def test_consecutive_radius_steps_monotonic_geometry(self) -> None:
         """Test that multiple consecutive radius steps produce monotonically increasing heights"""
         cone = SmarterCone.base(50).extend(radius=40, height=50).extend(radius=30).extend(radius=20).extend(height=50)
         geo = cone._geometry_sections()
@@ -552,7 +552,7 @@ class TestSmarterConeNegativeHeight(unittest.TestCase):
         for i in range(1, len(geo)):
             self.assertGreater(geo[i].height, geo[i - 1].height, f"Height at index {i} ({geo[i].height}) should be greater than at index {i - 1} ({geo[i - 1].height})")
 
-    def test_radius_step_negative_height(self):
+    def test_radius_step_negative_height(self) -> None:
         """Test that radius step in a negative-height cone offsets in the correct direction"""
         cone = SmarterCone.base(50).extend(radius=40, height=-50).extend(radius=30)
         geo = cone._geometry_sections()
@@ -562,44 +562,44 @@ class TestSmarterConeNegativeHeight(unittest.TestCase):
 
 class TestSmarterConeInnerModeRadius(unittest.TestCase):
 
-    def test_radius_mode_preserves_inner_radius_through_extend(self):
+    def test_radius_mode_preserves_inner_radius_through_extend(self) -> None:
         """Test that RADIUS mode keeps inner_radius constant during extend"""
         cone = SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS).extend(radius=40, height=100)
         self.assertAlmostEqual(cone.sections[1].inner_radius, 30)
 
-    def test_radius_mode_chained_extends(self):
+    def test_radius_mode_chained_extends(self) -> None:
         """Test that RADIUS mode preserves inner_radius through multiple extends"""
         cone = SmarterCone.base(50).inner(20, mode=InnerMode.RADIUS).extend(radius=40, height=50).extend(radius=30, height=50)
         self.assertAlmostEqual(cone.sections[1].inner_radius, 20)
         self.assertAlmostEqual(cone.sections[2].inner_radius, 20)
 
-    def test_radius_mode_preserves_inner_shifts_absolute(self):
+    def test_radius_mode_preserves_inner_shifts_absolute(self) -> None:
         """Test that RADIUS mode copies inner shifts as-is (not as offset)"""
         cone = SmarterCone.base(50).extend(radius=50, height=50).inner(30, shift_x=5, shift_y=3, mode=InnerMode.RADIUS).extend(radius=40, height=50, shift_x=10)
         # RADIUS mode: inner_shift_x stays 5 (not 10 + (5 - 0) = 15 as in THICKNESS)
         self.assertAlmostEqual(cone.sections[-1].inner_shift_x, 5)
         self.assertAlmostEqual(cone.sections[-1].inner_shift_y, 3)
 
-    def test_radius_mode_none_shifts_stay_none(self):
+    def test_radius_mode_none_shifts_stay_none(self) -> None:
         """Test that None inner shifts stay None in RADIUS mode"""
         cone = SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS).extend(radius=40, height=100)
         self.assertIsNone(cone.sections[-1].inner_shift_x)
         self.assertIsNone(cone.sections[-1].inner_shift_y)
 
-    def test_radius_mode_fillet_preserves_inner_radius(self):
+    def test_radius_mode_fillet_preserves_inner_radius(self) -> None:
         """Test that fillet sections keep constant inner_radius in RADIUS mode"""
         cone = SmarterCone.base(50).inner(20, mode=InnerMode.RADIUS).extend(radius=50, height=50).extend(radius=30, height=50, fillet=5)
         for i, s in enumerate(cone.sections):
             if s.inner_radius is not None:
                 self.assertAlmostEqual(s.inner_radius, 20, places=5, msg=f"Section {i} inner_radius should be 20")
 
-    def test_thickness_mode_is_default(self):
+    def test_thickness_mode_is_default(self) -> None:
         """Test that THICKNESS mode is the default (existing behavior)"""
         cone = SmarterCone.base(50).inner(40).extend(radius=30, height=100)
         # Wall thickness = 10, so inner = 30 - 10 = 20
         self.assertAlmostEqual(cone.sections[1].inner_radius, 20)
 
-    def test_mode_switch_mid_chain(self):
+    def test_mode_switch_mid_chain(self) -> None:
         """Test switching from THICKNESS to RADIUS mode mid-chain"""
         cone = SmarterCone.base(50).inner(40).extend(radius=40, height=50)
         # Wall thickness = 10, inner = 40 - 10 = 30
@@ -609,25 +609,25 @@ class TestSmarterConeInnerModeRadius(unittest.TestCase):
         # RADIUS mode: inner stays 25
         self.assertAlmostEqual(cone.sections[-1].inner_radius, 25)
 
-    def test_radius_mode_narrowing_outer_validates(self):
+    def test_radius_mode_narrowing_outer_validates(self) -> None:
         """Test that RADIUS mode with outer narrowing below inner raises during build"""
         with self.assertRaises(AssertionError):
             # inner_radius=30 but outer=20 would violate inner < outer
             SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS).extend(radius=20, height=100)
 
-    def test_copy_preserves_inner_mode(self):
+    def test_copy_preserves_inner_mode(self) -> None:
         """Test that copy() preserves the inner mode"""
         cone = SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS).extend(radius=40, height=100)
         copied = cone.copy()
         self.assertEqual(copied._inner_mode, InnerMode.RADIUS)
 
-    def test_inner_without_mode_preserves_existing_mode(self):
+    def test_inner_without_mode_preserves_existing_mode(self) -> None:
         """Test that inner() without mode parameter keeps the existing mode"""
         cone = SmarterCone.base(50).inner(30, mode=InnerMode.RADIUS)
         cone.inner(25)  # no mode specified
         self.assertEqual(cone._inner_mode, InnerMode.RADIUS)
 
-    def test_inner_mode_only_switches_mode(self):
+    def test_inner_mode_only_switches_mode(self) -> None:
         """Test that inner(mode=...) without radius switches mode and recalculates"""
         cone = SmarterCone.base(50).inner(40).extend(radius=60, height=50)
         # THICKNESS: wall=10, inner=60-10=50
@@ -637,13 +637,13 @@ class TestSmarterConeInnerModeRadius(unittest.TestCase):
         # RADIUS recalc: copies prev inner_radius=40
         self.assertAlmostEqual(cone.sections[-1].inner_radius, 40)
 
-    def test_inner_mode_only_before_any_inner_radius(self):
+    def test_inner_mode_only_before_any_inner_radius(self) -> None:
         """Test that inner(mode=...) without prior inner_radius is valid"""
         cone = SmarterCone.base(50).inner(mode=InnerMode.RADIUS)
         self.assertEqual(cone._inner_mode, InnerMode.RADIUS)
         self.assertIsNone(cone.sections[0].inner_radius)
 
-    def test_mode_only_recalculates_inner_to_radius(self):
+    def test_mode_only_recalculates_inner_to_radius(self) -> None:
         """Test that switching to RADIUS mode recalculates current section's inner"""
         # outer=50->60, wall=10 -> THICKNESS inner=60-10=50
         cone = SmarterCone.base(50).inner(40).extend(radius=60, height=50)
@@ -652,7 +652,7 @@ class TestSmarterConeInnerModeRadius(unittest.TestCase):
         cone.inner(mode=InnerMode.RADIUS)
         self.assertAlmostEqual(cone.sections[-1].inner_radius, 40)
 
-    def test_mode_only_recalculates_inner_to_thickness(self):
+    def test_mode_only_recalculates_inner_to_thickness(self) -> None:
         """Test that switching to THICKNESS mode recalculates current section's inner"""
         cone = SmarterCone.base(50).inner(40, mode=InnerMode.RADIUS).extend(radius=60, height=50)
         # RADIUS: inner stays 40
@@ -661,7 +661,7 @@ class TestSmarterConeInnerModeRadius(unittest.TestCase):
         cone.inner(mode=InnerMode.THICKNESS)
         self.assertAlmostEqual(cone.sections[-1].inner_radius, 50)
 
-    def test_mode_only_recalculates_inner_shifts(self):
+    def test_mode_only_recalculates_inner_shifts(self) -> None:
         """Test that mode switch recalculates inner shifts"""
         cone = SmarterCone.base(50).extend(radius=50, height=50).inner(40, shift_x=5, shift_y=3)
         cone.extend(radius=50, height=50, shift_x=10)
@@ -672,14 +672,14 @@ class TestSmarterConeInnerModeRadius(unittest.TestCase):
         self.assertAlmostEqual(cone.sections[-1].inner_shift_x, 5)
         self.assertAlmostEqual(cone.sections[-1].inner_shift_y, 3)
 
-    def test_mode_only_no_recalc_without_prior_inner(self):
+    def test_mode_only_no_recalc_without_prior_inner(self) -> None:
         """Test that mode switch on base section (no prior) is a no-op on geometry"""
         cone = SmarterCone.base(50).inner(40)
         cone.inner(mode=InnerMode.RADIUS)
         # Only 1 section, no prior to recalculate from — inner unchanged
         self.assertAlmostEqual(cone.sections[0].inner_radius, 40)
 
-    def test_inner_no_args_raises(self):
+    def test_inner_no_args_raises(self) -> None:
         """Test that inner() with no args raises AssertionError"""
         with self.assertRaises(AssertionError):
             SmarterCone.base(50).inner()
@@ -697,17 +697,17 @@ class TestSmarterConeBuilderTransformCommute(unittest.TestCase):
     "complete all builder calls, then apply all transforms."
     """
 
-    def _bbox_tuple(self, s):
+    def _bbox_tuple(self, s) -> tuple[float, float, float, float, float, float]:
         bb = s.bound_box
         return (bb.min.X, bb.min.Y, bb.min.Z, bb.max.X, bb.max.Y, bb.max.Z)
 
-    def _assert_bbox_close(self, s1, s2):
+    def _assert_bbox_close(self, s1, s2) -> None:
         b1, b2 = self._bbox_tuple(s1), self._bbox_tuple(s2)
-        for a, b in zip(b1, b2):
+        for a, b in zip(b1, b2, strict=True):
             self.assertAlmostEqual(a, b, places=4)
 
     @parameterized.expand([(30,), (60,), (90,), (180,), (-60,)])
-    def test_rotate_before_extend_matches_rotate_after(self, angle):
+    def test_rotate_before_extend_matches_rotate_after(self, angle) -> None:
         """Wedge built via inner+extend: rotate-then-extend == extend-then-rotate."""
         a = SmarterCone.base(35.5, angle=20).inner(25.5)
         a.rotate_z(angle)
@@ -719,7 +719,7 @@ class TestSmarterConeBuilderTransformCommute(unittest.TestCase):
 
         self._assert_bbox_close(a, b)
 
-    def test_move_before_extend_matches_move_after(self):
+    def test_move_before_extend_matches_move_after(self) -> None:
         """Translation also commutes with builder rebuild."""
         a = SmarterCone.base(35.5, angle=20).inner(25.5)
         a.move(10, 0, 0)
@@ -731,7 +731,7 @@ class TestSmarterConeBuilderTransformCommute(unittest.TestCase):
 
         self._assert_bbox_close(a, b)
 
-    def test_rotate_and_move_interleaved(self):
+    def test_rotate_and_move_interleaved(self) -> None:
         """rotate-move-extend produces the same geometry as extend-move-rotate
         with the equivalent reordering (move target adjusted for rotation)."""
         a = SmarterCone.base(35.5, angle=20).inner(25.5)
@@ -746,7 +746,7 @@ class TestSmarterConeBuilderTransformCommute(unittest.TestCase):
 
         self._assert_bbox_close(a, b)
 
-    def test_rebuild_preserves_invariant(self):
+    def test_rebuild_preserves_invariant(self) -> None:
         """After mid-build rotate + extend, the SmartSolid invariants hold:
         `self.origin == self.solid.location.position` and
         `self._orientation == self.solid.orientation`."""

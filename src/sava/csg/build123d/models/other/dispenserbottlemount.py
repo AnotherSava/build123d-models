@@ -8,7 +8,7 @@ from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import GearDimensions, create_gear
 from sava.csg.build123d.common.smartbox import SmartBox
-from sava.csg.build123d.common.smartercone import SmarterCone, InnerMode
+from sava.csg.build123d.common.smartercone import InnerMode, SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
@@ -57,7 +57,7 @@ class DispenserBottleMountDimensions:
     # GearDimensions instance to override the whole spec.
     cover_gear: GearDimensions = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Cover first so support can read cover_gear.radius_outer_extra.
         self.cover_gear = self.cover_gear or GearDimensions(
             gear_count=8,
@@ -160,7 +160,7 @@ class DispenserBottleMount:
     # to fit the (asymmetric) pin travel around it.
     _COVER_STADIUM_ANCHOR = (24.3702, 10.4949)
 
-    def __init__(self, dim: DispenserBottleMountDimensions):
+    def __init__(self, dim: DispenserBottleMountDimensions) -> None:
         self.dim = dim
 
     @property

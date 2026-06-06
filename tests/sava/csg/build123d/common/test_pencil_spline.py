@@ -9,7 +9,7 @@ from sava.csg.build123d.common.pencil import Pencil
 class TestPencilSpline(unittest.TestCase):
     """Test Pencil.spline() method with and without intermediate points."""
 
-    def test_backward_compatibility_simple_spline(self):
+    def test_backward_compatibility_simple_spline(self) -> None:
         """Test that existing spline calls without intermediate_points still work."""
         pencil = Pencil()
         result = pencil.spline((50, 50), (1, 0))
@@ -28,7 +28,7 @@ class TestPencilSpline(unittest.TestCase):
         edge = pencil.curves[0]
         self.assertTrue(edge.is_valid)
 
-    def test_spline_with_single_intermediate_point(self):
+    def test_spline_with_single_intermediate_point(self) -> None:
         """Test spline with a single intermediate point."""
         pencil = Pencil()
         result = pencil.spline((50, 50), (1, 0), intermediate_points=[(25, 25)])
@@ -47,7 +47,7 @@ class TestPencilSpline(unittest.TestCase):
         edge = pencil.curves[0]
         self.assertTrue(edge.is_valid)
 
-    def test_spline_with_multiple_intermediate_points(self):
+    def test_spline_with_multiple_intermediate_points(self) -> None:
         """Test spline with multiple intermediate points."""
         pencil = Pencil()
         intermediate = [(20, 30), (40, 20), (45, 45)]
@@ -67,7 +67,7 @@ class TestPencilSpline(unittest.TestCase):
         edge = pencil.curves[0]
         self.assertTrue(edge.is_valid)
 
-    def test_spline_with_empty_intermediate_points_list(self):
+    def test_spline_with_empty_intermediate_points_list(self) -> None:
         """Test that empty intermediate_points list behaves like None."""
         pencil1 = Pencil()
         pencil1.spline((50, 50), (1, 0), intermediate_points=[])
@@ -83,7 +83,7 @@ class TestPencilSpline(unittest.TestCase):
         self.assertAlmostEqual(pencil1.location.X, pencil2.location.X)
         self.assertAlmostEqual(pencil1.location.Y, pencil2.location.Y)
 
-    def test_spline_with_none_intermediate_points(self):
+    def test_spline_with_none_intermediate_points(self) -> None:
         """Test that explicitly passing None works the same as not passing it."""
         pencil = Pencil()
         result = pencil.spline((50, 50), (1, 0), intermediate_points=None)
@@ -94,7 +94,7 @@ class TestPencilSpline(unittest.TestCase):
         self.assertAlmostEqual(pencil.location.X, 50)
         self.assertAlmostEqual(pencil.location.Y, 50)
 
-    def test_intermediate_points_are_relative_to_current_location(self):
+    def test_intermediate_points_are_relative_to_current_location(self) -> None:
         """Test that intermediate points are relative to current location, not origin."""
         pencil = Pencil(start=(10, 10))
         pencil.jump((20, 20))  # Move to (20, 20) in local coords (30, 30 in world)
@@ -107,7 +107,7 @@ class TestPencilSpline(unittest.TestCase):
         self.assertAlmostEqual(pencil.location.X, 70)
         self.assertAlmostEqual(pencil.location.Y, 70)
 
-    def test_very_close_intermediate_point_to_start_raises_error(self):
+    def test_very_close_intermediate_point_to_start_raises_error(self) -> None:
         """Test that intermediate point very close to start location raises ValueError."""
         pencil = Pencil()
 
@@ -117,7 +117,7 @@ class TestPencilSpline(unittest.TestCase):
 
         self.assertIn("start and intermediate point 0", str(context.exception))
 
-    def test_very_close_intermediate_point_to_destination_raises_error(self):
+    def test_very_close_intermediate_point_to_destination_raises_error(self) -> None:
         """Test that intermediate point very close to destination raises ValueError."""
         pencil = Pencil()
 
@@ -127,7 +127,7 @@ class TestPencilSpline(unittest.TestCase):
 
         self.assertIn("intermediate point 1 and destination", str(context.exception))
 
-    def test_duplicate_intermediate_points_raises_error(self):
+    def test_duplicate_intermediate_points_raises_error(self) -> None:
         """Test that duplicate intermediate points raise ValueError."""
         pencil = Pencil()
 
@@ -137,7 +137,7 @@ class TestPencilSpline(unittest.TestCase):
 
         self.assertIn("intermediate point 0 and intermediate point 1", str(context.exception))
 
-    def test_spline_with_vector_intermediate_points(self):
+    def test_spline_with_vector_intermediate_points(self) -> None:
         """Test that intermediate points can be Vector objects, not just tuples."""
         pencil = Pencil()
         intermediate = [Vector(20, 30), Vector(40, 20)]
@@ -148,7 +148,7 @@ class TestPencilSpline(unittest.TestCase):
         self.assertEqual(len(pencil.curves), 1)
         self.assertTrue(pencil.curves[0].is_valid)
 
-    def test_spline_with_mixed_intermediate_point_types(self):
+    def test_spline_with_mixed_intermediate_point_types(self) -> None:
         """Test that intermediate points can be a mix of tuples and Vectors."""
         pencil = Pencil()
         intermediate = [(20, 30), Vector(40, 20), (45, 45)]
@@ -166,7 +166,7 @@ class TestPencilSpline(unittest.TestCase):
         ("two_points", [(20, 30), (40, 20)], 1),
         ("three_points", [(15, 20), (30, 35), (45, 25)], 1),
     ])
-    def test_spline_curve_count(self, name, intermediate, expected_curves):
+    def test_spline_curve_count(self, name, intermediate, expected_curves) -> None:
         """Test that spline always creates exactly one curve regardless of intermediate points."""
         pencil = Pencil()
         pencil.spline((50, 50), (1, 0), intermediate_points=intermediate)
@@ -174,7 +174,7 @@ class TestPencilSpline(unittest.TestCase):
         self.assertEqual(len(pencil.curves), expected_curves,
                         f"Should have {expected_curves} curve(s) for {name}")
 
-    def test_chaining_multiple_splines(self):
+    def test_chaining_multiple_splines(self) -> None:
         """Test that multiple spline calls can be chained together."""
         pencil = Pencil()
         pencil.spline((25, 25), (1, 0)).spline((50, 0), (0, -1), intermediate_points=[(10, 10)])
@@ -190,7 +190,7 @@ class TestPencilSpline(unittest.TestCase):
         self.assertAlmostEqual(pencil.location.X, 75)
         self.assertAlmostEqual(pencil.location.Y, 25)
 
-    def test_spline_with_custom_start_tangent(self):
+    def test_spline_with_custom_start_tangent(self) -> None:
         """Test spline with custom start tangent."""
         pencil = Pencil()
         result = pencil.spline((50, 50), (1, 0), start_tangent=(0, 1))
@@ -208,7 +208,7 @@ class TestPencilSpline(unittest.TestCase):
         self.assertAlmostEqual(pencil.location.X, 50)
         self.assertAlmostEqual(pencil.location.Y, 50)
 
-    def test_spline_with_start_tangent_and_intermediate_points(self):
+    def test_spline_with_start_tangent_and_intermediate_points(self) -> None:
         """Test spline with both custom start tangent and intermediate points."""
         pencil = Pencil()
         result = pencil.spline((50, 50), (1, 0), intermediate_points=[(25, 25)], start_tangent=(0, 1))
@@ -226,7 +226,7 @@ class TestPencilSpline(unittest.TestCase):
         self.assertAlmostEqual(pencil.location.X, 50)
         self.assertAlmostEqual(pencil.location.Y, 50)
 
-    def test_spline_with_vector_start_tangent(self):
+    def test_spline_with_vector_start_tangent(self) -> None:
         """Test that start_tangent can be a Vector object."""
         pencil = Pencil()
         result = pencil.spline((50, 50), (1, 0), start_tangent=Vector(0, 1))
@@ -236,7 +236,7 @@ class TestPencilSpline(unittest.TestCase):
         self.assertEqual(len(pencil.curves), 1)
         self.assertTrue(pencil.curves[0].is_valid)
 
-    def test_spline_start_tangent_overrides_calculated(self):
+    def test_spline_start_tangent_overrides_calculated(self) -> None:
         """Test that start_tangent overrides the auto-calculated tangent from previous curve."""
         pencil = Pencil()
 

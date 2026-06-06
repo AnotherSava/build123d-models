@@ -1,9 +1,8 @@
 from copy import copy
 from dataclasses import dataclass
-from math import radians, sin, degrees, asin
-from math import tan
+from math import asin, degrees, radians, sin, tan
 
-from build123d import Solid, Trapezoid, Circle, Location, fillet, Face, revolve, Axis, Wire
+from build123d import Axis, Circle, Face, Location, Solid, Trapezoid, Wire, fillet, revolve
 
 from sava.csg.build123d.common.exporter import export, save_3mf
 from sava.csg.build123d.common.geometry import Alignment, Direction, create_plane, create_vector
@@ -13,7 +12,7 @@ from sava.csg.build123d.common.smartcone import SmartCone
 from sava.csg.build123d.common.smartloft import SmartLoft
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.sweepsolid import SweepSolid
-from sava.csg.build123d.models.hydroponics.connector import HoseConnectorFactory, HoseConnectorDimensions
+from sava.csg.build123d.models.hydroponics.connector import HoseConnectorDimensions, HoseConnectorFactory
 
 
 @dataclass
@@ -34,7 +33,7 @@ class PipeDimensions:
         return self.diameter_outer / 2
 
     @property
-    def bend_angle_rad(self):
+    def bend_angle_rad(self) -> float:
         return radians(self.bend_angle)
 
 
@@ -99,7 +98,7 @@ class StandDimensions:
     tube_height: float = 80
     support_free_angle: float = 35
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.handles = self.handles or HandleDimensions()
         self.hose_connector = self.hose_connector or HoseConnectorDimensions()
         self.hose_holder = self.hose_holder or HoseHolder()
@@ -112,7 +111,7 @@ class StandDimensions:
         self.pipe.diameter_inner = self.hose_connector.diameter_inner
 
     @property
-    def support_free_angle_rad(self):
+    def support_free_angle_rad(self) -> float:
         return radians(self.support_free_angle)
 
     @property
@@ -122,7 +121,7 @@ class StandDimensions:
 
 
 class HydroponicsStand:
-    def __init__(self, dim: StandDimensions):
+    def __init__(self, dim: StandDimensions) -> None:
         self.dim = dim
         self.host_connector_factory = HoseConnectorFactory(self.dim.hose_connector)
 
@@ -258,13 +257,13 @@ class HydroponicsStand:
         inlet_connector_bottom.align_y(tube, Alignment.C, self.dim.hose_connector.distance_between_pipe_centres / 2 * (1 if direction == Direction.N else -1))
         return inlet_connector_bottom
 
-    def create_etches(self, tube: SmartSolid):
+    def create_etches(self, tube: SmartSolid) -> SmartSolid:
         trapezoid = Trapezoid(self.dim.etches_inner.outer_width, self.dim.etches_inner.thickness, self.dim.etches_inner.side_angle)
 
         # Fillet two vertices facing inside the tube
         internal_vertices = sorted(trapezoid.vertices(), key=lambda v: v.Y)[-2:]
         trapezoid = fillet(internal_vertices, self.dim.etches_inner.fillet_radius)
-        
+
         trapezoid.orientation = (90, 0, -90)
         trapezoid.position = ((self.dim.etches_inner.thickness - self.dim.tube_internal_diameter) / 2, 0, 0)
 
@@ -273,7 +272,7 @@ class HydroponicsStand:
 
         return etches.align_z(tube, Alignment.RL, -self.dim.etches_inner.distance_from_top + self.dim.tube_top_cut_offset)
 
-    def create_handles(self, tube: SmartSolid):
+    def create_handles(self, tube: SmartSolid) -> SmartSolid:
         shapes = []
         for i in range(self.dim.handles.count):
             plane = create_plane(x_axis=create_vector(1, i * 360 / self.dim.handles.count), y_axis=(0, 0, 1))
@@ -287,7 +286,7 @@ class HydroponicsStand:
 
         return SmartSolid(shapes).align_zxy(tube, Alignment.LR).cut(tube)
 
-    def create_outlet_hole(self, outlet_pipe_inner: SweepSolid):
+    def create_outlet_hole(self, outlet_pipe_inner: SweepSolid) -> SmartSolid:
         skip_height = -self.dim.hose_connector.connector_offset_z
         face = self.create_pipe_cover_face_wider(outlet_pipe_inner, skip_height=skip_height)
         outlet_hole = SmartLoft.extrude(face, self.dim.pipe.diameter_inner)
@@ -299,7 +298,7 @@ class HydroponicsStand:
 
         return outlet_hole
 
-    def create_magic_surface(self, tube: SmartSolid, tube_inside: SmartSolid, outlet_pipe_outer: SweepSolid, pipe_cover: SmartSolid, outlet_hole: SmartSolid):
+    def create_magic_surface(self, tube: SmartSolid, tube_inside: SmartSolid, outlet_pipe_outer: SweepSolid, pipe_cover: SmartSolid, outlet_hole: SmartSolid) -> SmartSolid:
         radius = self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness + self.dim.hose_connector.connector_offset_x + self.dim.hose_connector.diameter_outer_max / 2
 
         bottom = SmartCone.create_cone(90 - self.dim.support_free_angle, radius, self.dim.hose_holder.central_holder_radius)

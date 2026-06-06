@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from build123d import Wire, sweep, Sketch, Plane
+from build123d import Plane, Sketch, Wire, sweep
 
 from sava.csg.build123d.common.geometry import solidify_wire
 from sava.csg.build123d.common.pencil import Pencil

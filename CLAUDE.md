@@ -31,6 +31,12 @@ python -m pytest tests/sava/csg/build123d/common/test_smartsolid.py
 python -m pytest tests/sava/csg/build123d/common/test_smartsolid.py::TestSmartSolidBoundBox::test_get_bound_box_standard_planes
 ```
 
+**Lint** (pyflakes, bugbear, import order, annotations, private access, whitespace — every rule decision is documented in `ruff.toml`):
+```bash
+venv/Scripts/ruff.exe check .
+```
+A PostToolUse hook (`.claude/hooks/ruff_check.py`) auto-lints every edited `.py` file with `ruff check --fix`; unfixable violations come back as blocking feedback to be corrected immediately.
+
 **View model output:** Use F3D viewer with auto-reload:
 ```bash
 f3d models/current_model.3mf --watch --opacity=0.6
@@ -48,6 +54,7 @@ f3d models/current_model.3mf --watch --opacity=0.6
   - Bound box helpers (x_min, x_max, x_mid, y_size, etc.)
   - Support for both single solids and ShapeList collections
   - Cut helpers (`cut_x`, `cut_y`, `cut_z`): trim along an axis using `cut` (absolute to remove), `cut_fraction` (fraction to remove), `keep` (absolute to keep), or `keep_fraction` (fraction to keep)
+  - Bevel helpers: `bevel(side, direction, angle, offset=)` shaves a face with a planar cut (`offset` slides the cut plane along the side's normal); `bevel_edge(side_a, side_b, size_a, size_b=)` breaks a bound-box edge with a flat wedge sized by its legs
 
 - **SmartBox**: Extends SmartSolid for box primitives with cutout operations. Supports per-side tapering (independent wall angles or symmetric top dimensions), producing frustum/wedge shapes with a possibly off-center top. Construction math (parameter resolution, solid building, offset geometry) lives in `boxgeometry.py`
 

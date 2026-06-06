@@ -9,7 +9,7 @@ from sava.csg.build123d.common.pencil import Pencil
 class TestPencilMirrorInCustomPlane(unittest.TestCase):
     """Test that Pencil mirroring works correctly in custom (non-XY) planes."""
 
-    def test_mirror_in_xy_plane(self):
+    def test_mirror_in_xy_plane(self) -> None:
         """Baseline test: mirroring in standard XY plane should work."""
         pencil = Pencil(Plane.XY)
         pencil.draw(50, 45)  # Draw at 45° from X axis
@@ -23,7 +23,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         vertices = face.vertices()
         self.assertGreaterEqual(len(vertices), 2)
 
-    def test_mirror_in_xz_plane(self):
+    def test_mirror_in_xz_plane(self) -> None:
         """Test mirroring in XZ plane (rotated 90° from XY)."""
         pencil = Pencil(Plane.XZ)
         pencil.draw(50, 45)  # Draw at 45° from X axis in XZ plane
@@ -37,7 +37,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         vertices = face.vertices()
         self.assertGreaterEqual(len(vertices), 2)
 
-    def test_mirror_in_yz_plane(self):
+    def test_mirror_in_yz_plane(self) -> None:
         """Test mirroring in YZ plane."""
         pencil = Pencil(Plane.YZ)
         pencil.draw(50, 45)  # Draw at 45° from Y axis in YZ plane
@@ -51,7 +51,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         vertices = face.vertices()
         self.assertGreaterEqual(len(vertices), 2)
 
-    def test_mirror_in_tilted_plane(self):
+    def test_mirror_in_tilted_plane(self) -> None:
         """Test mirroring in a custom tilted plane (not aligned with standard axes)."""
         # Create a plane tilted 45° around Y axis
         tilted_plane = Plane.XY.rotated((0, 45, 0))
@@ -68,7 +68,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         vertices = face.vertices()
         self.assertGreaterEqual(len(vertices), 2)
 
-    def test_mirror_in_diagonal_plane(self):
+    def test_mirror_in_diagonal_plane(self) -> None:
         """Test mirroring in a plane tilted diagonally."""
         # Create a plane tilted around multiple axes
         diagonal_plane = Plane.XY.rotated((30, 45, 15))
@@ -85,7 +85,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         vertices = face.vertices()
         self.assertGreaterEqual(len(vertices), 2)
 
-    def test_mirrored_wires_are_coplanar(self):
+    def test_mirrored_wires_are_coplanar(self) -> None:
         """Test that original and mirrored wires lie in the same plane."""
         # Use a tilted plane to make the test meaningful
         tilted_plane = Plane.XY.rotated((0, 30, 0))
@@ -119,7 +119,7 @@ class TestPencilMirrorInCustomPlane(unittest.TestCase):
         ("tilted_45y", Plane.XY.rotated((0, 45, 0))),
         ("tilted_diagonal", Plane.XY.rotated((30, 45, 60))),
     ])
-    def test_mirror_axis_x_various_planes(self, name, plane):
+    def test_mirror_axis_x_various_planes(self, name, plane) -> None:
         """Test mirroring across X axis in various plane orientations."""
         pencil = Pencil(plane)
         pencil.draw(50, 45)

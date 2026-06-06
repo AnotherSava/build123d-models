@@ -1,13 +1,13 @@
 from copy import copy
 
-from build123d import sweep, Plane, SweepType, Wire, Vector, Location, Axis, VectorLike
+from build123d import Axis, Location, Plane, SweepType, Vector, VectorLike, Wire, sweep
 
-from sava.csg.build123d.common.geometry import create_wire_tangent_plane, create_plane_from_planes, orient_plane, multi_rotate_vector
+from sava.csg.build123d.common.geometry import create_plane_from_planes, create_wire_tangent_plane, orient_plane
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
 class SweepSolid(SmartSolid):
-    def __init__(self, sketch: SweepType, path: Wire, path_plane: Plane, label: str = None):
+    def __init__(self, sketch: SweepType, path: Wire, path_plane: Plane, label: str = None) -> None:
         self.sketch = sketch
         self.path = copy(path)
         self.plane_path = copy(path_plane)

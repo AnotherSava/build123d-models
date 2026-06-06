@@ -2,8 +2,8 @@ import math
 from copy import copy
 from dataclasses import dataclass
 
-from build123d import Vector, Solid, Part, Plane, Compound
-from traitlets import HasTraits, Float, Int, TraitError, validate
+from build123d import Compound, Part, Plane, Solid, Vector
+from traitlets import Float, HasTraits, Int, TraitError, validate
 
 from sava.common.advanced_math import advanced_round
 from sava.csg.build123d.common.geometry import Alignment
@@ -39,25 +39,25 @@ class MeshLidDimensions(HasTraits):
     handle: MeshLidHandleDimensions = None
 
     @validate('hex_count_length')
-    def _validate_hex_count_length(self, proposal):
+    def _validate_hex_count_length(self, proposal: dict) -> int | None:
         value = proposal['value']
         if value is not None and value % 2 != 0:
             raise TraitError(f"hex_count_length must be even, got {value}")
         return value
 
     @property
-    def wall_height(self):
+    def wall_height(self) -> float:
         return self.height if self.handle is None or self.handle.wall_height is None else self.handle.wall_height
 
-    def get_mesh_height(self):
+    def get_mesh_height(self) -> float:
         return self.wall_height - (self.inner_space_height or 0)
 
-    def get_hex_short_diagonal(self):
+    def get_hex_short_diagonal(self) -> float:
         return (self.length - self.wall_thickness * 2 - self.grid_thickness * (self.hex_count_length - 1)) / self.hex_count_length
 
 
 class MeshLid(SmartBox):
-    def __init__(self, dimensions: MeshLidDimensions):
+    def __init__(self, dimensions: MeshLidDimensions) -> None:
         super().__init__(dimensions.length, dimensions.width, dimensions.height)
 
         self.dimensions = dimensions
@@ -118,7 +118,7 @@ class MeshLid(SmartBox):
 
         return lid
 
-    def create_recess(self, length: float, width: float, height) -> SmartSolid:
+    def create_recess(self, length: float, width: float, height: float) -> SmartSolid:
         base_slope_length = length * self.dimensions.handle.slope_length_coefficient
         full_hexes_covered_x = max(1, int(2 * base_slope_length / self.internal_mesh_hex.short_diagonal))
         slopeLength = full_hexes_covered_x * (self.internal_mesh_hex.short_diagonal + self.dimensions.grid_thickness) / 2 - self.dimensions.grid_thickness / 2

@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
-from math import tan, radians
+from math import radians, tan
 
-from build123d import Vector, Plane, Axis, Location, Face, Polyline, extrude
+from build123d import Axis, Face, Location, Plane, Polyline, Vector, extrude
 
 from sava.csg.build123d.common.edgefilters import AXIS_X, AxisFilter, PositionalFilter
-from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
-from sava.csg.build123d.common.geometry import create_vector, Alignment
+from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl
+from sava.csg.build123d.common.geometry import Alignment, create_vector
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -88,49 +88,49 @@ class PowerAdapterBoxDimensions:
         first_socket_centre = self.socket_padding + self.socket_side / 2
         return row_half_width - first_socket_centre
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         box_max = self.box_height - self.lock.tip_distance - self.lock.tip_gap
         tip_max = (self.lock.tip_thickness + self.lock.cantilever_thickness) / tan(radians(self.lock.hook_angle))
 
         self.lock.tip_height = min(box_max, tip_max)
 
     @property
-    def lid_length_internal(self):
+    def lid_length_internal(self) -> float:
         return self.box_length - self.lid_wall_thickness * 2
 
     @property
-    def lid_width_internal(self):
+    def lid_width_internal(self) -> float:
         return self.box_width - self.lid_wall_thickness * 2
 
     @property
-    def lid_cutout_height(self):
+    def lid_cutout_height(self) -> float:
         return self.box_height / 8 * 7
 
     @property
-    def lid_height(self):
+    def lid_height(self) -> float:
         return self.lid_cutout_height + self.lid_internal_height + self.lid_ceiling_thickness
 
     @property
-    def box_length(self):
+    def box_length(self) -> float:
         return self.get_side_length(self.sockets_per_row) + self.box_length_padding
 
     @property
-    def box_height(self):
+    def box_height(self) -> float:
         return self.floor_thickness + self.recess.depth_bottom + self.recess.depth_top
 
     @property
-    def box_wider_height(self):
+    def box_wider_height(self) -> float:
         return self.box_height - self.lid_cutout_height
 
-    def get_side_length(self, socket_count: int):
+    def get_side_length(self, socket_count: int) -> float:
         return self.socket_side * socket_count + self.socket_padding * (socket_count + 1)
 
 class PowerAdapterBase:
-    def __init__(self, dim: PowerAdapterBoxDimensions):
+    def __init__(self, dim: PowerAdapterBoxDimensions) -> None:
         self.dim = dim
 
     # Creates tapered box protrusion that connects box and lid
-    def create_protrusions(self, filleted: bool):
+    def create_protrusions(self, filleted: bool) -> SmartBox:
         protrusion_base_length = self.dim.lock.length + self.dim.lock.length_padding * 2 + self.dim.protrusion_side_delta
         width = self.dim.lid_wall_thickness + self.dim.box_taper_diff
 
@@ -140,9 +140,8 @@ class PowerAdapterBase:
             result.fillet_by(radius, AxisFilter(Axis.Z, 30), PositionalFilter(Axis.X, result.x_mid, result.x_max))
 
         return result
-        return protrusion.clone(2, (self.dim.lock_shift_from_centre * 2, 0))
 
-    def orient(self, solid: SmartSolid, base: SmartSolid, shift_z: float = 0):
+    def orient(self, solid: SmartSolid, base: SmartSolid, shift_z: float = 0) -> SmartSolid:
         result = []
         solid.align_z(base, Alignment.LR, shift_z)
         for orientation, alignment in [[0, Alignment.RL], [180, Alignment.LR]]:
@@ -362,7 +361,7 @@ dimensions = PowerAdapterBoxDimensions()
 power_adapter_box = PowerAdapterBox(dimensions)
 power_adapter_lid = PowerAdapterLid(dimensions)
 
-def export_3mf(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartSolid):
+def export_3mf(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartSolid) -> None:
     # clear()
     box.align_zxy(lid, Alignment.RR, -dimensions.lid_height - dimensions.box_wider_height)
     socket_texts.colocate(box)
@@ -371,7 +370,7 @@ def export_3mf(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps
     export(text, box, socket_texts)
     save_3mf("models/other/power_adapters/export.3mf", True)
 
-def export_stl(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartSolid):
+def export_stl(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartSolid) -> None:
     clear()
 
     lid.orient((180, 0, 0))

@@ -1,22 +1,23 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import IntEnum
-from math import cos, sin, radians, tan
+from math import cos, radians, sin, tan
 
-from build123d import Vector, Part, Wire
+from build123d import Part, Vector, Wire
 
-from sava.csg.build123d.common.geometry import create_vector, extrude_wire, create_closed_wire
+from sava.csg.build123d.common.geometry import create_closed_wire, create_vector, extrude_wire
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
-def get_hex_side(short_diagonal: float):
+def get_hex_side(short_diagonal: float) -> float:
     return short_diagonal * tan(radians(30))
 
 
-def get_diagonal(short_diagonal: float = None):
+def get_diagonal(short_diagonal: float = None) -> float:
     return short_diagonal / cos(radians(30))
 
 
-def get_distance_y(short_diagonal: float, short_diagonal_gap: float, diagonal_gap: float = None):
+def get_distance_y(short_diagonal: float, short_diagonal_gap: float, diagonal_gap: float = None) -> float:
     diagonal_gap = short_diagonal_gap if diagonal_gap is None else diagonal_gap
     return diagonal_gap / cos(radians(30)) - short_diagonal_gap / 2 * tan(radians(30)) + get_diagonal(short_diagonal) / 2 + get_hex_side(short_diagonal) / 2
 
@@ -29,7 +30,7 @@ class HexTileEdges(IntEnum):
     E = 0
     NE = 60
 
-    def get_unit_vector(self, length = 1) -> Vector:
+    def get_unit_vector(self, length: float = 1) -> Vector:
         return create_vector(length, self.value)
 
     def get_next_counter_clock_wise(self, count: int = 1) -> 'HexTileEdges':
@@ -38,7 +39,7 @@ class HexTileEdges(IntEnum):
     def get_next_clock_wise(self, count: int = 1) -> 'HexTileEdges':
         return HexTileEdges((self.value - 60 * count) % 360)
 
-    def get_vertices(self):
+    def get_vertices(self) -> tuple['HexTileVertices', 'HexTileVertices']:
         return HexTileVertices((self.value + 240) % 360), HexTileVertices((self.value + 300) % 360)
 
 class HexTileManifestEdges(IntEnum):
@@ -81,7 +82,7 @@ class HexTileVertices(IntEnum):
         return HexTileVertices((self.value + 60) % 360)
 
     @classmethod
-    def iterate(cls, start: 'HexTileVertices' = N):
+    def iterate(cls, start: 'HexTileVertices' = N) -> Iterator['HexTileVertices']:
         sorted_vertices = sorted(cls, key=lambda v: v.value)
         start_index = sorted_vertices.index(start)
         for i in range(len(sorted_vertices)):
@@ -102,7 +103,7 @@ class HexagonRayConfiguration:
 
 
 class HexagonConfiguration:
-    def __init__(self, ray_thickness: float = None, wall_thickness: float = None):
+    def __init__(self, ray_thickness: float = None, wall_thickness: float = None) -> None:
         self.ray_thickness = ray_thickness
         self.wall_thickness = wall_thickness
         self.walls = {}
@@ -136,18 +137,18 @@ class HexagonConfiguration:
         return (cwEdge.get_unit_vector(ccwOffset) - ccwEdge.get_unit_vector(cwOffset)) / cos(radians(30)) * multiplier
 
 class Hexagon:
-    def __init__(self, short_diagonal: float, height: float = 0, centre: Vector = Vector()):
+    def __init__(self, short_diagonal: float, height: float = 0, centre: Vector | None = None) -> None:
         self.short_diagonal = short_diagonal
         self.height = height
-        self.centre = centre
+        self.centre = centre if centre is not None else Vector()
 
         self.ray_length = short_diagonal / 2 / cos(radians(30))
         self.side = get_hex_side(short_diagonal)
 
-    def get_side(self):
+    def get_side(self) -> float:
         return get_hex_side(self.short_diagonal)
 
-    def get_diagonal(self):
+    def get_diagonal(self) -> float:
         return get_diagonal(self.short_diagonal)
 
     def create_ray_solid(self, configuration: HexagonConfiguration) -> Part:

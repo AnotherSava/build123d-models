@@ -2,7 +2,7 @@ from copy import copy
 
 from build123d import Axis, Face, Plane, revolve
 
-from sava.csg.build123d.common.geometry import rotate_plane, orient_plane
+from sava.csg.build123d.common.geometry import orient_plane, rotate_plane
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
 
@@ -13,7 +13,7 @@ class SmartRevolve(SmartSolid):
     allowing retrieval of planes at any angular position along the revolve.
     """
 
-    def __init__(self, sketch: Face, axis: Axis, angle: float, sketch_plane: Plane, label: str = None):
+    def __init__(self, sketch: Face, axis: Axis, angle: float, sketch_plane: Plane, label: str = None) -> None:
         """Create a SmartRevolve from a face revolved around an axis.
 
         Args:

@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass, field
 
-from ._vec import Vec, vsub, vcross, vdot, vlen
+from ._vec import Vec, vcross, vdot, vlen, vsub
 
 Face = tuple[int, int, int]
 

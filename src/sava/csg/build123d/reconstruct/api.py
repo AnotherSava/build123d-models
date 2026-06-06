@@ -7,7 +7,7 @@ from build123d import Vector
 from ._vec import Vec, vadd, vcross, vdot, vmul, vnorm
 from .boundary import boundary_polygons, simplify_collinear
 from .datum import build_datum_frame, make_frame, pick_datum, shift_origin_to_first_quadrant, to_local
-from .extrusion import cap_depth_in_frame, candidate_axes, classify_planes_vs_axis
+from .extrusion import candidate_axes, cap_depth_in_frame, classify_planes_vs_axis
 from .mesh_io import read_mesh
 from .numbers import fmt
 from .pencil_emit import Point2D, _signed_area, emit_pencil_for, find_shared_start
@@ -94,7 +94,7 @@ def _filter_noise_loops(loops_2d: list[list[Point2D]]) -> list[list[Point2D]]:
         return loops_2d
     areas = [abs(_signed_area(p)) for p in loops_2d]
     threshold = max(areas) * _NOISE_LOOP_AREA_FRAC
-    return [p for p, a in zip(loops_2d, areas) if a >= threshold]
+    return [p for p, a in zip(loops_2d, areas, strict=True) if a >= threshold]
 
 
 # Plane clusters merge triangles whose offsets agree within ~0.05 mm (planes.py).
@@ -417,7 +417,7 @@ def _polygon_loops(loops: list[list[Point2D]],
                    circles: list[tuple[float, Point2D] | None],
                    boxes: list[tuple[float, float, Point2D, float] | None]) -> list[list[Point2D]]:
     """Loops that will be emitted as Pencils (not collapsed into cylinders or boxes)."""
-    return [L for L, c, b in zip(loops, circles, boxes) if c is None and b is None]
+    return [L for L, c, b in zip(loops, circles, boxes, strict=True) if c is None and b is None]
 
 
 def _canonical_polygon(poly: list[Point2D]) -> tuple[list[Point2D], float, Point2D]:
@@ -450,7 +450,7 @@ def _canonical_polygon(poly: list[Point2D]) -> tuple[list[Point2D], float, Point
     # smallest-x vertices coincide in design and only differ by µm of
     # tessellation noise, so a raw-float lex-min would flip-flop between
     # the two 180°-rotated orientations.
-    def _quant(verts, g=0.05):
+    def _quant(verts: list[tuple[float, float]], g: float = 0.05) -> tuple[tuple[int, int], ...]:
         return tuple(sorted((round(x / g), round(y / g)) for x, y in verts))
     if _quant(canon_rot) < _quant(canon):
         canon = canon_rot

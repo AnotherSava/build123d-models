@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from sava.csg.build123d.common.exporter import export, save_3mf
-from sava.csg.build123d.common.geometry import Direction, Alignment
+from sava.csg.build123d.common.geometry import Alignment, Direction
 from sava.csg.build123d.common.smartbox import SmartBox
 
 
@@ -31,27 +31,27 @@ class CelebritiesBoxDimensions:
     token_notch_length: float = 10.0
 
     @property
-    def token_notch_depth(self):
+    def token_notch_depth(self) -> float:
         return min(self.token_notch_max_depth, self.cards_height - self.cube_side - self.tokens_height)
 
     @property
-    def inner_width(self):
+    def inner_width(self) -> float:
         return max(self.cards_width, self.cube_side * 3) + self.gap
 
     @property
-    def outer_length(self):
+    def outer_length(self) -> float:
         return self.cards_length + self.cube_side + 2 * self.gap + 3 * self.wall_thickness
 
     @property
-    def outer_width(self):
+    def outer_width(self) -> float:
         return self.inner_width + 2 * self.wall_thickness
 
     @property
-    def outer_height(self):
+    def outer_height(self) -> float:
         return self.cards_height + self.floor_thickness
 
 
-def create_celebrities_box(dim: CelebritiesBoxDimensions):
+def create_celebrities_box(dim: CelebritiesBoxDimensions) -> SmartBox:
     outer_box = SmartBox(dim.outer_length, dim.outer_width, dim.outer_height)
 
     card_box = SmartBox(dim.cards_length + dim.gap, dim.inner_width, dim.cards_height)

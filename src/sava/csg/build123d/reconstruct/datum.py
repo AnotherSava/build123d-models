@@ -1,6 +1,6 @@
 import math
 
-from ._vec import Vec, vsub, vdot, vcross, vnorm
+from ._vec import Vec, vcross, vdot, vnorm, vsub
 from .boundary import boundary_polygons
 from .planes import PlaneCluster
 

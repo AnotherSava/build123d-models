@@ -1,6 +1,5 @@
-from copy import copy
 
-from build123d import Location, Plane, Solid, Vector
+from build123d import Location, Plane, Solid
 
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -23,7 +22,7 @@ class SmartSphere(SmartSolid):
         shell = sphere.create_shell(5)  # 5mm thick shell outside
     """
 
-    def __init__(self, radius: float, internal_radius: float = None, angle: float = 360, plane: Plane = Plane.XY, label: str = None):
+    def __init__(self, radius: float, internal_radius: float = None, angle: float = 360, plane: Plane = Plane.XY, label: str = None) -> None:
         """
         Creates a sphere, optionally hollow.
 

@@ -8,7 +8,7 @@ from sava.csg.build123d.common.text import TextDimensions, create_text
 
 class TestTextSolidRotation(unittest.TestCase):
 
-    def test_text_is_valid_after_orient(self):
+    def test_text_is_valid_after_orient(self) -> None:
         """Test that text remains valid after orient()"""
         dim = TextDimensions(font_size=12, font="Liberation Sans", height=0.8)
         text = create_text(dim, "A")
@@ -17,7 +17,7 @@ class TestTextSolidRotation(unittest.TestCase):
 
         self.assertTrue(text.wrap_solid().is_valid)
 
-    def test_text_is_valid_after_rotate(self):
+    def test_text_is_valid_after_rotate(self) -> None:
         """Test that text remains valid after rotate()"""
         dim = TextDimensions(font_size=12, font="Liberation Sans", height=0.8)
         text = create_text(dim, "A")
@@ -26,7 +26,7 @@ class TestTextSolidRotation(unittest.TestCase):
 
         self.assertTrue(text.wrap_solid().is_valid)
 
-    def test_text_is_valid_after_rotate_with_axis(self):
+    def test_text_is_valid_after_rotate_with_axis(self) -> None:
         """Test that text remains valid after rotate_with_axis()"""
         dim = TextDimensions(font_size=12, font="Liberation Sans", height=0.8)
         text = create_text(dim, "A")
@@ -38,7 +38,7 @@ class TestTextSolidRotation(unittest.TestCase):
         mesher = Mesher()
         mesher.add_shape(text.wrap_solid())
 
-    def test_text_mesh_valid_after_rotate_with_axis(self):
+    def test_text_mesh_valid_after_rotate_with_axis(self) -> None:
         """Test that text can be meshed after rotate_with_axis()"""
         dim = TextDimensions(font_size=12, font="Liberation Sans", height=0.8)
         text = create_text(dim, "H")
@@ -48,7 +48,7 @@ class TestTextSolidRotation(unittest.TestCase):
         mesher = Mesher()
         mesher.add_shape(text.wrap_solid())
 
-    def test_multiple_rotated_texts_combined_and_meshed(self):
+    def test_multiple_rotated_texts_combined_and_meshed(self) -> None:
         """Test combining multiple rotated texts into SmartSolid and meshing"""
         dim = TextDimensions(font_size=12, font="Liberation Sans", height=0.8)
         labels = ["A", "B", "C", "H", "I", "J"]
@@ -68,7 +68,7 @@ class TestTextSolidRotation(unittest.TestCase):
         mesher = Mesher()
         mesher.add_shape(combined.wrap_solid())
 
-    def test_multichar_text_rotate_works(self):
+    def test_multichar_text_rotate_works(self) -> None:
         """Test that multi-char text (ShapeList) works with rotate_multi() after orientation replacement."""
         dim = TextDimensions(font_size=12, font="Liberation Sans", height=0.8)
         text = create_text(dim, "E/F")

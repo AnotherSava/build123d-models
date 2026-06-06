@@ -24,10 +24,10 @@ def advanced_round(x: float, div: int, mod: int = 0, min_value: int = None, max_
     if mod > remainder:
         lower_candidate -= div
         upper_candidate -= div
-    
+
     # Apply range constraints
     candidates = []
-    
+
     # Check lower candidate
     if (min_value is None or lower_candidate >= min_value) and (max_value is None or lower_candidate <= max_value):
         candidates.append(lower_candidate)
@@ -35,7 +35,7 @@ def advanced_round(x: float, div: int, mod: int = 0, min_value: int = None, max_
     # Check upper candidate
     if (min_value is None or upper_candidate >= min_value) and (max_value is None or upper_candidate <= max_value):
         candidates.append(upper_candidate)
-    
+
     # If no candidates within range, find the closest valid value
     if not candidates:
         # Find all valid values in the range
@@ -53,7 +53,7 @@ def advanced_round(x: float, div: int, mod: int = 0, min_value: int = None, max_
                         break
                 if candidates:
                     break
-    
+
     # Return the candidate closest to x
     if candidates:
         return min(candidates, key = lambda n: abs(x - n))

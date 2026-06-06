@@ -2,18 +2,18 @@ import math
 from dataclasses import dataclass, field
 from math import asin, degrees
 
-from build123d import Plane, Axis, Solid
+from build123d import Axis, Plane, Solid
 
 from sava.common.advanced_math import COS_45
+from sava.csg.build123d.common.edgefilters import PositionalFilter
 from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
-from sava.csg.build123d.common.edgefilters import PositionalFilter
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.smartsphere import SmartSphere
-from sava.csg.build123d.common.text import create_text, TextDimensions
+from sava.csg.build123d.common.text import TextDimensions, create_text
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,7 @@ class CableHolderDimensions:
 
 
 class CableHolder:
-    def __init__(self, dim: CableHolderDimensions):
+    def __init__(self, dim: CableHolderDimensions) -> None:
         self.dim = dim
 
     def create_cable_ball_connector(self, radius: float) -> SmartSolid:

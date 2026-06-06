@@ -3,7 +3,7 @@ from enum import Enum, auto
 from math import acos, degrees
 from typing import TYPE_CHECKING
 
-from build123d import Axis, Face, Edge, ShapeList, Vertex
+from build123d import Axis, Edge, Face, ShapeList, Vertex
 
 from sava.csg.build123d.common.geometry import is_within_interval
 
@@ -29,7 +29,7 @@ class SurfaceFilter:
     faces: list[Face] = None
     tolerance: float = 1e-5
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.solid is None and self.faces is None:
             raise ValueError("SurfaceFilter requires either 'solid' or 'faces'")
         if self.faces is None:

@@ -11,41 +11,41 @@ EXPECTED_PATH = DATA_DIR / 'expected_iris_blade.py'
 class TestIrisBladeReconstruction(unittest.TestCase):
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.result = reconstruct(str(MESH_PATH))
 
-    def test_is_2d5_extrudable(self):
+    def test_is_2d5_extrudable(self) -> None:
         self.assertTrue(self.result.is_2d5_extrudable)
         self.assertIsNone(self.result.error)
 
-    def _assert_vector_close(self, actual, expected_xyz, places=2):
+    def _assert_vector_close(self, actual, expected_xyz, places=2) -> None:
         self.assertAlmostEqual(actual.X, expected_xyz[0], places=places)
         self.assertAlmostEqual(actual.Y, expected_xyz[1], places=places)
         self.assertAlmostEqual(actual.Z, expected_xyz[2], places=places)
 
-    def test_extrusion_axis(self):
+    def test_extrusion_axis(self) -> None:
         self._assert_vector_close(self.result.extrusion_axis, (0.683, -0.731, 0.0))
 
-    def test_datum_frame_axes(self):
+    def test_datum_frame_axes(self) -> None:
         self._assert_vector_close(self.result.z_dir, (0.683, -0.731, 0.0))
         self._assert_vector_close(self.result.y_dir, (0.0, 0.0, 1.0))
         self._assert_vector_close(self.result.x_dir, (0.731, 0.683, 0.0))
 
-    def test_datum_contact_area(self):
+    def test_datum_contact_area(self) -> None:
         self.assertAlmostEqual(self.result.datum_contact_area, 74.87, places=1)
 
-    def test_layer_depths(self):
+    def test_layer_depths(self) -> None:
         depths = sorted(L.depth for L in self.result.layers)
         expected = [-0.611, 0.889, 3.889, 7.889]
         self.assertEqual(len(depths), len(expected))
-        for actual, ref in zip(depths, expected):
+        for actual, ref in zip(depths, expected, strict=True):
             self.assertAlmostEqual(actual, ref, places=2)
 
-    def test_layer_names(self):
+    def test_layer_names(self) -> None:
         names = {L.name for L in self.result.layers}
         self.assertEqual(names, {'front', 'back', 'back_protrusion', 'front_protrusion'})
 
-    def test_layer_depths_by_name(self):
+    def test_layer_depths_by_name(self) -> None:
         """Each named layer sits at the depth expected from the source mesh."""
         depth_for = {L.name: L.depth for L in self.result.layers}
         self.assertAlmostEqual(depth_for['back_protrusion'], -0.611, places=2)
@@ -53,7 +53,7 @@ class TestIrisBladeReconstruction(unittest.TestCase):
         self.assertAlmostEqual(depth_for['front'], 3.889, places=2)
         self.assertAlmostEqual(depth_for['front_protrusion'], 7.889, places=2)
 
-    def test_cylinder(self):
+    def test_cylinder(self) -> None:
         self.assertEqual(len(self.result.cylinders), 1)
         cyl = self.result.cylinders[0]
         self.assertAlmostEqual(cyl.radius, 1.8, places=1)
@@ -66,12 +66,12 @@ class TestIrisBladeReconstruction(unittest.TestCase):
         self.assertAlmostEqual(cv, 1.70, places=1)
         self.assertAlmostEqual(cz, 3.0, places=1)
 
-    def test_emitted_code_matches_expected(self):
+    def test_emitted_code_matches_expected(self) -> None:
         expected = EXPECTED_PATH.read_text(encoding='utf-8').strip()
         actual = self.result.code.strip()
         self.assertEqual(actual, expected)
 
-    def test_emitted_code_executes_and_reproduces_bbox(self):
+    def test_emitted_code_executes_and_reproduces_bbox(self) -> None:
         """Verify the emitted code runs and produces geometry matching the source mesh."""
         namespace = {}
         exec(self.result.code, namespace)
@@ -91,7 +91,7 @@ class TestIrisBladeReconstruction(unittest.TestCase):
         # Volume = body + back rim + cylinder pin ~ 1044 + 39.5 + 41.6 ~ 1125 mm^3.
         self.assertAlmostEqual(blade.solid.volume, 1125, delta=50)
 
-    def test_emitted_polygons_share_start_vertex(self):
+    def test_emitted_polygons_share_start_vertex(self) -> None:
         """The shared anchor vertex is folded into the local origin, so every
         emit-eligible polygon opens with a bare Pencil() (default Plane.XY)."""
         code = self.result.code

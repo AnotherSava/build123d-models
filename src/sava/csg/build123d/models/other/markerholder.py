@@ -4,7 +4,7 @@ from build123d import Axis
 
 from sava.csg.build123d.common.edgefilters import PositionalFilter
 from sava.csg.build123d.common.exporter import export_3mf, export_stl
-from sava.csg.build123d.common.geometry import Alignment, DELTA
+from sava.csg.build123d.common.geometry import DELTA, Alignment
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -39,7 +39,7 @@ class MarkerHolderDimensions:
 
 
 class MarkerHolder:
-    def __init__(self, dim: MarkerHolderDimensions):
+    def __init__(self, dim: MarkerHolderDimensions) -> None:
         self.dim = dim
 
     def create(self) -> SmartSolid:

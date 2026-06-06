@@ -17,14 +17,14 @@ class TestSmartLoftProfileTracking(unittest.TestCase):
         target = Circle(5).face()
         return SmartLoft.create(base, target, height=20)
 
-    def test_initial_profile_positions(self):
+    def test_initial_profile_positions(self) -> None:
         """Test that profiles are at correct initial positions."""
         loft = self._create_smart_loft()
 
         assertVectorAlmostEqual(self, loft.base_profile.center(), Vector(0, 0, 0))
         assertVectorAlmostEqual(self, loft.target_profile.center(), Vector(0, 0, 20))
 
-    def test_move_tracks_profiles(self):
+    def test_move_tracks_profiles(self) -> None:
         """Test that move() updates profile positions."""
         loft = self._create_smart_loft()
         loft.move(10, 20, 30)
@@ -32,7 +32,7 @@ class TestSmartLoftProfileTracking(unittest.TestCase):
         assertVectorAlmostEqual(self, loft.base_profile.center(), Vector(10, 20, 30))
         assertVectorAlmostEqual(self, loft.target_profile.center(), Vector(10, 20, 50))
 
-    def test_rotate_z_tracks_profiles(self):
+    def test_rotate_z_tracks_profiles(self) -> None:
         """Test that rotate() around Z axis updates profile positions."""
         loft = self._create_smart_loft()
         # Move off-center first so rotation has visible effect on position
@@ -44,7 +44,7 @@ class TestSmartLoftProfileTracking(unittest.TestCase):
         # (10, 0, 20) rotated 90° around Z becomes (0, 10, 20)
         assertVectorAlmostEqual(self, loft.target_profile.center(), Vector(0, 10, 20))
 
-    def test_rotate_x_tracks_profiles(self):
+    def test_rotate_x_tracks_profiles(self) -> None:
         """Test that rotate() around X axis updates profile positions."""
         loft = self._create_smart_loft()
         loft.rotate(Axis.X, 90)
@@ -54,7 +54,7 @@ class TestSmartLoftProfileTracking(unittest.TestCase):
         # (0, 0, 20) rotated 90° around X becomes (0, -20, 0)
         assertVectorAlmostEqual(self, loft.target_profile.center(), Vector(0, -20, 0))
 
-    def test_orient_tracks_profiles(self):
+    def test_orient_tracks_profiles(self) -> None:
         """Test that orient() updates profile orientations."""
         loft = self._create_smart_loft()
         loft.orient((90, 0, 0))
@@ -63,7 +63,7 @@ class TestSmartLoftProfileTracking(unittest.TestCase):
         self.assertEqual(loft.base_profile.orientation, Vector(90, 0, 0))
         self.assertEqual(loft.target_profile.orientation, Vector(90, 0, 0))
 
-    def test_combined_move_rotate(self):
+    def test_combined_move_rotate(self) -> None:
         """Test profiles track through move then rotate."""
         loft = self._create_smart_loft()
         loft.move(10, 0, 0)
@@ -72,7 +72,7 @@ class TestSmartLoftProfileTracking(unittest.TestCase):
         assertVectorAlmostEqual(self, loft.base_profile.center(), Vector(0, 10, 0))
         assertVectorAlmostEqual(self, loft.target_profile.center(), Vector(0, 10, 20))
 
-    def test_combined_rotate_move(self):
+    def test_combined_rotate_move(self) -> None:
         """Test profiles track through rotate then move."""
         loft = self._create_smart_loft()
         loft.rotate(Axis.Z, 90)
@@ -83,7 +83,7 @@ class TestSmartLoftProfileTracking(unittest.TestCase):
         assertVectorAlmostEqual(self, loft.base_profile.center(), Vector(10, 20, 30))
         assertVectorAlmostEqual(self, loft.target_profile.center(), Vector(10, 20, 50))
 
-    def test_profiles_match_solid_center(self):
+    def test_profiles_match_solid_center(self) -> None:
         """Test that profile centers stay aligned with solid after transformations."""
         loft = self._create_smart_loft()
         loft.move(5, 10, 15)
@@ -97,7 +97,7 @@ class TestSmartLoftProfileTracking(unittest.TestCase):
 class TestSmartLoftExtrude(unittest.TestCase):
     """Tests for SmartLoft.extrude() profile tracking."""
 
-    def test_extrude_initial_positions(self):
+    def test_extrude_initial_positions(self) -> None:
         """Test that extrude creates profiles at correct positions."""
         profile = Circle(10).face()
         loft = SmartLoft.extrude(profile, 30)
@@ -105,7 +105,7 @@ class TestSmartLoftExtrude(unittest.TestCase):
         assertVectorAlmostEqual(self, loft.base_profile.center(), Vector(0, 0, 0))
         assertVectorAlmostEqual(self, loft.target_profile.center(), Vector(0, 0, 30))
 
-    def test_extrude_negative_direction(self):
+    def test_extrude_negative_direction(self) -> None:
         """Test extrude with negative Z direction."""
         profile = Circle(10).face()
         loft = SmartLoft.extrude(profile, 20, direction=(0, 0, -1))
@@ -113,7 +113,7 @@ class TestSmartLoftExtrude(unittest.TestCase):
         assertVectorAlmostEqual(self, loft.base_profile.center(), Vector(0, 0, 0))
         assertVectorAlmostEqual(self, loft.target_profile.center(), Vector(0, 0, -20))
 
-    def test_extrude_move_tracks_profiles(self):
+    def test_extrude_move_tracks_profiles(self) -> None:
         """Test that move() works on extruded SmartLoft."""
         profile = Circle(10).face()
         loft = SmartLoft.extrude(profile, 30)
@@ -131,7 +131,7 @@ class TestSmartLoftConsecutiveRotations(unittest.TestCase):
         target = Circle(5).face()
         return SmartLoft.create(base, target, height=20)
 
-    def test_two_z_rotations_equal_single(self):
+    def test_two_z_rotations_equal_single(self) -> None:
         """Two 45° Z rotations should equal one 90° rotation for profile tracking."""
         loft1 = self._create_smart_loft()
         loft1.move(10, 0, 0)
@@ -145,7 +145,7 @@ class TestSmartLoftConsecutiveRotations(unittest.TestCase):
         assertVectorAlmostEqual(self, loft1.base_profile.center(), loft2.base_profile.center())
         assertVectorAlmostEqual(self, loft1.target_profile.center(), loft2.target_profile.center())
 
-    def test_rotate_move_rotate_profiles(self):
+    def test_rotate_move_rotate_profiles(self) -> None:
         """Test rotate + move + rotate sequence tracks profiles correctly."""
         loft = self._create_smart_loft()
         loft.move(10, 0, 0)
@@ -163,7 +163,7 @@ class TestSmartLoftConsecutiveRotations(unittest.TestCase):
         assertVectorAlmostEqual(self, loft.base_profile.center(), (-10, 5, 0))
         assertVectorAlmostEqual(self, loft.target_profile.center(), (-10, 5, 20))
 
-    def test_four_90_rotations_return_to_original(self):
+    def test_four_90_rotations_return_to_original(self) -> None:
         """4x 90° Z rotation should return profiles to original positions."""
         loft = self._create_smart_loft()
         loft.move(10, 5, 0)

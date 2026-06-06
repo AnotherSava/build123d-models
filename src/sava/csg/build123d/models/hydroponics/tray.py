@@ -1,20 +1,20 @@
-from dataclasses import dataclass
-from math import sin, radians, tan, atan, sqrt, degrees
 from collections.abc import Iterable
+from dataclasses import dataclass
+from math import atan, degrees, radians, sin, sqrt, tan
 
 from bd_warehouse.fastener import hex_recess
 from bd_warehouse.thread import IsoThread
-from build123d import Solid, Vector, Axis, Plane, Wire, Face
+from build123d import Axis, Plane, Solid, Vector, Wire
 
-from sava.csg.build123d.common.exporter import export, save_3mf, clear, save_stl
+from sava.csg.build123d.common.edgefilters import PositionalFilter
+from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl
 from sava.csg.build123d.common.geometry import Alignment, create_vector
-from sava.csg.build123d.common.modelcutter import cut_with_wires, CutSpec
+from sava.csg.build123d.common.modelcutter import CutSpec, cut_with_wires
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_handle_wire
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartloft import SmartLoft
-from sava.csg.build123d.common.edgefilters import PositionalFilter
 from sava.csg.build123d.common.smartsolid import SmartSolid, fuse
 from sava.csg.build123d.models.hydroponics.basket import BasketDimensions
 
@@ -79,7 +79,7 @@ class TrayDimensions:
     def basket_hole_width(self) -> float:
         return self.basket_dimensions.rim_diameter_outer_wide + self.basket_gap
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.basket_dimensions is None:
             self.basket_dimensions = BasketDimensions()
 
@@ -124,11 +124,11 @@ class TrayDimensions:
         return self.get_hole_offset(0, 0).X
 
     @property
-    def hole_step_x(self):
+    def hole_step_x(self) -> float:
         return self.basket_hole_width + self.basket_distance_x
 
     @property
-    def hole_step_y(self):
+    def hole_step_y(self) -> float:
         return self.basket_hole_width + self.basket_distance_y
 
     def get_hole_offset(self, column: int, row: int) -> Vector:
@@ -140,7 +140,7 @@ class TrayDimensions:
 
 # Replacement tray for the Ahopegarden 10 Pods hydroponic growing system. Optimized for germination with capacity extended to 23 pods.
 class TrayFactory:
-    def __init__(self, dim: TrayDimensions):
+    def __init__(self, dim: TrayDimensions) -> None:
         self.dim = dim
 
     def create_tray(self, peg_holes: bool = True) -> list[SmartSolid]:
@@ -208,20 +208,20 @@ class TrayFactory:
 
     def _create_cutting_wire(self, tray: SmartSolid) -> Wire:
         angle = degrees(atan(self.dim.hole_step_y / (2 * self.dim.hole_step_x)))
-        l = sqrt(4 * self.dim.hole_step_x ** 2 + self.dim.hole_step_y ** 2) / 4
+        segment = sqrt(4 * self.dim.hole_step_x ** 2 + self.dim.hole_step_y ** 2) / 4
         v1 = self.dim.get_hole_offset(3, 0)
         v2 = self.dim.get_hole_offset(4, 0)
         delta_x = self.dim.tray_height / 4 # since cut goes 45 degrees to the left
         start = (v1 + v2) / 2 + Vector(tray.x_mid + delta_x, tray.y_mid, tray.z_mid)
         pencil = Pencil(start=start - create_vector(self.dim.outer_width / 2, angle))
-        pencil.draw(self.dim.outer_width / 2 + l / 2, angle)
-        pencil.draw(l, -angle)
-        pencil.draw(l, angle)
-        pencil.draw(l, -angle)
+        pencil.draw(self.dim.outer_width / 2 + segment / 2, angle)
+        pencil.draw(segment, -angle)
+        pencil.draw(segment, angle)
+        pencil.draw(segment, -angle)
         pencil.draw(self.dim.outer_width / 2, angle)
         return pencil.create_wire(False)
 
-    def prepare_for_print(self, tray: SmartSolid):
+    def prepare_for_print(self, tray: SmartSolid) -> SmartSolid:
         # return tray
 
         tray.orient((0, 0, 45))
@@ -247,10 +247,10 @@ class TrayFactory:
         return rim_outer.fuse(leg_holder_boundary)
 
     def create_cutout(self) -> SmartSolid:
-        l = (self.dim.cutout_length - self.dim.cutout_diameter / 2 * (1 + sin(radians(self.dim.cutout_angle))))
+        length = (self.dim.cutout_length - self.dim.cutout_diameter / 2 * (1 + sin(radians(self.dim.cutout_angle))))
 
         pencil = Pencil()
-        pencil.draw(l, 180 + self.dim.cutout_angle)
+        pencil.draw(length, 180 + self.dim.cutout_angle)
         pencil.arc_with_radius(self.dim.cutout_diameter / 2, 90 + self.dim.cutout_angle, -90 - self.dim.cutout_angle)
 
         return pencil.extrude_mirrored_y(self.dim.tray_height, pencil.location.X)
@@ -351,7 +351,7 @@ dimensions = TrayDimensions()
 tray_factory = TrayFactory(dimensions)
 
 
-def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: SmartSolid, watering_hole_cap: SmartSolid):
+def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: SmartSolid, watering_hole_cap: SmartSolid) -> None:
     export(*tray_pieces)
 
     tray = SmartSolid(tray_pieces)
@@ -371,7 +371,7 @@ def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: Smar
 
     save_3mf("models/hydroponic/tray/export.3mf", current=True)
 
-def export_all():
+def export_all() -> None:
     tray_solid_pieces = tray_factory.create_tray()
     tray_solid_pieces_no_peg_holes = tray_factory.create_tray(False)
     peg_solid = tray_factory.create_peg()

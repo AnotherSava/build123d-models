@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from typing import Any
 
-from build123d import Text, extrude, Plane, Location
+from build123d import Location, Plane, Text, extrude
 
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -13,7 +14,7 @@ class TextDimensions:
 
 
 class TextSolid(SmartSolid):
-    def __init__(self, element, plane: Plane = Plane.XY, label: str = None):
+    def __init__(self, element: Any, plane: Plane = Plane.XY, label: str = None) -> None:
         if plane != Plane.XY:
             element = element.locate(Location(plane))
         super().__init__(element, label=label)

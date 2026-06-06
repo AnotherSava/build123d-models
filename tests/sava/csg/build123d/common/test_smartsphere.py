@@ -9,7 +9,7 @@ from tests.sava.csg.build123d.test_utils import assertVectorAlmostEqual
 
 class TestSmartSphereBasic(unittest.TestCase):
 
-    def test_solid_sphere_creation(self):
+    def test_solid_sphere_creation(self) -> None:
         """Test creating a basic solid sphere"""
         radius = 50.0
         sphere = SmartSphere(radius)
@@ -19,7 +19,7 @@ class TestSmartSphereBasic(unittest.TestCase):
         self.assertEqual(sphere.angle, 360)
         self.assertIsNotNone(sphere.solid)
 
-    def test_solid_sphere_dimensions(self):
+    def test_solid_sphere_dimensions(self) -> None:
         """Test that solid sphere has correct bounding box"""
         radius = 25.0
         sphere = SmartSphere(radius)
@@ -28,7 +28,7 @@ class TestSmartSphereBasic(unittest.TestCase):
         self.assertAlmostEqual(sphere.y_size, radius * 2, places=5)
         self.assertAlmostEqual(sphere.z_size, radius * 2, places=5)
 
-    def test_solid_sphere_centered(self):
+    def test_solid_sphere_centered(self) -> None:
         """Test that solid sphere is centered at origin"""
         radius = 30.0
         sphere = SmartSphere(radius)
@@ -37,7 +37,7 @@ class TestSmartSphereBasic(unittest.TestCase):
         self.assertAlmostEqual(sphere.y_mid, 0, places=5)
         self.assertAlmostEqual(sphere.z_mid, 0, places=5)
 
-    def test_hollow_sphere_creation(self):
+    def test_hollow_sphere_creation(self) -> None:
         """Test creating a hollow sphere"""
         radius = 50.0
         internal_radius = 40.0
@@ -47,7 +47,7 @@ class TestSmartSphereBasic(unittest.TestCase):
         self.assertEqual(sphere.internal_radius, internal_radius)
         self.assertIsNotNone(sphere.solid)
 
-    def test_hollow_sphere_dimensions(self):
+    def test_hollow_sphere_dimensions(self) -> None:
         """Test that hollow sphere has correct bounding box (based on outer radius)"""
         radius = 50.0
         internal_radius = 40.0
@@ -57,7 +57,7 @@ class TestSmartSphereBasic(unittest.TestCase):
         self.assertAlmostEqual(sphere.y_size, radius * 2, places=5)
         self.assertAlmostEqual(sphere.z_size, radius * 2, places=5)
 
-    def test_sphere_with_label(self):
+    def test_sphere_with_label(self) -> None:
         """Test creating sphere with a label"""
         sphere = SmartSphere(25.0, label="test_sphere")
         self.assertEqual(sphere.label, "test_sphere")
@@ -68,7 +68,7 @@ class TestSmartSphereBasic(unittest.TestCase):
         (50.0,),
         (100.0,),
     ])
-    def test_various_radii(self, radius):
+    def test_various_radii(self, radius) -> None:
         """Test spheres with various radii"""
         sphere = SmartSphere(radius)
 
@@ -78,27 +78,27 @@ class TestSmartSphereBasic(unittest.TestCase):
 
 class TestSmartSphereCreateHollow(unittest.TestCase):
 
-    def test_create_hollow_larger_first(self):
+    def test_create_hollow_larger_first(self) -> None:
         """Test create_hollow with larger radius first"""
         sphere = SmartSphere.create_hollow(50.0, 40.0)
 
         self.assertEqual(sphere.radius, 50.0)
         self.assertEqual(sphere.internal_radius, 40.0)
 
-    def test_create_hollow_smaller_first(self):
+    def test_create_hollow_smaller_first(self) -> None:
         """Test create_hollow with smaller radius first"""
         sphere = SmartSphere.create_hollow(40.0, 50.0)
 
         self.assertEqual(sphere.radius, 50.0)
         self.assertEqual(sphere.internal_radius, 40.0)
 
-    def test_create_hollow_with_angle(self):
+    def test_create_hollow_with_angle(self) -> None:
         """Test create_hollow with angle parameter"""
         sphere = SmartSphere.create_hollow(50.0, 40.0, angle=180)
 
         self.assertEqual(sphere.angle, 180)
 
-    def test_create_hollow_with_label(self):
+    def test_create_hollow_with_label(self) -> None:
         """Test create_hollow with label parameter"""
         sphere = SmartSphere.create_hollow(50.0, 40.0, label="hollow")
 
@@ -107,12 +107,12 @@ class TestSmartSphereCreateHollow(unittest.TestCase):
 
 class TestSmartSpherePlane(unittest.TestCase):
 
-    def test_default_plane_is_xy(self):
+    def test_default_plane_is_xy(self) -> None:
         """Test that default plane is Plane.XY"""
         sphere = SmartSphere(25.0)
         self.assertEqual(sphere.plane, Plane.XY)
 
-    def test_sphere_with_custom_plane(self):
+    def test_sphere_with_custom_plane(self) -> None:
         """Test creating sphere with custom plane"""
         custom_plane = Plane.XZ
         sphere = SmartSphere(25.0, plane=custom_plane)
@@ -121,12 +121,12 @@ class TestSmartSpherePlane(unittest.TestCase):
 
 class TestSmartSphereAngle(unittest.TestCase):
 
-    def test_default_angle_is_360(self):
+    def test_default_angle_is_360(self) -> None:
         """Test that default angle is 360 (full sphere)"""
         sphere = SmartSphere(25.0)
         self.assertEqual(sphere.angle, 360)
 
-    def test_hemisphere_creation(self):
+    def test_hemisphere_creation(self) -> None:
         """Test creating a hemisphere (180 degree angle)"""
         radius = 50.0
         sphere = SmartSphere(radius, angle=180)
@@ -137,7 +137,7 @@ class TestSmartSphereAngle(unittest.TestCase):
         self.assertAlmostEqual(sphere.x_size, radius * 2, places=5)
         self.assertAlmostEqual(sphere.y_size, radius, places=5)
 
-    def test_quarter_sphere_creation(self):
+    def test_quarter_sphere_creation(self) -> None:
         """Test creating a quarter sphere (90 degree angle)"""
         radius = 50.0
         sphere = SmartSphere(radius, angle=90)
@@ -150,12 +150,12 @@ class TestSmartSphereAngle(unittest.TestCase):
         (270,),
         (360,),
     ])
-    def test_various_angles(self, angle):
+    def test_various_angles(self, angle) -> None:
         """Test spheres with various angles"""
         sphere = SmartSphere(50.0, angle=angle)
         self.assertEqual(sphere.angle, angle)
 
-    def test_hollow_partial_sphere(self):
+    def test_hollow_partial_sphere(self) -> None:
         """Test creating a hollow partial sphere"""
         sphere = SmartSphere(50.0, internal_radius=40.0, angle=180)
 
@@ -166,7 +166,7 @@ class TestSmartSphereAngle(unittest.TestCase):
 
 class TestSmartSphereCreateOffset(unittest.TestCase):
 
-    def test_offset_external_positive(self):
+    def test_offset_external_positive(self) -> None:
         """Test increasing external radius"""
         sphere = SmartSphere(50.0)
         offset_sphere = sphere.create_offset(5.0)
@@ -174,7 +174,7 @@ class TestSmartSphereCreateOffset(unittest.TestCase):
         self.assertEqual(offset_sphere.radius, 55.0)
         self.assertIsNone(offset_sphere.internal_radius)
 
-    def test_offset_external_negative(self):
+    def test_offset_external_negative(self) -> None:
         """Test decreasing external radius"""
         sphere = SmartSphere(50.0)
         offset_sphere = sphere.create_offset(-5.0)
@@ -182,7 +182,7 @@ class TestSmartSphereCreateOffset(unittest.TestCase):
         self.assertEqual(offset_sphere.radius, 45.0)
         self.assertIsNone(offset_sphere.internal_radius)
 
-    def test_offset_internal_positive(self):
+    def test_offset_internal_positive(self) -> None:
         """Test increasing internal radius"""
         sphere = SmartSphere(50.0, internal_radius=40.0)
         offset_sphere = sphere.create_offset(5.0, external=False)
@@ -190,7 +190,7 @@ class TestSmartSphereCreateOffset(unittest.TestCase):
         self.assertEqual(offset_sphere.radius, 50.0)
         self.assertEqual(offset_sphere.internal_radius, 45.0)
 
-    def test_offset_internal_negative(self):
+    def test_offset_internal_negative(self) -> None:
         """Test decreasing internal radius"""
         sphere = SmartSphere(50.0, internal_radius=40.0)
         offset_sphere = sphere.create_offset(-5.0, external=False)
@@ -198,7 +198,7 @@ class TestSmartSphereCreateOffset(unittest.TestCase):
         self.assertEqual(offset_sphere.radius, 50.0)
         self.assertEqual(offset_sphere.internal_radius, 35.0)
 
-    def test_offset_internal_on_solid_sphere_raises(self):
+    def test_offset_internal_on_solid_sphere_raises(self) -> None:
         """Test that adjusting internal radius of solid sphere raises error"""
         sphere = SmartSphere(50.0)
 
@@ -206,7 +206,7 @@ class TestSmartSphereCreateOffset(unittest.TestCase):
             sphere.create_offset(5.0, external=False)
         self.assertIn("solid sphere", str(context.exception))
 
-    def test_offset_preserves_center(self):
+    def test_offset_preserves_center(self) -> None:
         """Test that offset sphere is aligned to same center"""
         sphere = SmartSphere(50.0)
         sphere.move(10, 20, 30)
@@ -214,25 +214,25 @@ class TestSmartSphereCreateOffset(unittest.TestCase):
 
         assertVectorAlmostEqual(self, (offset_sphere.x_mid, offset_sphere.y_mid, offset_sphere.z_mid), (10, 20, 30))
 
-    def test_offset_preserves_label(self):
+    def test_offset_preserves_label(self) -> None:
         """Test that offset sphere preserves label"""
         sphere = SmartSphere(50.0, label="my_sphere")
         offset_sphere = sphere.create_offset(5.0)
         self.assertEqual(offset_sphere.label, "my_sphere")
 
-    def test_offset_with_custom_label(self):
+    def test_offset_with_custom_label(self) -> None:
         """Test that offset sphere can have custom label"""
         sphere = SmartSphere(50.0, label="original")
         offset_sphere = sphere.create_offset(5.0, label="offset")
         self.assertEqual(offset_sphere.label, "offset")
 
-    def test_offset_preserves_angle(self):
+    def test_offset_preserves_angle(self) -> None:
         """Test that offset sphere preserves angle"""
         sphere = SmartSphere(50.0, angle=180)
         offset_sphere = sphere.create_offset(5.0)
         self.assertEqual(offset_sphere.angle, 180)
 
-    def test_offset_partial_sphere_preserves_rotation(self):
+    def test_offset_partial_sphere_preserves_rotation(self) -> None:
         """Test that offset on rotated partial sphere preserves orientation"""
         sphere = SmartSphere(50.0, angle=180)
         sphere.rotate_x(90)  # Flat side now faces +Z instead of +Y
@@ -245,7 +245,7 @@ class TestSmartSphereCreateOffset(unittest.TestCase):
 
 class TestSmartSphereCreateShell(unittest.TestCase):
 
-    def test_shell_external_positive(self):
+    def test_shell_external_positive(self) -> None:
         """Test creating shell outside solid sphere (positive offset)"""
         sphere = SmartSphere(50.0)
         shell = sphere.create_shell(5.0)
@@ -253,7 +253,7 @@ class TestSmartSphereCreateShell(unittest.TestCase):
         self.assertEqual(shell.radius, 55.0)
         self.assertEqual(shell.internal_radius, 50.0)
 
-    def test_shell_external_negative(self):
+    def test_shell_external_negative(self) -> None:
         """Test creating shell inside solid sphere (negative offset)"""
         sphere = SmartSphere(50.0)
         shell = sphere.create_shell(-5.0)
@@ -261,7 +261,7 @@ class TestSmartSphereCreateShell(unittest.TestCase):
         self.assertEqual(shell.radius, 50.0)
         self.assertEqual(shell.internal_radius, 45.0)
 
-    def test_shell_internal_positive(self):
+    def test_shell_internal_positive(self) -> None:
         """Test creating shell on internal surface (into cavity)"""
         sphere = SmartSphere(50.0, internal_radius=40.0)
         shell = sphere.create_shell(5.0, external=False)
@@ -269,7 +269,7 @@ class TestSmartSphereCreateShell(unittest.TestCase):
         self.assertEqual(shell.radius, 45.0)
         self.assertEqual(shell.internal_radius, 40.0)
 
-    def test_shell_internal_negative(self):
+    def test_shell_internal_negative(self) -> None:
         """Test creating shell on internal surface (into material)"""
         sphere = SmartSphere(50.0, internal_radius=40.0)
         shell = sphere.create_shell(-5.0, external=False)
@@ -277,7 +277,7 @@ class TestSmartSphereCreateShell(unittest.TestCase):
         self.assertEqual(shell.radius, 40.0)
         self.assertEqual(shell.internal_radius, 35.0)
 
-    def test_shell_internal_on_solid_raises(self):
+    def test_shell_internal_on_solid_raises(self) -> None:
         """Test that creating shell on internal surface of solid sphere raises error"""
         sphere = SmartSphere(50.0)
 
@@ -285,7 +285,7 @@ class TestSmartSphereCreateShell(unittest.TestCase):
             sphere.create_shell(5.0, external=False)
         self.assertIn("solid sphere", str(context.exception))
 
-    def test_shell_preserves_center(self):
+    def test_shell_preserves_center(self) -> None:
         """Test that shell sphere is aligned to same center"""
         sphere = SmartSphere(50.0)
         sphere.move(10, 20, 30)
@@ -298,7 +298,7 @@ class TestSmartSphereCreateShell(unittest.TestCase):
         (5.0,),
         (10.0,),
     ])
-    def test_shell_thickness(self, thickness):
+    def test_shell_thickness(self, thickness) -> None:
         """Test shell with various thicknesses"""
         sphere = SmartSphere(50.0)
         shell = sphere.create_shell(thickness)
@@ -306,19 +306,19 @@ class TestSmartSphereCreateShell(unittest.TestCase):
         self.assertEqual(shell.radius, 50.0 + thickness)
         self.assertEqual(shell.internal_radius, 50.0)
 
-    def test_shell_preserves_angle(self):
+    def test_shell_preserves_angle(self) -> None:
         """Test that shell preserves angle"""
         sphere = SmartSphere(50.0, angle=180)
         shell = sphere.create_shell(5.0)
         self.assertEqual(shell.angle, 180)
 
-    def test_shell_with_custom_label(self):
+    def test_shell_with_custom_label(self) -> None:
         """Test that shell can have custom label"""
         sphere = SmartSphere(50.0, label="original")
         shell = sphere.create_shell(5.0, label="shell")
         self.assertEqual(shell.label, "shell")
 
-    def test_shell_partial_sphere_concentric(self):
+    def test_shell_partial_sphere_concentric(self) -> None:
         """Test that shell on partial sphere is concentric (shares geometric center)"""
         sphere = SmartSphere(50.0, angle=180)
         shell = sphere.create_shell(5.0)
@@ -326,7 +326,7 @@ class TestSmartSphereCreateShell(unittest.TestCase):
         # For concentric hemispheres, the flat edge (y_min) should be at the same position
         self.assertAlmostEqual(sphere.y_min, shell.y_min, places=5)
 
-    def test_shell_partial_sphere_preserves_rotation(self):
+    def test_shell_partial_sphere_preserves_rotation(self) -> None:
         """Test that shell on rotated partial sphere preserves orientation"""
         sphere = SmartSphere(50.0, angle=180)
         sphere.rotate_x(90)  # Flat side now faces +Z instead of +Y
@@ -339,7 +339,7 @@ class TestSmartSphereCreateShell(unittest.TestCase):
 
 class TestSmartSphereCopy(unittest.TestCase):
 
-    def test_copy_solid_sphere(self):
+    def test_copy_solid_sphere(self) -> None:
         """Test copying a solid sphere"""
         sphere = SmartSphere(50.0, label="original")
         copied = sphere.copy()
@@ -350,14 +350,14 @@ class TestSmartSphereCopy(unittest.TestCase):
         self.assertEqual(copied.label, "original")
         self.assertEqual(copied.plane, sphere.plane)
 
-    def test_copy_partial_sphere(self):
+    def test_copy_partial_sphere(self) -> None:
         """Test copying a partial sphere preserves angle"""
         sphere = SmartSphere(50.0, angle=180)
         copied = sphere.copy()
 
         self.assertEqual(copied.angle, 180)
 
-    def test_copy_hollow_sphere(self):
+    def test_copy_hollow_sphere(self) -> None:
         """Test copying a hollow sphere"""
         sphere = SmartSphere(50.0, internal_radius=40.0)
         copied = sphere.copy()
@@ -365,14 +365,14 @@ class TestSmartSphereCopy(unittest.TestCase):
         self.assertEqual(copied.radius, 50.0)
         self.assertEqual(copied.internal_radius, 40.0)
 
-    def test_copy_with_new_label(self):
+    def test_copy_with_new_label(self) -> None:
         """Test copying with a new label"""
         sphere = SmartSphere(50.0, label="original")
         copied = sphere.copy(label="copied")
 
         self.assertEqual(copied.label, "copied")
 
-    def test_copy_independence(self):
+    def test_copy_independence(self) -> None:
         """Test that copy is independent from original"""
         sphere = SmartSphere(50.0)
         copied = sphere.copy()
@@ -384,14 +384,14 @@ class TestSmartSphereCopy(unittest.TestCase):
 
 class TestSmartSphereTransformations(unittest.TestCase):
 
-    def test_move(self):
+    def test_move(self) -> None:
         """Test moving a sphere"""
         sphere = SmartSphere(25.0)
         sphere.move(10, 20, 30)
 
         assertVectorAlmostEqual(self, (sphere.x_mid, sphere.y_mid, sphere.z_mid), (10, 20, 30))
 
-    def test_rotate(self):
+    def test_rotate(self) -> None:
         """Test rotating a sphere (should maintain shape for sphere)"""
         sphere = SmartSphere(25.0)
         sphere.move(10, 0, 0)
@@ -400,7 +400,7 @@ class TestSmartSphereTransformations(unittest.TestCase):
         self.assertAlmostEqual(sphere.x_mid, 0, places=5)
         self.assertAlmostEqual(sphere.y_mid, 10, places=5)
 
-    def test_scale(self):
+    def test_scale(self) -> None:
         """Test scaling a sphere"""
         sphere = SmartSphere(25.0)
         sphere.scale(2.0)

@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 from build123d import Vector, extrude, import_svg, scale
 
-from sava.csg.build123d.common.exporter import export, save_3mf, get_path
-from sava.csg.build123d.common.geometry import Direction, Alignment
+from sava.csg.build123d.common.exporter import export, get_path, save_3mf
+from sava.csg.build123d.common.geometry import Alignment, Direction
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -31,27 +31,27 @@ class TurnOrderBoxDimensions:
     key_notch_length: float = 15.0
 
     @property
-    def turn_order_box_length(self):
+    def turn_order_box_length(self) -> float:
         return self.turn_order_length + self.gap
 
     @property
-    def turn_order_box_width(self):
+    def turn_order_box_width(self) -> float:
         return self.turn_order_width + self.gap
 
     @property
-    def outer_box_height(self):
+    def outer_box_height(self) -> float:
         return self.turn_order_height * 4 + self.floor_thickness
 
     @property
-    def outer_box_length(self):
+    def outer_box_length(self) -> float:
         return self.turn_order_box_length + self.wall_thickness * 2
 
 
 class TurnOrder:
-    def __init__(self, dim: TurnOrderBoxDimensions):
+    def __init__(self, dim: TurnOrderBoxDimensions) -> None:
         self.dim = dim
 
-    def create_box(self):
+    def create_box(self) -> SmartBox:
         box = SmartBox(self.dim.outer_box_length, self.dim.insert_width, self.dim.outer_box_height)
 
         key_box = self.create_key()

@@ -22,7 +22,7 @@ class HoseConnectorDimensions:
     thickness: float | None = 1.6
     diameter_inner: float | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert (self.thickness is None) != (self.diameter_inner is None)
 
         self.diameter_inner = self.diameter_inner or self.diameter_outer - 2 * self.thickness - self.diameter_delta
@@ -32,12 +32,12 @@ class HoseConnectorDimensions:
         return self.diameter_outer + self.diameter_delta
 
     @property
-    def distance_between_pipe_centres(self):
+    def distance_between_pipe_centres(self) -> float:
         return self.distance_between_connectors + self.diameter_outer_max
 
 
 class HoseConnectorFactory:
-    def __init__(self, dim: HoseConnectorDimensions):
+    def __init__(self, dim: HoseConnectorDimensions) -> None:
         self.dim = dim
 
     def create_hose_connector(self, pipe_diameter_outer: float, pipe_length: float = None) -> SmartSolid:

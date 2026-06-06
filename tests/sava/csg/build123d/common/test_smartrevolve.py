@@ -1,7 +1,6 @@
 import unittest
-from math import cos, sin, radians
 
-from build123d import Vector, Axis, Plane, Face, Rectangle
+from build123d import Axis, Plane, Vector
 from parameterized import parameterized
 
 from sava.csg.build123d.common.pencil import Pencil
@@ -19,7 +18,7 @@ class TestSmartRevolveBasic(unittest.TestCase):
         face = pencil.create_face()
         return SmartRevolve(face, axis, angle, Plane.XZ)
 
-    def test_create_plane_at_start(self):
+    def test_create_plane_at_start(self) -> None:
         """Test that create_plane_at(0) returns the original sketch plane."""
         revolve = self._create_simple_revolve(angle=180)
         plane = revolve.create_plane_at(0)
@@ -28,7 +27,7 @@ class TestSmartRevolveBasic(unittest.TestCase):
         assertVectorAlmostEqual(self, plane.origin, Plane.XZ.origin)
         assertVectorAlmostEqual(self, plane.z_dir, Plane.XZ.z_dir)
 
-    def test_create_plane_at_end_180_degrees(self):
+    def test_create_plane_at_end_180_degrees(self) -> None:
         """Test that create_plane_at(1) returns plane rotated by full angle."""
         revolve = self._create_simple_revolve(angle=180, axis=Axis.Y)
         plane = revolve.create_plane_at(1)
@@ -38,7 +37,7 @@ class TestSmartRevolveBasic(unittest.TestCase):
         # Original origin (0, 0, 0) stays at origin
         assertVectorAlmostEqual(self, plane.origin, Vector(0, 0, 0))
 
-    def test_create_plane_at_mid(self):
+    def test_create_plane_at_mid(self) -> None:
         """Test that create_plane_at(0.5) returns plane at half the angle."""
         revolve = self._create_simple_revolve(angle=180, axis=Axis.Y)
         plane = revolve.create_plane_at(0.5)
@@ -55,7 +54,7 @@ class TestSmartRevolveBasic(unittest.TestCase):
         (0.75,),
         (1.0,),
     ])
-    def test_create_plane_at_various_positions(self, t: float):
+    def test_create_plane_at_various_positions(self, t: float) -> None:
         """Test that create_plane_at returns valid planes at various positions."""
         revolve = self._create_simple_revolve(angle=300, axis=Axis.Z)
         plane = revolve.create_plane_at(t)
@@ -78,7 +77,7 @@ class TestSmartRevolveWithMove(unittest.TestCase):
         face = pencil.create_face()
         return SmartRevolve(face, axis, angle, Plane.XZ)
 
-    def test_plane_origin_moves_with_object(self):
+    def test_plane_origin_moves_with_object(self) -> None:
         """Test that create_plane_at origin moves when object is moved."""
         revolve = self._create_simple_revolve()
 
@@ -100,7 +99,7 @@ class TestSmartRevolveWithMove(unittest.TestCase):
         ((5, 10, 15),),
         ((-5, -10, -15),),
     ])
-    def test_plane_origin_tracks_movement(self, move_vector):
+    def test_plane_origin_tracks_movement(self, move_vector) -> None:
         """Test that plane origin correctly tracks object movement."""
         revolve = self._create_simple_revolve()
 
@@ -123,7 +122,7 @@ class TestSmartRevolveWithRotate(unittest.TestCase):
         face = pencil.create_face()
         return SmartRevolve(face, axis, angle, Plane.XZ)
 
-    def test_plane_rotates_with_object(self):
+    def test_plane_rotates_with_object(self) -> None:
         """Test that create_plane_at directions rotate when object is rotated."""
         revolve = self._create_simple_revolve()
 
@@ -149,7 +148,7 @@ class TestSmartRevolveWithOrient(unittest.TestCase):
         face = pencil.create_face()
         return SmartRevolve(face, axis, angle, Plane.XZ)
 
-    def test_plane_orients_with_object(self):
+    def test_plane_orients_with_object(self) -> None:
         """Test that create_plane_at changes when object is oriented."""
         revolve = self._create_simple_revolve()
 
@@ -179,7 +178,7 @@ class TestSmartRevolveCopy(unittest.TestCase):
         face = pencil.create_face()
         return SmartRevolve(face, axis, angle, Plane.XZ)
 
-    def test_copy_preserves_all_fields(self):
+    def test_copy_preserves_all_fields(self) -> None:
         """Test that copy() creates independent copy with all fields preserved."""
         original = self._create_simple_revolve(angle=270)
         original.move(10, 20, 30)
@@ -192,7 +191,7 @@ class TestSmartRevolveCopy(unittest.TestCase):
         assertVectorAlmostEqual(self, copied.sketch_plane.origin, original.sketch_plane.origin)
         assertVectorAlmostEqual(self, copied.axis.direction, original.axis.direction)
 
-    def test_copy_is_independent(self):
+    def test_copy_is_independent(self) -> None:
         """Test that copy is independent from original."""
         original = self._create_simple_revolve()
 
@@ -202,7 +201,7 @@ class TestSmartRevolveCopy(unittest.TestCase):
         # Original should not be affected
         assertVectorAlmostEqual(self, original.origin, Vector(0, 0, 0))
 
-    def test_copy_preserves_label(self):
+    def test_copy_preserves_label(self) -> None:
         """Test that copy can override or preserve label."""
         original = self._create_simple_revolve()
         original.label = "original_label"
@@ -218,7 +217,7 @@ class TestSmartRevolveCopy(unittest.TestCase):
 
 class TestPencilRevolve(unittest.TestCase):
 
-    def test_pencil_revolve_returns_smart_revolve(self):
+    def test_pencil_revolve_returns_smart_revolve(self) -> None:
         """Test that Pencil.revolve() returns SmartRevolve instance."""
         pencil = Pencil(Plane.XZ, start=(10, 0))
         pencil.arc_with_radius(2, 0, 180).arc_with_radius(2, 180, 180)
@@ -226,7 +225,7 @@ class TestPencilRevolve(unittest.TestCase):
 
         self.assertIsInstance(result, SmartRevolve)
 
-    def test_pencil_revolve_has_correct_plane(self):
+    def test_pencil_revolve_has_correct_plane(self) -> None:
         """Test that Pencil.revolve() sets sketch_plane from pencil's plane."""
         custom_plane = Plane.XZ
         pencil = Pencil(custom_plane, start=(10, 0))
@@ -237,7 +236,7 @@ class TestPencilRevolve(unittest.TestCase):
         # (Pencil may adjust origin based on start position)
         assertVectorAlmostEqual(self, result.sketch_plane.z_dir, custom_plane.z_dir)
 
-    def test_pencil_revolve_preserves_angle(self):
+    def test_pencil_revolve_preserves_angle(self) -> None:
         """Test that Pencil.revolve() stores the correct angle."""
         pencil = Pencil(Plane.XZ, start=(5, 0))
         pencil.right(2).up(3).left(2).down(3)
@@ -245,7 +244,7 @@ class TestPencilRevolve(unittest.TestCase):
 
         self.assertEqual(result.angle, 270)
 
-    def test_pencil_revolve_preserves_axis(self):
+    def test_pencil_revolve_preserves_axis(self) -> None:
         """Test that Pencil.revolve() stores the correct axis."""
         pencil = Pencil(Plane.XZ, start=(5, 0))
         pencil.right(2).up(3).left(2).down(3)
@@ -269,7 +268,7 @@ class TestSmartRevolveCombinedTransformations(unittest.TestCase):
         ((0, 90, 0), (10, 0, 20)),
         ((45, 45, 45), (5, 5, 5)),
     ])
-    def test_combined_rotation_and_movement(self, rotation, movement):
+    def test_combined_rotation_and_movement(self, rotation, movement) -> None:
         """Test create_plane_at with combined rotation and movement."""
         revolve = self._create_simple_revolve()
 

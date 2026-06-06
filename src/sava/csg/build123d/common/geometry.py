@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from enum import Enum, IntEnum, auto
-from math import cos, sin, radians, atan2, degrees, acos
+from math import acos, atan2, cos, degrees, radians, sin
 from typing import TYPE_CHECKING
 
-from build123d import Vector, Axis, Wire, Face, Plane, VectorLike, sweep, Solid, ShapeList, Edge, extrude
+from build123d import Axis, Edge, Face, Plane, Solid, Vector, VectorLike, Wire, extrude, sweep
 from build123d.topology import Mixin1D
 
 # TYPE_CHECKING import for type hints only; runtime import is lazy to avoid circular dependency
@@ -215,7 +215,6 @@ def get_angle_between(dir1: VectorLike, dir2: VectorLike) -> float:
     Returns:
         Angle between the vectors in degrees (0 to 180)
     """
-    from math import acos, degrees
     dir1 = to_vector(dir1)
     dir2 = to_vector(dir2)
     dot = dir1.X * dir2.X + dir1.Y * dir2.Y
@@ -258,10 +257,10 @@ def shift_vector(vector: Vector, *args: float) -> Vector:
 
     return result
 
-def get_angle(vector: Vector):
+def get_angle(vector: Vector) -> float:
     return -degrees(atan2(vector.X, vector.Y))
 
-def create_plane_from_planes(plane_xy: Plane, axis_x: Plane):
+def create_plane_from_planes(plane_xy: Plane, axis_x: Plane) -> Plane:
     """Create a plane that matches plane_xy position and z-direction,
     but rotated so the x-axis aligns with the intersection of axis_x plane."""
     # Get the intersection line between plane_xy and axis_x
@@ -276,17 +275,17 @@ def create_plane_from_planes(plane_xy: Plane, axis_x: Plane):
 
 def create_wire_tangent_plane(wire: Mixin1D, position_at: float) -> Plane:
     """Creates a plane at a specified position along a wire, orthogonal to the wire's direction.
-    
+
     Args:
         wire: The wire to create a tangent plane for
         position_at: Position along the wire as a parameter from 0.0 to 1.0
                     - 0.0 = start of the wire
-                    - 1.0 = end of the wire  
+                    - 1.0 = end of the wire
                     - 0.5 = middle of the wire
                     - Values can be outside 0-1 range for extrapolation
-    
+
     Returns:
-        A Plane object positioned at the specified location with its Z-axis 
+        A Plane object positioned at the specified location with its Z-axis
         aligned with the wire's tangent direction (orthogonal to the wire)
     """
     # Get position and tangent at the specified parameter along the wire
@@ -354,18 +353,18 @@ def multi_rotate_vector(vector: VectorLike, plane: Plane, rotations: VectorLike)
     # Convert inputs to Vector if needed
     vector = to_vector(vector)
     rotations = to_vector(rotations)
-    
+
     # Get the plane's axes
     x_axis = Axis(plane.location.position, plane.x_dir)
-    y_axis = Axis(plane.location.position, plane.y_dir) 
+    y_axis = Axis(plane.location.position, plane.y_dir)
     z_axis = Axis(plane.location.position, plane.z_dir)
-    
+
     # Apply rotations sequentially: X, then Y, then Z
     result = vector
     result = rotate_vector(result, x_axis, rotations.X)
     result = rotate_vector(result, y_axis, rotations.Y)
     result = rotate_vector(result, z_axis, rotations.Z)
-    
+
     return result
 
 def rotate_axis(axis_to_rotate: Axis, axis_rotate_around: Axis, angle: float) -> Axis:
@@ -500,75 +499,75 @@ def orient_axis(orientation: VectorLike) -> tuple[Axis, Axis, Axis]:
 
 def calculate_orientation(x_axis: Axis, y_axis: Axis, z_axis: Axis) -> Vector:
     """Calculate the orientation angles that would produce the given axes using object-attached rotations.
-    
+
     This is the reverse of orient_axis - given three axes representing a coordinate system,
     calculate the orientation vector (X, Y, Z) that would produce these axes when applied
     to the standard XYZ axes using object-attached rotations.
-    
+
     Args:
         x_axis: The desired X-axis
-        y_axis: The desired Y-axis  
+        y_axis: The desired Y-axis
         z_axis: The desired Z-axis
-        
+
     Returns:
         Vector with orientation angles (X, Y, Z) in degrees
     """
     # We need to find angles that when applied via object-attached rotations
     # would transform (1,0,0), (0,1,0), (0,0,1) to the given axes
-    
+
     # Start with the assumption that we apply rotations in order: X, then Y, then Z
     # Working backwards from the final result
-    
+
     # The Z-axis direction tells us about the final orientation
     # After all rotations, the original Z-axis should point in z_axis.direction
     final_z = z_axis.direction
-    
+
     # The Y-axis direction after all rotations should be y_axis.direction
     final_y = y_axis.direction
-    
+
     # The X-axis direction after all rotations should be x_axis.direction
     final_x = x_axis.direction
-    
+
     # To reverse the process, we need to find the angles
     # Let's use the fact that we can extract Euler angles from a rotation matrix
-    
+
     # The rotation matrix is formed by the three axis directions as columns
     # R = [x_axis.direction, y_axis.direction, z_axis.direction]
-    
+
     # For ZYX Euler angles (which matches build123d's X,Y,Z object-attached order in reverse):
     # We extract angles from the rotation matrix
-    
+
     # Extract orientation angles from the rotation matrix
     # The matrix is: [final_x, final_y, final_z] as columns
-    
+
     # For object-attached rotations X, Y, Z, the equivalent is extracting ZYX Euler angles
     # from the transpose of the rotation matrix (since we're going backwards)
-    
+
     # Z rotation angle (around Z-axis) - this affects how X and Y axes are rotated in XY plane
     # After Z rotation, X-axis becomes (cos(Z), sin(Z), 0) and Y-axis becomes (-sin(Z), cos(Z), 0)
-    
-    # Y rotation angle (around Y-axis) - this affects how X and Z axes are rotated in XZ plane  
+
+    # Y rotation angle (around Y-axis) - this affects how X and Z axes are rotated in XZ plane
     # X-axis becomes (cos(Y), 0, -sin(Y)) and Z-axis becomes (sin(Y), 0, cos(Y))
-    
+
     # X rotation angle (around X-axis) - this affects how Y and Z axes are rotated in YZ plane
     # Y-axis becomes (0, cos(X), sin(X)) and Z-axis becomes (0, -sin(X), cos(X))
-    
+
     # For intrinsic XYZ rotations, we need to extract angles correctly
     # The rotation matrix R is formed by the axis directions as columns: [final_x, final_y, final_z]
     # For intrinsic XYZ rotations, we use the proper extraction formulas
-    
+
     # The rotation matrix elements are:
     # R = [final_x.X  final_y.X  final_z.X]
-    #     [final_x.Y  final_y.Y  final_z.Y] 
+    #     [final_x.Y  final_y.Y  final_z.Y]
     #     [final_x.Z  final_y.Z  final_z.Z]
-    
+
     # For intrinsic XYZ rotations, the extraction formulas are:
     # sin(Y) = R[0,2] = final_z.X
     # cos(Y) = sqrt(R[0,0]^2 + R[0,1]^2) = sqrt(final_x.X^2 + final_y.X^2)
-    
+
     sin_y = final_z.X
     cos_y = (final_x.X**2 + final_y.X**2)**0.5
-    
+
     # Check for gimbal lock
     if abs(cos_y) < 1e-6:
         # Gimbal lock - Y rotation is ±90 degrees
@@ -584,7 +583,7 @@ def calculate_orientation(x_axis: Axis, y_axis: Axis, z_axis: Axis) -> Vector:
         angle_x = degrees(atan2(-final_z.Y, final_z.Z))
         # tan(Z) = -R[0,1] / R[0,0] = -final_y.X / final_x.X
         angle_z = degrees(atan2(-final_y.X, final_x.X))
-    
+
     return Vector(angle_x, angle_y, angle_z)
 
 def _choose_diameter(total_length: float) -> float:

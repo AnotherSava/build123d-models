@@ -1,14 +1,15 @@
 import shutil
 import tempfile
 import warnings
+from collections.abc import Iterable
 from copy import copy, deepcopy
 from pathlib import Path
-from collections.abc import Iterable
+from typing import Any
 
-from build123d import Shape, Color, Mesher, Plane, Wire, Compound, Edge, BoundBox, Face
+from build123d import BoundBox, Color, Edge, Face, Mesher, Plane, Shape, Wire
 
 from sava.common.logging import logger
-from sava.csg.build123d.common.geometry import solidify_wire, solidify_edges, solidify_faces
+from sava.csg.build123d.common.geometry import solidify_edges, solidify_faces, solidify_wire
 from sava.csg.build123d.common.smartplane import SmartPlane
 from sava.csg.build123d.common.smartsolid import get_solid
 
@@ -39,7 +40,7 @@ def _is_valid_color(name: str) -> bool:
     try:
         Color(name)
         return True
-    except:
+    except Exception:
         return False
 
 
@@ -60,7 +61,7 @@ def _get_color_for_label(label: str) -> str:
     raise RuntimeError(f"All {len(BASIC_COLORS)} colors exhausted. Cannot assign color to label '{label}'.")
 
 
-def _prepare_shape(shape, label: str, edge_max_length: float = None, prepare_for_stl: bool = False) -> Iterable[Shape]:
+def _prepare_shape(shape: Any, label: str, edge_max_length: float = None, prepare_for_stl: bool = False) -> Iterable[Shape]:
     """Convert shape to exportable shape(s) and assign color based on label.
 
     Args:
@@ -109,7 +110,7 @@ def clear() -> None:
     _index = 1
 
 
-def _try_add_shape(mesher: Mesher, prepared: Shape, label: str, **kwargs) -> None:
+def _try_add_shape(mesher: Mesher, prepared: Shape, label: str, **kwargs: Any) -> None:
     """Add `prepared` to `mesher`. On lib3MF validation failure, fall back to
     raw triangles iff `label` is emergency-flagged; otherwise re-raise.
 
@@ -123,8 +124,8 @@ def _try_add_shape(mesher: Mesher, prepared: Shape, label: str, **kwargs) -> Non
         if label not in _emergency_labels:
             raise
         print(f"!!! EMERGENCY: '{label}' failed lib3MF validation: {e}")
-        print(f"!!! Writing raw triangles -- geometry is NOT slicer-safe.")
-        verts, tris = Mesher._mesh_shape(deepcopy(prepared), 0.001, 0.1)
+        print("!!! Writing raw triangles -- geometry is NOT slicer-safe.")
+        verts, tris = Mesher._mesh_shape(deepcopy(prepared), 0.001, 0.1)   # noqa: SLF001 — build123d internals, no public tessellation API
         _add_raw_mesh_to_mesher(mesher, verts, tris, label)
         _emergency_used.add(label)
 
@@ -150,7 +151,7 @@ def _print_emergency_banner() -> None:
 
 def _add_raw_mesh_to_mesher(mesher: Mesher, verts: list, faces: list, label: str) -> None:
     """Append a raw triangle mesh to `mesher` under `label`'s colour."""
-    v3, t3 = Mesher._create_3mf_mesh(verts, faces)
+    v3, t3 = Mesher._create_3mf_mesh(verts, faces)   # noqa: SLF001 — build123d internals, no public raw-mesh API
     mesh = mesher.model.AddMeshObject()
     mesh.SetGeometry(v3, t3)
     mesh.SetName(label)
@@ -188,7 +189,7 @@ def export_stl_file(stl_path: str, label: str = 'source',
     _raw_meshes.setdefault(label, []).append((verts, faces))
 
 
-def _copy_shape_for_storage(shape):
+def _copy_shape_for_storage(shape: Any) -> Any:
     """Create a copy of a shape for storage to capture current state."""
     from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -201,7 +202,7 @@ def _copy_shape_for_storage(shape):
         return copy(shape)
 
 
-def export(*shapes, label: str = None, emergency: bool = False):
+def export(*shapes: Any, label: str = None, emergency: bool = False) -> None:
     """Add shape(s) to export storage.
 
     If label is provided, all shapes use that label.
@@ -228,17 +229,17 @@ def export(*shapes, label: str = None, emergency: bool = False):
         _shapes[shape_label].append(_copy_shape_for_storage(shape))
 
 
-def show_red(*shapes):
+def show_red(*shapes: Any) -> None:
     """Export shape(s) with 'red' label."""
     export(*shapes, label="red")
 
 
-def show_blue(*shapes):
+def show_blue(*shapes: Any) -> None:
     """Export shape(s) with 'blue' label."""
     export(*shapes, label="blue")
 
 
-def show_green(*shapes):
+def show_green(*shapes: Any) -> None:
     """Export shape(s) with 'green' label."""
     export(*shapes, label="green")
 
@@ -251,7 +252,7 @@ def get_project_root_folder() -> Path:
     raise FileNotFoundError("Could not find project root")
 
 
-def get_path(*path_from_project_root) -> str:
+def get_path(*path_from_project_root: str) -> str:
     # If first path is absolute, use it directly - mostly for temporary files in tests
     first = Path(path_from_project_root[0])
     if first.is_absolute():
@@ -280,7 +281,7 @@ def _report_labels(edge_max_length: float = None) -> None:
 def _get_shapes_bounding_box() -> BoundBox | None:
     """Get bounding box of all exported shapes."""
     bboxes = []
-    for label, shapes in _shapes.items():
+    for shapes in _shapes.values():
         for shape in shapes:
             if isinstance(shape, BoundBox):
                 bboxes.append(shape)
@@ -386,7 +387,7 @@ def create_file_path(location: str, filename: str = None) -> str:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     return path
 
-def export_stl(directory: str, *shapes, clean: bool = False) -> None:
+def export_stl(directory: str, *shapes: Any, clean: bool = False) -> None:
     """Export shapes to STL files in `directory`. With `clean`, remove all existing
     .stl files there first, so renamed or dropped parts leave no stale files behind."""
     clear()
@@ -396,7 +397,7 @@ def export_stl(directory: str, *shapes, clean: bool = False) -> None:
             stale.unlink()
     save_stl(directory)
 
-def export_3mf(directory: str, *shapes) -> None:
+def export_3mf(directory: str, *shapes: Any) -> None:
     export(*shapes)
     save_3mf(directory, True)
 

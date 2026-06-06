@@ -5,7 +5,6 @@ from enum import IntEnum
 from math import acos, atan2, cos, radians, sin, tan
 
 import numpy as np
-
 from build123d import Edge, Face, Plane, Solid, Vector, Wire, loft
 
 from sava.common.advanced_math import advanced_mod
@@ -57,7 +56,7 @@ class SmarterCone(SmartSolid):
     See docs/code/smartercone.md for the full builder guide.
     """
 
-    def __init__(self, sections: list[ConeSection], plane: Plane = Plane.XY, angle: float = 360, label: str = None):
+    def __init__(self, sections: list[ConeSection], plane: Plane = Plane.XY, angle: float = 360, label: str = None) -> None:
         # Validation
         assert len(sections) >= 1, "Must have at least 1 section"
         for i in range(len(sections)):
@@ -354,7 +353,7 @@ class SmarterCone(SmartSolid):
         if has_h:
             assert height != 0, f"Height must be non-zero, got {height}"
             if self._height_sign != 0:
-                assert (height > 0) == (self._height_sign > 0), f"Height sign must match existing direction"
+                assert (height > 0) == (self._height_sign > 0), "Height sign must match existing direction"
             height = prev.height + height
 
         if has_r and has_h and not has_a:
@@ -379,7 +378,7 @@ class SmarterCone(SmartSolid):
             radius = prev.radius
             height = prev.height  # inner-only step: same outer radius and height
         else:
-            assert False, "Invalid parameter combination: specify (radius+height), (angle+height), (angle+radius), (radius only), (height only), or (no params)"
+            raise AssertionError("Invalid parameter combination: specify (radius+height), (angle+height), (angle+radius), (radius only), (height only), or (no params)")
 
         return radius, height
 

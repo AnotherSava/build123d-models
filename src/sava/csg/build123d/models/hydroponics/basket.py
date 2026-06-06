@@ -1,10 +1,9 @@
 from dataclasses import dataclass
-from math import radians, degrees, atan, tan, cos
+from math import atan, degrees, radians, tan
 
-from build123d import Plane, Axis, Location, Face
+from build123d import Axis, Face, Location, Plane
 
-from sava.common.common import flatten
-from sava.csg.build123d.common.exporter import export, save_3mf, save_stl, clear, show_red, show_green
+from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl
 from sava.csg.build123d.common.geometry import Alignment
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_handle_solid, create_handle_wire
@@ -98,15 +97,15 @@ class BasketDimensions:
         return self.radius_inner(self.rim_depth)
 
     @property
-    def outer_radius_top(self):
+    def outer_radius_top(self) -> float:
         return self.inner_radius_top + self.thickness
 
     @property
-    def rim_depth(self):
+    def rim_depth(self) -> float:
         return (self.rim_diameter_outer_wide / 2 - self.outer_radius_top) / tan(self.rim_angle_radians)
 
     @property
-    def inner_radius_top(self):
+    def inner_radius_top(self) -> float:
         return self.sponge_diameter_top / 2
 
     @property
@@ -141,7 +140,7 @@ class BasketDimensions:
 
 
 class BasketFactory:
-    def __init__(self, dim: BasketDimensions):
+    def __init__(self, dim: BasketDimensions) -> None:
         self.dim = dim
 
     def _create_basket(self) -> tuple[SmartSolid, SmarterCone]:
@@ -296,7 +295,7 @@ class BasketFactory:
 
         return [SmartSolid(foundation, foundation_support).rotate_z(360 / dim.window_count * (index + 0.5)) for index in [1, 2]]
 
-def export_stl(*solids):
+def export_stl(*solids: SmartSolid) -> None:
     clear()
     for solid in solids:
         if not solid.label.startswith("latch_"):
@@ -310,7 +309,7 @@ def create_basket(height: float) -> SmartSolid:
     basket_factory = BasketFactory(dimensions)
     return basket_factory.create_basket()
 
-def export_basket():
+def export_basket() -> None:
     dimensions = BasketDimensions()
     basket_factory = BasketFactory(dimensions)
     basket_solid = basket_factory.create_basket()
