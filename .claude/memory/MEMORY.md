@@ -18,6 +18,7 @@
 - [reference_arrange_scene_pattern.md](reference_arrange_scene_pattern.md) — Multi-part export: assembled 3MF scene first, then `clear()`, then STL (applies `bed_orientation`); tray.py/splitter.py are the correct examples
 - [reference_slice_verification.md](reference_slice_verification.md) — Verify geometry: thin-Box slices, refactor equivalence (volume/bbox, relative tolerances), intersect-volume fit checks
 - [reference_extrude_winding_direction.md](reference_extrude_winding_direction.md) — extrude(face, h) follows the face normal, which flips with polygon winding; position cutter prisms by recentering, never by assuming +normal
+- [reference_forward_port_stale_model.md](reference_forward_port_stale_model.md) — Port a stale model forward: run its last-working commit as a golden oracle (worktree + current venv), diff per sub-part to localize each common-API drift; documents Pencil/SweepSolid/rotate semantic changes
 
 # Feedback
 - [feedback_visualization_orientation.md](feedback_visualization_orientation.md) — Build models in scene/visualization orientation, NOT print; use `SmartSolid.bed_orientation` for print pose (applied only at STL export). Reverses the old "build in print orientation" guidance
