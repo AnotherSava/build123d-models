@@ -2,17 +2,22 @@ from copy import copy
 from dataclasses import dataclass
 from math import asin, degrees, radians, sin, tan
 
-from build123d import Axis, Circle, Face, Location, Solid, Trapezoid, Wire, fillet, revolve
+from build123d import Axis, Circle, Face, Location, Plane, Solid, Trapezoid, Vector, VectorLike, Wire, fillet, revolve
 
-from sava.csg.build123d.common.exporter import export, save_3mf
-from sava.csg.build123d.common.geometry import Alignment, Direction, create_plane, create_vector
+from sava.csg.build123d.common.exporter import export_3mf, export_stl
+from sava.csg.build123d.common.geometry import Alignment, Direction, create_vector, rotate_orientation
 from sava.csg.build123d.common.pencil import Pencil
-from sava.csg.build123d.common.primitives import create_cone_with_angle
 from sava.csg.build123d.common.smartcone import SmartCone
 from sava.csg.build123d.common.smartloft import SmartLoft
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.sweepsolid import SweepSolid
 from sava.csg.build123d.models.hydroponics.connector import HoseConnectorDimensions, HoseConnectorFactory
+
+
+def _create_plane(origin: VectorLike = (0, 0, 0), x_axis: VectorLike = (1, 0, 0), y_axis: VectorLike = (0, 1, 0)) -> Plane:
+    x_dir = Vector(x_axis).normalized()
+    z_dir = x_dir.cross(Vector(y_axis).normalized())
+    return Plane(origin=origin, x_dir=x_dir, z_dir=z_dir)
 
 
 @dataclass
@@ -126,10 +131,13 @@ class HydroponicsStand:
         self.host_connector_factory = HoseConnectorFactory(self.dim.hose_connector)
 
     def create_stand(self) -> SmartSolid:
-        tube = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness, self.dim.tube_height))
+        tube = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness, self.dim.tube_height), label="stand")
 
         tube_inside = SmartSolid(Solid.make_cylinder(self.dim.tube_internal_diameter / 2, self.dim.tube_height))
-        top_cut = create_cone_with_angle(self.dim.tube_internal_diameter / 2, self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness, self.dim.etches_inner.side_angle)
+        top_cut_bottom_radius = self.dim.tube_internal_diameter / 2
+        top_cut_top_radius = top_cut_bottom_radius + self.dim.tube_wall_thickness
+        top_cut_height = abs((top_cut_top_radius - top_cut_bottom_radius) / tan(radians(self.dim.etches_inner.side_angle)))
+        top_cut = SmartSolid(Solid.make_cone(top_cut_bottom_radius, top_cut_top_radius, top_cut_height))
         top_cut.align_zxy(tube, Alignment.RL, self.dim.tube_top_cut_offset)
 
         handles = self.create_handles(tube)
@@ -170,7 +178,9 @@ class HydroponicsStand:
     def create_pipe_cover_face_wider(self, pipe: SweepSolid, shift_z: float = 0, offset_z: float = 0, skip_height: float = 0) -> Face:
         dim = self.dim.pipe
 
-        pencil = Pencil(pipe.create_path_plane(), (0, 0, shift_z))
+        # shift_z offsets the profile along the path-plane normal. Pencil only shifts by the
+        # in-plane (X, Y) components of its start vector, so apply the normal offset to the plane.
+        pencil = Pencil(pipe.create_path_plane().offset(shift_z))
         if skip_height < dim.length_straight:
             pencil.up(dim.length_straight - skip_height)
             skip_angle = 0
@@ -199,7 +209,9 @@ class HydroponicsStand:
         plane = inlet_pipe_outer.create_plane_end()
 
         connector_top.solid.location = Location(plane)
-        connector_top.rotate_multi((180, 0, 0), plane)
+        # Flip 180deg about the plane's X axis in place. rotate_multi would also rotate the origin
+        # around the plane (translating the part); an orient-only reorientation keeps it seated.
+        connector_top.orient(rotate_orientation(connector_top.solid.orientation, (180, 0, 0), plane))
         connector_top.align_z(inlet_pipe_outer, Alignment.RR, 0, plane)
 
         return connector_top
@@ -207,7 +219,7 @@ class HydroponicsStand:
     def create_pipe(self, inlet_connector_bottom: SmartSolid) -> tuple[SweepSolid, SweepSolid]:
         dim = self.dim.pipe
 
-        plane = create_plane((0, 0, 0), (-inlet_connector_bottom.x_mid, -inlet_connector_bottom.y_mid, 0), (0, 0, 1))
+        plane = _create_plane((0, 0, 0), (-inlet_connector_bottom.x_mid, -inlet_connector_bottom.y_mid, 0), (0, 0, 1))
 
         path = Pencil(plane)
         path.up(dim.length_straight)
@@ -221,7 +233,10 @@ class HydroponicsStand:
         pipe_outer.align_z(inlet_connector_bottom, Alignment.RR)
 
         pipe_inner = SweepSolid(Circle(dim.diameter_inner / 2), wire, plane)
-        pipe_inner.solid.position = pipe_outer.solid.position
+        # Move through the tracked API (not a direct solid.position assignment) so the inner pipe's
+        # path plane follows the move — create_path_plane/create_plane_end rely on that tracking.
+        delta = pipe_outer.solid.position - pipe_inner.solid.position
+        pipe_inner.move(delta.X, delta.Y, delta.Z)
 
         return pipe_inner, pipe_outer
 
@@ -275,7 +290,7 @@ class HydroponicsStand:
     def create_handles(self, tube: SmartSolid) -> SmartSolid:
         shapes = []
         for i in range(self.dim.handles.count):
-            plane = create_plane(x_axis=create_vector(1, i * 360 / self.dim.handles.count), y_axis=(0, 0, 1))
+            plane = _create_plane(x_axis=create_vector(1, i * 360 / self.dim.handles.count), y_axis=(0, 0, 1))
             pencil = Pencil(plane)
             pencil.right(self.dim.tube_internal_diameter / 2 + self.dim.tube_wall_thickness + self.dim.handles.thickness)
             pencil.double_arc((-self.dim.handles.thickness * 1.01, self.dim.handles.height))
@@ -289,7 +304,9 @@ class HydroponicsStand:
     def create_outlet_hole(self, outlet_pipe_inner: SweepSolid) -> SmartSolid:
         skip_height = -self.dim.hose_connector.connector_offset_z
         face = self.create_pipe_cover_face_wider(outlet_pipe_inner, skip_height=skip_height)
-        outlet_hole = SmartLoft.extrude(face, self.dim.pipe.diameter_inner)
+        # Extrude along the face normal (as raw build123d extrude did): the face lies in the
+        # pipe's tilted path plane, so SmartLoft.extrude's default (0, 0, 1) would collapse it.
+        outlet_hole = SmartLoft.extrude(face, self.dim.pipe.diameter_inner, face.normal_at())
 
         plane = outlet_pipe_inner.create_plane_end()
         outlet_hole.align_x(None, Alignment.CR, plane=plane)
@@ -334,15 +351,11 @@ class HydroponicsStand:
         return top.fuse(bottom).intersect(above_floor).fuse(invert).cut(bottom_cut)
 
 
-dimensions = StandDimensions()
-hydroponics = HydroponicsStand(dimensions)
+if __name__ == "__main__":
+    dimensions = StandDimensions()
+    hydroponics = HydroponicsStand(dimensions)
 
-component = hydroponics.create_stand()
-# component = hydroponics.create_empty_cone(30, 50, 5)
-# component = hydroponics.create_magic_surface()
-# component = hydroponics.create_pipe(dimensions.pipe.countertop_thickness)
-# solid.orientation = (90, 0, -90)
-# component = hydroponics.create_hose_connector(2, 23)
-print(component.bound_box.size)
-export(component)
-save_3mf()
+    stand = hydroponics.create_stand()
+
+    export_3mf("models/hydroponic/stand/export.3mf", stand)
+    export_stl("models/hydroponic/stand/stl", stand, clean=True)
