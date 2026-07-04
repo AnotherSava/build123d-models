@@ -430,7 +430,10 @@ class SmarterCone(SmartSolid):
                 inner_r = max(s.radius, MIN_SIZE_OCCT)
             else:
                 outer_r = s.radius
-                inner_r = max(s.radius + thickness, MIN_SIZE_OCCT)
+                # A zero-radius section is a geometric point — no inner hole, so an
+                # inward shell stays a pointed hollow cone instead of clamping the tip's
+                # inner radius above its zero outer radius (which trips ConeSection.validate).
+                inner_r = None if outer_r <= MIN_SIZE_OCCT else max(s.radius + thickness, MIN_SIZE_OCCT)
             new_sections.append(ConeSection(outer_r, s.height, inner_r, s.shift_x, s.shift_y, s.inner_shift_x, s.inner_shift_y))
         result = SmarterCone(new_sections, self.plane, self.angle, label or self.label)
         return result.colocate(self)
