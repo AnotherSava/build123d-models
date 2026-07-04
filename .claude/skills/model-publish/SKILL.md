@@ -13,16 +13,23 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
    - Read the source to understand dimensions, features, and structure
    - Ask user for a few keywords or a short description if the model name alone isn't descriptive enough
 
-2. **Collect photos**
+2. **Ensure regression coverage**
+   - A model going public should be guarded against silent geometry drift, so verify it is covered by the regression suite before publishing. It is covered if its `build` is registered in `MODEL_BUILDERS` (`tests/sava/csg/build123d/models/test_model_regression.py`) and a `signature.json` sits in its output folder — if so, continue.
+   - If not, add it following `docs/code/model_regression.md` ("Adding a model"):
+     - Give the module a `build() -> ModelSpec` and route `__main__` through `export_model(build())` (models that export at import time must move that work into `build()`). If the model is stale and no longer builds against current common code, forward-port it until it does first — see `.claude/memory/reference_forward_port_stale_model.md`.
+     - Register it in `MODEL_BUILDERS`, regenerate its committed meshes (`venv/Scripts/python.exe -m <model module>`), then baseline: `MODEL_REGRESSION_REBASELINE=1 venv/Scripts/python.exe -m pytest tests/ -m regression`.
+     - Confirm green: `venv/Scripts/python.exe -m pytest tests/ -m regression -k <model_name>` (run the full `-m regression` suite too if you touched shared `common/` code).
+
+3. **Collect photos**
    - Create a `photo` subfolder inside the model's output folder (e.g. `models/other/marker_holder/photo/`)
    - Ask user for the cover photo in 4x3 format — copy it to `photo/cover_4x3.<ext>` (preserving original extension)
    - Ask user for the cover photo in 3x4 format — copy it to `photo/cover_3x4.<ext>`
    - Ask user for any additional photos — copy them to `photo/photo_01.<ext>`, `photo/photo_02.<ext>`, etc.
 
-3. **Create output folder**
+4. **Create output folder**
    - Create a `description` subfolder inside the model's output folder (e.g. `models/other/marker_holder/description/`)
 
-4. **Research similar models**
+5. **Research similar models**
    - First, use WebFetch to read descriptions and tags from models already published in this project (Thingiverse/MakerWorld links in `README.md`) - these are the primary reference for style and formatting
    - Then search for similar models by other authors using `.claude/skills/model-publish/scripts/web_search.py`:
      - `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/web_search.py search "<keywords>" --platform both --max 5`
@@ -40,8 +47,8 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
 
      ```
 
-5. **Write description (Thingiverse format)**
-   - Come up with a model name for publishing (concise, descriptive, similar to names of similar models found in step 4)
+6. **Write description (Thingiverse format)**
+   - Come up with a model name for publishing (concise, descriptive, similar to names of similar models found in step 5)
    - Choose a Thingiverse category based on categories of similar Thingiverse models in `similar_models.txt`
    - Assemble a description based on the model's actual features and inspired by similar models
    - Save to `description/thingiverse.md` with structured header followed by description body:
@@ -59,11 +66,11 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
      - End with an italic call-to-action: `*Suggestions for improvements? Reach out — happy to refine the design.*`
      - Concise, practical tone
 
-6. **User review**
+7. **User review**
    - Present the description to the user for feedback
    - Iterate on `description/thingiverse.md` until user is satisfied
 
-7. **Create MakerWorld version**
+8. **Create MakerWorld version**
    - Create `description/makerworld.md` with the same header format but MakerWorld-specific values:
      ```
      Name: <model name>
@@ -73,13 +80,13 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
      <description body>
      ```
    - Choose a MakerWorld category:
-     - Review categories of similar MakerWorld models in `similar_models.txt` (from step 4)
+     - Review categories of similar MakerWorld models in `similar_models.txt` (from step 5)
      - Present the most common category > subcategory pairs to the user, along with a recommended pick
      - The category must match an existing MakerWorld category (typed into autocomplete during upload)
    - Description body may differ from Thingiverse version (e.g. emojis for section headers, more visual layout)
    - Tags can differ from Thingiverse — use tags found on similar MakerWorld models
 
-8. **Publish draft to Thingiverse**
+9. **Publish draft to Thingiverse**
    - Collect the list of files to upload:
      - Photos: `cover_4x3.*` and all `photo_*` files from the `photo/` subfolder
      - Model files: `bambu.3mf` from the model output folder and all `.stl` files from `stl/`
@@ -93,8 +100,8 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
    - Requires OAuth2 token — first run will open browser for login, token is saved to `.env` for reuse
    - Prerequisites: `THINGIVERSE_CLIENT_ID` and `THINGIVERSE_CLIENT_SECRET` in `.env` (register app at https://www.thingiverse.com/apps/create with redirect URL `http://localhost:3000/callback`)
 
-9. **Publish draft to MakerWorld**
-   - Use the same file list from step 8
+10. **Publish draft to MakerWorld**
+   - Use the same file list from step 9
    - Use `.claude/skills/model-publish/scripts/makerworld.py` to create a draft:
      - `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/makerworld.py draft <description_dir> --photo-dir <photo_dir> --files <file1> <file2> ...`
      - Example: `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/makerworld.py draft models/other/marker_holder/description --photo-dir models/other/marker_holder/photo --files models/other/marker_holder/bambu.3mf models/other/marker_holder/stl/marker_holder.stl`
@@ -105,9 +112,9 @@ allowed-tools: Read, Write, Edit, Bash, WebSearch, WebFetch
    - Creates as draft — not publicly visible until manually published
    - Prerequisites: run `./venv/Scripts/python.exe .claude/skills/model-publish/scripts/makerworld.py login` first to authenticate (session persists in `.chrome_mw_profile/`)
 
-10. **Update project README and description files**
+11. **Update project README and description files**
     - Add or update the model entry in `README.md` under the appropriate section
-    - Use only the Thingiverse URL from step 8 (MakerWorld URLs change after publishing, so leave a placeholder):
+    - Use only the Thingiverse URL from step 9 (MakerWorld URLs change after publishing, so leave a placeholder):
       ```
       - **Model Name** - Short description ([Thingiverse](https://www.thingiverse.com/thing:XXXXX), [MakerWorld](TBD)).
       ```
