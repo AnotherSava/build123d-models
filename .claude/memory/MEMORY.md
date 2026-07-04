@@ -2,7 +2,7 @@
 
 ## Publishing Scripts
 - All technical details are in `.claude/skills/model-publish/PUBLISHING_NOTES.md` (checked into repo)
-- Skill: `.claude/skills/model-publish/SKILL.md` — 10 steps from source code reading to publishing
+- Skill: `.claude/skills/model-publish/SKILL.md` — 11 steps from source code reading to publishing (step 2 = ensure regression coverage)
 - Scripts: `.claude/skills/model-publish/scripts/` — `web_search.py`, `thingiverse.py`, `makerworld.py`
 - First published model: marker_holder ([Thingiverse](https://www.thingiverse.com/thing:7294115), [MakerWorld](https://makerworld.com/en/models/drafts/6798386))
 
@@ -21,6 +21,7 @@
 - [reference_forward_port_stale_model.md](reference_forward_port_stale_model.md) — Port a stale model forward: run its last-working commit as a golden oracle (worktree + current venv), diff per sub-part to localize each common-API drift; documents Pencil/SweepSolid/rotate semantic changes
 - [reference_model_regression_suite.md](reference_model_regression_suite.md) — Guard models vs geometry drift via B-rep-invariant signatures; byte-comparing exported 3MF/STL is a trap
 - [reference_build123d_mirrored_compound_volume.md](reference_build123d_mirrored_compound_volume.md) — build123d Compound.volume returns 0 for a mirrored multi-solid compound; sum per-solid volumes
+- [reference_notch_inplane_wedge.md](reference_notch_inplane_wedge.md) — add_notch forward-port: build the wedge natively in-plane (no orient) so coplanar faces merge and booleans stay stable; the Direction vector-rewrite dropped alignment_closer/middle (GAH-only), restore additively
 
 # Feedback
 - [feedback_visualization_orientation.md](feedback_visualization_orientation.md) — Build models in scene/visualization orientation, NOT print; use `SmartSolid.bed_orientation` for print pose (applied only at STL export). Reverses the old "build in print orientation" guidance

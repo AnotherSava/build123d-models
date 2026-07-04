@@ -78,6 +78,23 @@ class Direction(Enum):
     def axis(self) -> Axis:
         return Axis((0, 0, 0), self.value)
 
+    @property
+    def _positive(self) -> bool:
+        """Whether this direction points along the positive end of its axis (N/E/U)."""
+        return self.value.X + self.value.Y + self.value.Z > 0
+
+    @property
+    def alignment_closer(self) -> Alignment:
+        """Alignment that snaps an object flush to a reference solid's face on THIS
+        side (its near edge): RL on the positive-axis side, LR on the negative one."""
+        return Alignment.RL if self._positive else Alignment.LR
+
+    @property
+    def alignment_middle(self) -> Alignment:
+        """Alignment that snaps an object's centre onto a reference solid's face on
+        THIS side: R on the positive-axis side, L on the negative one."""
+        return Alignment.R if self._positive else Alignment.L
+
     def rotate(self, angle: int, axis: Axis = Axis.Z) -> 'Direction':
         return Direction.from_vector(rotate_vector(self.value, axis, angle))
 

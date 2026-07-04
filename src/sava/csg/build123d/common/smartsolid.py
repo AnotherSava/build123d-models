@@ -704,18 +704,37 @@ class SmartSolid:
         return self.copy(label).bevel_edge(side_a, side_b, size_a, size_b)
 
     def add_notch(self, direction: Direction, depth: float, length: float) -> None:
-        raise NotImplementedError("Remove dependency on pencil")
-        # notch_height = depth / length * self.get_side_length(direction)
-        #
-        # pencil = Pencil().up(notch_height).left(self.get_side_length(direction))
-        # notch = SmartSolid(pencil.extrude(self.get_side_length(direction)))
-        ## notch.orient((90, 90 + direction.(update this)value, 0))
-        # notch.align_z(self, Alignment.LR, -depth).align_axis(self, direction.axis, direction.alignment_closer).align_axis(self, direction.orthogonal_axis)
-        #
-        # extended_shape = self.scaled(1, 1, depth / self.z_size)
-        # extended_shape.align_xy(self).align_z(self, Alignment.LL)
-        #
-        # self.fuse(notch.intersect(extended_shape))
+        """Fuse a triangular finger-scoop ramp onto the bottom edge of the face facing
+        `direction`: it drops `depth` below the box bottom at that face and ramps back
+        up to the bottom over `length` inward, spanning the face's full width. Mutates
+        in place.
+
+        Built natively in the vertical plane (no post-rotation) so the ramp's faces stay
+        exactly coincident with the box. A wedge rotated then moved injects ~1e-7 transform
+        error that leaves the coplanar faces unmerged and destabilises later booleans."""
+        from sava.csg.build123d.common.pencil import Pencil  # inline to avoid circular import
+
+        horizontal = direction in (Direction.E, Direction.W)
+        plane = Plane.XZ if horizontal else Plane.YZ
+        width = self.y_size if horizontal else self.x_size
+
+        # Canonical right triangle: drop leg at local x=0, ramping up to local x=length,
+        # dropping `depth` below; extruded across the full face width.
+        wedge = Pencil(plane, start=(length, 0)).left(length).down(depth).extrude(width)
+        # Mirror the ramp onto a positive-axis face (N/E); negative-axis faces (S/W) already match.
+        if direction in (Direction.N, Direction.E):
+            wedge.mirror(Plane.YZ if horizontal else Plane.XZ)
+
+        wb = wedge.solid.bounding_box()
+        face = {Direction.E: self.x_max, Direction.W: self.x_min, Direction.N: self.y_max, Direction.S: self.y_min}[direction]
+        if horizontal:
+            drop_edge = wb.max.X if direction == Direction.E else wb.min.X
+            wedge.move(face - drop_edge, self.y_max - wb.max.Y, self.z_min - wb.max.Z)
+        else:
+            drop_edge = wb.max.Y if direction == Direction.N else wb.min.Y
+            wedge.move(self.x_min - wb.min.X, face - drop_edge, self.z_min - wb.max.Z)
+
+        self.fuse(wedge)
 
     def copy(self, label: str = None) -> 'SmartSolid':
         result = SmartSolid()
