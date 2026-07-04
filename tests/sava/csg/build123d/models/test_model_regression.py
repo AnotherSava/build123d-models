@@ -20,6 +20,7 @@ import pytest
 
 from sava.csg.build123d.common.modelspec import export_model
 from sava.csg.build123d.models.hydroponics import basket, splitter, stand, tray
+from sava.csg.build123d.models.inserts.grand_austria_hotel import celebrities, player, turnorder
 from sava.csg.build123d.models.other import cableholder, dispenserbottlemount, markerholder, pipeclamp, poweradapters
 
 from ._signature import compare, load_reference, save_reference, signature
@@ -40,6 +41,9 @@ MODEL_BUILDERS = {
     "tray": tray.build,
     "power_adapters": poweradapters.build,
     "cable_holder": cableholder.build,
+    "celebrities": celebrities.build,
+    "player": player.build,
+    "turnorder": turnorder.build,
 }
 
 _REBASELINE = os.environ.get("MODEL_REGRESSION_REBASELINE") == "1"

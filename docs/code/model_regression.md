@@ -62,8 +62,8 @@ part **label**, mirroring the one-STL-per-label output.
 
 1. Give the model module a `build() -> ModelSpec` and route its `__main__`
    through `export_model(build())` (drop the hand-wired `export_3mf`/`export_stl`
-   calls). Models that export at *import time* (e.g. `grand_austria_hotel/*`) must
-   first move that work into `build()` / `__main__`.
+   calls). Models that export at *import time* must first move that work into
+   `build()` / `__main__`.
 2. Register it in `MODEL_BUILDERS` in `test_model_regression.py`.
 3. Create the baseline once and commit it with the model:
    ```bash

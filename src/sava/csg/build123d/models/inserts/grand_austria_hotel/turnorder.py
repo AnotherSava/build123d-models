@@ -2,8 +2,9 @@ from dataclasses import dataclass
 
 from build123d import Vector, extrude, import_svg, scale
 
-from sava.csg.build123d.common.exporter import export, get_path, save_3mf
+from sava.csg.build123d.common.exporter import get_path
 from sava.csg.build123d.common.geometry import Alignment, Direction
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
 
@@ -93,7 +94,11 @@ class TurnOrder:
         return solid.orient((0, 0, self.dim.key_rotation))
 
 
-dimensions = TurnOrderBoxDimensions()
-key = TurnOrder(dimensions)
-export(key.create_box())
-save_3mf()
+def build() -> ModelSpec:
+    box = TurnOrder(TurnOrderBoxDimensions()).create_box()
+    box.label = "turnorder"
+    return ModelSpec(name="turnorder", output_dir="models/inserts/grand_austria_hotel/turnorder", scene=[box])
+
+
+if __name__ == "__main__":
+    export_model(build())

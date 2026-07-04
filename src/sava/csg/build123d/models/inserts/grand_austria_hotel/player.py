@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sava.csg.build123d.common.exporter import export, save_3mf
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -37,10 +37,11 @@ class PlayerComponents(SmartBox):
         return pencil.extrude_mirrored_y(self.dim.height)
 
 
+def build() -> ModelSpec:
+    mold = PlayerComponents(PlayerComponentsDimensions()).create_single_couple().molded()
+    mold.label = "player"
+    return ModelSpec(name="player", output_dir="models/inserts/grand_austria_hotel/player", scene=[mold])
 
-dimensions = PlayerComponentsDimensions()
-player_components = PlayerComponents(dimensions)
 
-component = player_components.create_single_couple()
-export(component.molded())
-save_3mf()
+if __name__ == "__main__":
+    export_model(build())

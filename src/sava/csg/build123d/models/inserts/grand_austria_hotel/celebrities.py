@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from sava.csg.build123d.common.exporter import export, save_3mf
 from sava.csg.build123d.common.geometry import Alignment, Direction
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.smartbox import SmartBox
 
 
@@ -72,8 +72,12 @@ def create_celebrities_box(dim: CelebritiesBoxDimensions) -> SmartBox:
 
     return outer_box.cut(card_box, cube_box, token_box)
 
-dimensions = CelebritiesBoxDimensions()
-celebrities_box = create_celebrities_box(dimensions)
 
-export(celebrities_box)
-save_3mf()
+def build() -> ModelSpec:
+    box = create_celebrities_box(CelebritiesBoxDimensions())
+    box.label = "celebrities"
+    return ModelSpec(name="celebrities", output_dir="models/inserts/grand_austria_hotel/celebrities", scene=[box])
+
+
+if __name__ == "__main__":
+    export_model(build())
