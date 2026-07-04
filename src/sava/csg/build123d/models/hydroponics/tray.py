@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 from dataclasses import dataclass
 from math import atan, degrees, radians, sin, sqrt, tan
 
@@ -7,9 +6,9 @@ from bd_warehouse.thread import IsoThread
 from build123d import Axis, Plane, Solid, Vector, Wire
 
 from sava.csg.build123d.common.edgefilters import PositionalFilter
-from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl
 from sava.csg.build123d.common.geometry import Alignment, create_vector
 from sava.csg.build123d.common.modelcutter import CutSpec, cut_with_wires
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_handle_wire
 from sava.csg.build123d.common.smartbox import SmartBox
@@ -347,42 +346,44 @@ class TrayFactory:
         return SmartSolid(watering_hole, handle, ball, label="watering_hole_cap")
 
 
-dimensions = TrayDimensions()
-tray_factory = TrayFactory(dimensions)
-
-
-def export_3mf(tray_pieces: Iterable[SmartSolid], peg: SmartSolid, peg_cap: SmartSolid, watering_hole_cap: SmartSolid) -> None:
-    export(*tray_pieces)
-
+def _arrange_scene(dim: TrayDimensions, tray_pieces: list[SmartSolid], peg: SmartSolid, peg_cap: SmartSolid, watering_hole_cap: SmartSolid) -> list[SmartSolid]:
+    scene = list(tray_pieces)
     tray = SmartSolid(tray_pieces)
 
     for direction_x in [-1, 1]:
         for direction_y in [-1, 1]:
-            peg.align_xy(tray, Alignment.C, direction_x * dimensions.peg_hole_offset_x, direction_y * dimensions.watering_hole_offset_y)
-            peg.align_z(tray, Alignment.RR, -dimensions.tray_height)
-            export(peg)
+            peg_placed = peg.copy()
+            peg_placed.align_xy(tray, Alignment.C, direction_x * dim.peg_hole_offset_x, direction_y * dim.watering_hole_offset_y)
+            peg_placed.align_z(tray, Alignment.RR, -dim.tray_height)
+            scene.append(peg_placed)
 
-            peg_cap.align_zxy(peg, Alignment.RL, dimensions.peg_cap_handle_height)
-            export(peg_cap)
+            peg_cap_placed = peg_cap.copy()
+            peg_cap_placed.align_zxy(peg_placed, Alignment.RL, dim.peg_cap_handle_height)
+            scene.append(peg_cap_placed)
 
-    watering_hole_cap.align_xy(tray, Alignment.C, dimensions.watering_hole_offset_x, dimensions.watering_hole_offset_y)
-    watering_hole_cap.align_z(tray, Alignment.LR)
-    export(watering_hole_cap)
+    watering_hole_cap_placed = watering_hole_cap.copy()
+    watering_hole_cap_placed.align_xy(tray, Alignment.C, dim.watering_hole_offset_x, dim.watering_hole_offset_y)
+    watering_hole_cap_placed.align_z(tray, Alignment.LR)
+    scene.append(watering_hole_cap_placed)
 
-    save_3mf("models/hydroponic/tray/export.3mf", current=True)
+    return scene
 
-def export_all() -> None:
-    tray_solid_pieces = tray_factory.create_tray()
-    tray_solid_pieces_no_peg_holes = tray_factory.create_tray(False)
-    peg_solid = tray_factory.create_peg()
-    peg_cap_solid = tray_factory.create_peg_cap()
-    watering_hole_cap_solid = tray_factory.create_watering_hole_cap()
 
-    export_3mf(tray_solid_pieces, peg_solid, peg_cap_solid, watering_hole_cap_solid)
+def build() -> ModelSpec:
+    dim = TrayDimensions()
+    factory = TrayFactory(dim)
 
-    clear()
-    export(*tray_solid_pieces, *tray_solid_pieces_no_peg_holes, peg_solid, peg_cap_solid, watering_hole_cap_solid)
+    tray_pieces = factory.create_tray()
+    tray_pieces_no_peg_holes = factory.create_tray(False)
+    peg = factory.create_peg()
+    peg_cap = factory.create_peg_cap()
+    watering_hole_cap = factory.create_watering_hole_cap()
 
-    save_stl("models/hydroponic/tray/stl")
+    scene = _arrange_scene(dim, tray_pieces, peg, peg_cap, watering_hole_cap)
+    prints = [*tray_pieces, *tray_pieces_no_peg_holes, peg, peg_cap, watering_hole_cap]
 
-export_all()
+    return ModelSpec(name="tray", output_dir="models/hydroponic/tray", scene=scene, prints=prints)
+
+
+if __name__ == "__main__":
+    export_model(build())

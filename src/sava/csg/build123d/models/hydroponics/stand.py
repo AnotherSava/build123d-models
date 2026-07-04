@@ -4,8 +4,8 @@ from math import asin, degrees, radians, sin, tan
 
 from build123d import Axis, Circle, Face, Location, Plane, Solid, Trapezoid, Vector, VectorLike, Wire, fillet, revolve
 
-from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import Alignment, Direction, create_vector, rotate_orientation
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartcone import SmartCone
 from sava.csg.build123d.common.smartloft import SmartLoft
@@ -351,11 +351,10 @@ class HydroponicsStand:
         return top.fuse(bottom).intersect(above_floor).fuse(invert).cut(bottom_cut)
 
 
+def build() -> ModelSpec:
+    stand = HydroponicsStand(StandDimensions()).create_stand()
+    return ModelSpec(name="stand", output_dir="models/hydroponic/stand", scene=[stand])
+
+
 if __name__ == "__main__":
-    dimensions = StandDimensions()
-    hydroponics = HydroponicsStand(dimensions)
-
-    stand = hydroponics.create_stand()
-
-    export_3mf("models/hydroponic/stand/export.3mf", stand)
-    export_stl("models/hydroponic/stand/stl", stand, clean=True)
+    export_model(build())

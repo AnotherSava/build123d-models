@@ -4,8 +4,8 @@ from bd_warehouse.thread import IsoThread
 from build123d import Solid
 
 from sava.common.advanced_math import COS_45
-from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl
 from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.models.hydroponics.connector import HoseConnectorDimensions, HoseConnectorFactory
@@ -118,23 +118,13 @@ class HydroponicsSplitterFactory:
         return result
 
 
-dimensions = SplitterDimensions()
-splitter_factory = HydroponicsSplitterFactory(dimensions)
-
-
-def export_3mf(splitter: SmartSolid, screw: SmartSolid) -> None:
+def build() -> ModelSpec:
+    factory = HydroponicsSplitterFactory(SplitterDimensions())
+    splitter = factory.create_splitter()
+    screw = factory.create_screw()
     screw.move_x(-30).align_z(splitter, Alignment.LR)
-    export(splitter, screw)
-    save_3mf("models/hydroponic/splitter/export.3mf", current=True)
+    return ModelSpec(name="splitter", output_dir="models/hydroponic/splitter", scene=[splitter, screw])
 
-def export_all() -> None:
-    splitter_solid = splitter_factory.create_splitter()
-    screw_solid = splitter_factory.create_screw()
 
-    export_3mf(splitter_solid, screw_solid)
-
-    clear()
-    export(splitter_solid, screw_solid)
-    save_stl("models/hydroponic/splitter/stl")
-
-export_all()
+if __name__ == "__main__":
+    export_model(build())

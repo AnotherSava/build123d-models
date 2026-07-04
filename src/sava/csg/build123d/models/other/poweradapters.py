@@ -4,8 +4,8 @@ from math import radians, tan
 from build123d import Axis, Face, Location, Plane, Polyline, Vector, extrude
 
 from sava.csg.build123d.common.edgefilters import AXIS_X, AxisFilter, PositionalFilter
-from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl
 from sava.csg.build123d.common.geometry import Alignment, create_vector
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -357,33 +357,24 @@ class PowerAdapterBox(PowerAdapterBase):
         return pencil.extrude(self.dim.lock.length_bottom + self.dim.box_taper_diff * 2)
 
 
-dimensions = PowerAdapterBoxDimensions()
-power_adapter_box = PowerAdapterBox(dimensions)
-power_adapter_lid = PowerAdapterLid(dimensions)
+def build() -> ModelSpec:
+    dim = PowerAdapterBoxDimensions()
+    box, socket_texts = PowerAdapterBox(dim).create_box()
+    lid, snaps, text = PowerAdapterLid(dim).create_lid()
 
-def export_3mf(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartSolid) -> None:
-    # clear()
-    box.align_zxy(lid, Alignment.RR, -dimensions.lid_height - dimensions.box_wider_height)
+    # Assembled visualization scene: box sits below the lid, socket texts follow.
+    box.align_zxy(lid, Alignment.RR, -dim.lid_height - dim.box_wider_height)
     socket_texts.colocate(box)
+    scene = [lid.fuse(snaps).copy(), text.copy(), box.copy(), socket_texts.copy()]
 
-    export(lid.fuse(snaps), label="lid")
-    export(text, box, socket_texts)
-    save_3mf("models/other/power_adapters/export.3mf", True)
-
-def export_stl(box: SmartSolid, socket_texts: SmartSolid, lid: SmartSolid, snaps: SmartSolid, text: SmartSolid) -> None:
-    clear()
-
+    # Print layout: flip the lid onto its ceiling, carrying snaps and text along.
     lid.orient((180, 0, 0))
     snaps.colocate(lid)
     text.colocate(lid)
+    prints = [box, socket_texts, text, lid.fuse(snaps)]
 
-    export(box, socket_texts, text)
-    export(lid.fuse(snaps), label="lid")
-    save_stl("models/other/power_adapters/stl")
+    return ModelSpec(name="power_adapters", output_dir="models/other/power_adapters", scene=scene, prints=prints)
 
 
-box_solid, socket_texts_solid = power_adapter_box.create_box()
-lid_solid, snaps_solid, text_solid = power_adapter_lid.create_lid()
-
-export_3mf(box_solid, socket_texts_solid, lid_solid, snaps_solid, text_solid)
-export_stl(box_solid, socket_texts_solid, lid_solid, snaps_solid, text_solid)
+if __name__ == "__main__":
+    export_model(build())

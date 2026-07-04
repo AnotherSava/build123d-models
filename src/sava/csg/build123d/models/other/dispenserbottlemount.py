@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 from build123d import Axis
 
-from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import GearDimensions, create_gear
 from sava.csg.build123d.common.smartbox import SmartBox
@@ -458,7 +458,7 @@ class DispenserBottleMount:
         return support_top.rotate_z(dim.cut_angle_shift)
 
 
-if __name__ == "__main__":
+def build() -> ModelSpec:
     dim = DispenserBottleMountDimensions()
     slot_position = 1
     mount = DispenserBottleMount(dim)
@@ -477,6 +477,10 @@ if __name__ == "__main__":
     cover.rotate_z(mount._aligned_cover_rotation(slot_position))
     cover.align_z(diaphragm_support, Alignment.RL, dim.cover_gear.thickness)
 
-    export_3mf("models/other/dispenser_bottle_mount/export.3mf", diaphragm_plate, *blades, cover, diaphragm_support)
-    # export_3mf("models/other/dispenser_bottle_mount/export.3mf", cover)
-    export_stl("models/other/dispenser_bottle_mount/stl", diaphragm_plate, blades[0], cover, diaphragm_support)
+    scene = [diaphragm_plate, *blades, cover, diaphragm_support]
+    prints = [diaphragm_plate, blades[0], cover, diaphragm_support]
+    return ModelSpec(name="dispenser_bottle_mount", output_dir="models/other/dispenser_bottle_mount", scene=scene, prints=prints)
+
+
+if __name__ == "__main__":
+    export_model(build())

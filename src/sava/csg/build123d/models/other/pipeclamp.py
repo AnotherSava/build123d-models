@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 from build123d import Plane
 
-from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
@@ -72,10 +72,14 @@ class PipeClamp:
         return half_pipe.fuse(holder)
 
 
+def build() -> ModelSpec:
+    pipe_clamp = PipeClamp(PipeClampDimensions())
+    half_a = pipe_clamp.create_half_a()
+    half_a.label = "shape_1"
+    half_b = pipe_clamp.create_half_b()
+    half_b.label = "shape_2"
+    return ModelSpec(name="pipe_clamp", output_dir="models/other/pipe_clamp", scene=[half_a, half_b])
+
+
 if __name__ == "__main__":
-    dimensions = PipeClampDimensions()
-    pipe_clamp = PipeClamp(dimensions)
-    half_a_model = pipe_clamp.create_half_a()
-    half_b_model = pipe_clamp.create_half_b()
-    export_3mf("models/other/pipe_clamp/export.3mf", half_a_model, half_b_model)
-    export_stl("models/other/pipe_clamp/stl", half_a_model, half_b_model)
+    export_model(build())
