@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from build123d import Axis
 
 from sava.csg.build123d.common.edgefilters import PositionalFilter
-from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import DELTA, Alignment
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -60,11 +60,12 @@ class MarkerHolder:
         return marker_holder
 
 
+def build() -> ModelSpec:
+    model = MarkerHolder(MarkerHolderDimensions()).create()
+    return ModelSpec(name="marker_holder", output_dir="models/other/marker_holder", scene=[model])
+
+
 if __name__ == "__main__":
     from sava.common.logging import logger
     logger.setLevel("DEBUG")
-    dimensions = MarkerHolderDimensions()
-    marker_holder_factory = MarkerHolder(dimensions)
-    model = marker_holder_factory.create()
-    export_3mf("models/other/marker_holder/export.3mf", model)
-    export_stl("models/other/marker_holder/stl", model)
+    export_model(build())

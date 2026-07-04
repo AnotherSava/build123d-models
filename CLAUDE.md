@@ -16,7 +16,7 @@ The Direct API provides the fundamental primitives (Box, Cylinder, Sphere, etc.)
 
 ## Commands
 
-**Run all tests:**
+**Run tests** (base suite; the slow model regression suite is excluded by default — see "Model regression" below):
 ```bash
 python -m pytest tests/
 ```
@@ -112,8 +112,9 @@ src/sava/csg/build123d/
 ├── common/           # Core utilities and base classes
 └── models/           # Actual 3D model definitions
     ├── common/       # Shared model components
+    ├── hydroponics/  # Hydroponics models (basket, stand, tray, splitter)
     ├── inserts/      # Board game inserts (e.g., grand_austria_hotel/)
-    └── other/        # Other models (hydroponics/, poweradapters.py)
+    └── other/        # Other models (cable_channel/, poweradapters.py)
 ```
 
 ## Key Patterns
@@ -228,6 +229,15 @@ def make_my_model(dim: MyModelDimensions):
 def test_flatten(input, expected):
     assert list(flatten(input)) == expected
 ```
+
+### Model regression
+
+- After substantive changes to shared logic under `src/sava/csg/build123d/common/` (SmartSolid, SmartBox, Pencil, the exporter, etc.), run the model regression suite before wrapping up and report the result — it guards committed models against silent geometry drift:
+  ```bash
+  venv/Scripts/python.exe -m pytest tests/ -m regression
+  ```
+- The suite is slow and grows with every model, so it is excluded from the default `pytest tests/` run via the `regression` marker (`pytest.ini`). It runs deliberately — via `-m regression`, and as part of `/commit`, which runs `.claude/commit-checks.sh` (base suite, then the regression suite) before planning commits.
+- When a geometry change is intentional, re-baseline (`MODEL_REGRESSION_REBASELINE=1 pytest tests/ -m regression`) and commit the updated `signature.json`. Coverage grows one model at a time — see `docs/code/model_regression.md`.
 
 ### Refactoring
 
