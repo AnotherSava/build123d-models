@@ -444,10 +444,14 @@ if __name__ == "__main__":
     cable_channel = CableChannel(dimensions)
     # create_scene(cable_channel)
 
-    # channel_model = cable_channel.create_channel(150)
+    channel_model = cable_channel.create_channel(30)
+    box = SmartBox(channel_model.x_size * 0.6, 11, 0.5)
+    box.align(channel_model).z(Alignment.LR)
+    channel_model.cut(box)
+    channel_model.cut_z(keep=-1.2)
     # channel_model = cable_channel.create_channel(inner=18).right()
     # channel_model = cable_channel.create_channel(inner=14).down()
-    channel_model = cable_channel.create_cap(inner=14).down()
+    # channel_model = cable_channel.create_cap(inner=14).down()
 
     export_3mf("models/other/cable_channel/export.3mf", channel_model)
     export_stl("models/other/cable_channel/stl", channel_model, clean=True)
