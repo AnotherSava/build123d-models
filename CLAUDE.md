@@ -35,7 +35,7 @@ python -m pytest tests/sava/csg/build123d/common/test_smartsolid.py::TestSmartSo
 ```bash
 venv/Scripts/ruff.exe check .
 ```
-A PostToolUse hook (`.claude/hooks/ruff_check.py`) auto-lints every edited `.py` file with `ruff check --fix`; unfixable violations come back as blocking feedback to be corrected immediately.
+A PostToolUse hook (`.claude/hooks/ruff_check.py`) auto-lints every edited `.py` file with `ruff check --fix`, except import organization (F401 unused, I001 sorting) which is deferred to commit time (via `/clean-code`) to avoid churning imports mid-edit; unfixable violations come back as blocking feedback to be corrected immediately.
 
 **View model output:** Use F3D viewer with auto-reload:
 ```bash

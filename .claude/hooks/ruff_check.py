@@ -21,7 +21,10 @@ def main() -> int:
         Path(file_path).resolve().relative_to(PROJECT_ROOT)
     except ValueError:
         return 0
-    result = subprocess.run([str(RUFF), "check", "--fix", file_path], capture_output=True, text=True)
+    # Import organization (F401 unused imports, I001 sorting) is deferred to
+    # commit time (the /clean-code step) so incremental edits aren't churned —
+    # a just-added import isn't stripped before its first use lands.
+    result = subprocess.run([str(RUFF), "check", "--fix", "--extend-ignore", "F401,I001", file_path], capture_output=True, text=True)
     if result.returncode == 0:
         return 0
     sys.stderr.write(result.stdout + result.stderr)
