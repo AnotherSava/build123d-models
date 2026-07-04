@@ -6,8 +6,8 @@ from build123d import Axis, Plane, Solid
 
 from sava.common.advanced_math import COS_45
 from sava.csg.build123d.common.edgefilters import PositionalFilter
-from sava.csg.build123d.common.exporter import export_3mf, export_stl
 from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartercone import SmarterCone
@@ -226,11 +226,12 @@ class CableHolder:
         return torus.fuse(top_connector)
 
 
-if __name__ == "__main__":
-    dimensions = CableHolderDimensions()
-    cable_holder = CableHolder(dimensions)
-    cable_ball_solids = [cable_holder.create_cable_ball(diameter / 10) for diameter in range(30, 43)]
-    holder_solids = [cable_holder.create_holder(length) for length in range(1, 7)]
+def build() -> ModelSpec:
+    cable_holder = CableHolder(CableHolderDimensions())
+    balls = [cable_holder.create_cable_ball(diameter / 10) for diameter in range(30, 43)]
+    holders = [cable_holder.create_holder(length) for length in range(1, 7)]
+    return ModelSpec(name="cable_holder", output_dir="models/other/cable_holder", scene=[holders[3]], prints=[*holders, *balls])
 
-    export_3mf("models/other/cable_holder/export.3mf", holder_solids[3])
-    export_stl("models/other/cable_holder/stl", *holder_solids, *cable_ball_solids)
+
+if __name__ == "__main__":
+    export_model(build())
