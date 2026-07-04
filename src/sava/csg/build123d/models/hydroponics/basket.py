@@ -3,8 +3,8 @@ from math import atan, degrees, radians, tan
 
 from build123d import Axis, Face, Location, Plane
 
-from sava.csg.build123d.common.exporter import clear, export, save_3mf, save_stl
 from sava.csg.build123d.common.geometry import Alignment
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.primitives import create_handle_solid, create_handle_wire
 from sava.csg.build123d.common.smartbox import SmartBox
@@ -295,34 +295,28 @@ class BasketFactory:
 
         return [SmartSolid(foundation, foundation_support).rotate_z(360 / dim.window_count * (index + 0.5)) for index in [1, 2]]
 
-def export_stl(*solids: SmartSolid) -> None:
-    clear()
-    for solid in solids:
-        if not solid.label.startswith("latch_"):
-            solid.mirror(Plane.XY)
-        export(solid)
-    save_stl("models/hydroponic/basket/stl")
-
 def create_basket(height: float) -> SmartSolid:
     dimensions = BasketDimensions()
     dimensions.height = height
-    basket_factory = BasketFactory(dimensions)
-    return basket_factory.create_basket()
+    return BasketFactory(dimensions).create_basket()
 
-def export_basket() -> None:
-    dimensions = BasketDimensions()
-    basket_factory = BasketFactory(dimensions)
-    basket_solid = basket_factory.create_basket()
-    lid_solid = basket_factory.create_lid(basket_solid, 10)
 
-    export(lid_solid, label="lid_a")
-    export(lid_solid.rotate_z(180), label="lid_b")
-    export(basket_solid)
-    save_3mf("models/hydroponic/basket/export.3mf", True)
+def build() -> ModelSpec:
+    factory = BasketFactory(BasketDimensions())
+    basket = factory.create_basket()
+    lid_a = factory.create_lid(basket, 10)
+    lid_a.label = "lid_a"
+    lid_b = factory.create_lid(basket, 10).rotate_z(180)
+    lid_b.label = "lid_b"
+    scene = [lid_a, lid_b, basket]
 
-    lid_variety = (basket_factory.create_lid(basket_solid, diameter) for diameter in [4, 6, 8, 10, 12])
-    basket_variety = (create_basket(height) for height in [61, 63, 65])
-    export_stl(*basket_variety, *lid_variety)
+    # Print layout: parts flipped mouth-down via a mirror across XY (a reflection
+    # bed_orientation can't express), matching the committed per-part STLs.
+    baskets = [create_basket(height).mirror(Plane.XY) for height in [61, 63, 65]]
+    lids = [factory.create_lid(basket, diameter).mirror(Plane.XY) for diameter in [4, 6, 8, 10, 12]]
+
+    return ModelSpec(name="basket", output_dir="models/hydroponic/basket", scene=scene, prints=[*baskets, *lids])
+
 
 if __name__ == "__main__":
-    export_basket()
+    export_model(build())

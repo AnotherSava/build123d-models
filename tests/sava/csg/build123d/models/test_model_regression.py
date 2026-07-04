@@ -19,7 +19,7 @@ import os
 import pytest
 
 from sava.csg.build123d.common.modelspec import export_model
-from sava.csg.build123d.models.hydroponics import splitter, stand, tray
+from sava.csg.build123d.models.hydroponics import basket, splitter, stand, tray
 from sava.csg.build123d.models.other import dispenserbottlemount, markerholder, pipeclamp, poweradapters
 
 from ._signature import compare, load_reference, save_reference, signature
@@ -32,6 +32,7 @@ pytestmark = pytest.mark.regression
 # Registry of covered models — extend one at a time.
 MODEL_BUILDERS = {
     "marker_holder": markerholder.build,
+    "basket": basket.build,
     "stand": stand.build,
     "pipe_clamp": pipeclamp.build,
     "splitter": splitter.build,

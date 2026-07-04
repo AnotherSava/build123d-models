@@ -29,18 +29,26 @@ def _leaf_shapes(part: Any) -> list[Any]:
     return [solid]
 
 
+def _shape_volume(shape: Any) -> float:
+    # build123d's Compound.volume mis-reports 0 for a mirrored multi-solid compound;
+    # summing per-solid volumes is correct and identical for single solids / valid compounds.
+    solids = shape.solids()
+    return sum(s.volume for s in solids) if solids else shape.volume
+
+
 def _aggregate(shapes: list[Any]) -> dict[str, Any]:
-    volume = sum(s.volume for s in shapes)
+    volume = sum(_shape_volume(s) for s in shapes)
     bbox = shapes[0].bounding_box()
     for s in shapes[1:]:
         bbox = bbox.add(s.bounding_box())
     com = [0.0, 0.0, 0.0]
     for s in shapes:
+        sv = _shape_volume(s)
         c = s.center(CenterOf.MASS)
-        com[0] += c.X * s.volume
-        com[1] += c.Y * s.volume
-        com[2] += c.Z * s.volume
-    com = [c / volume for c in com]
+        com[0] += c.X * sv
+        com[1] += c.Y * sv
+        com[2] += c.Z * sv
+    com = [c / volume for c in com] if volume else [0.0, 0.0, 0.0]
     return {
         "volume": round(volume, 4),
         "area": round(sum(s.area for s in shapes), 4),

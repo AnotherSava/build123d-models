@@ -20,6 +20,7 @@
 - [reference_extrude_winding_direction.md](reference_extrude_winding_direction.md) — extrude(face, h) follows the face normal, which flips with polygon winding; position cutter prisms by recentering, never by assuming +normal
 - [reference_forward_port_stale_model.md](reference_forward_port_stale_model.md) — Port a stale model forward: run its last-working commit as a golden oracle (worktree + current venv), diff per sub-part to localize each common-API drift; documents Pencil/SweepSolid/rotate semantic changes
 - [reference_model_regression_suite.md](reference_model_regression_suite.md) — Guard models vs geometry drift via B-rep-invariant signatures; byte-comparing exported 3MF/STL is a trap
+- [reference_build123d_mirrored_compound_volume.md](reference_build123d_mirrored_compound_volume.md) — build123d Compound.volume returns 0 for a mirrored multi-solid compound; sum per-solid volumes
 
 # Feedback
 - [feedback_visualization_orientation.md](feedback_visualization_orientation.md) — Build models in scene/visualization orientation, NOT print; use `SmartSolid.bed_orientation` for print pose (applied only at STL export). Reverses the old "build in print orientation" guidance
