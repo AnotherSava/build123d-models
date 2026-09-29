@@ -2,13 +2,9 @@
 /venv/
 /models/current_model.3mf
 /models/current_model/
-/.idea/
-/.claude/settings.local.json
 /nul
 .env
 __pycache__/
 .chrome_mw_profile/
 /tmp/
 similar_models.txt
-# ralphex progress logs
-.ralphex/progress/
