@@ -56,6 +56,8 @@ See `docs/code/reconstruct/` for the algorithm, findings, and the public Python 
 
 ## Installation
 
+The `.3mf` model files are stored with [Git LFS](https://git-lfs.com/); install it before cloning so they check out as real files.
+
 Install the required dependencies:
 
 ```bash

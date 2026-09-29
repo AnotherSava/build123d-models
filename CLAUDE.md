@@ -236,7 +236,7 @@ def test_flatten(input, expected):
   ```bash
   venv/Scripts/python.exe -m pytest tests/ -m regression
   ```
-- The suite is slow and grows with every model, so it is excluded from the default `pytest tests/` run via the `regression` marker (`pytest.ini`). It runs deliberately — via `-m regression`, and as part of `/commit`, which runs `.claude/commit-checks.sh` (base suite, then the regression suite) before planning commits.
+- The suite is slow and grows with every model, so it is excluded from the default `pytest tests/` run via the `regression` marker (`pytest.ini`). It runs deliberately — via `-m regression`, and as part of `/commit`, which runs `.claude/commit-checks.sh` (conventions checker, base suite, then the regression suite) before planning commits.
 - When a geometry change is intentional, re-baseline (`MODEL_REGRESSION_REBASELINE=1 pytest tests/ -m regression`) and commit the updated `signature.json`. Coverage grows one model at a time — see `docs/code/model_regression.md`.
 
 ### Refactoring

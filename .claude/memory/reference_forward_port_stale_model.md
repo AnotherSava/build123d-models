@@ -4,7 +4,6 @@ description: Port a stale/broken model forward by running its last-working commi
 metadata: 
   node_type: memory
   type: reference
-  originSessionId: 7d59a8c7-e41f-4991-85a3-1a5c974895e5
 ---
 
 When a model no longer runs because the **common code it depends on changed underneath it** (renamed/removed helpers, shifted semantics), port it forward against a *golden oracle* instead of guessing:

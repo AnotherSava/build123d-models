@@ -11,8 +11,9 @@ The suite is slow and grows with every model, so it is **excluded from the
 default `pytest tests/` run** via the `regression` marker (`pytest.ini`) — the
 frequent base suite stays fast. It runs deliberately, in two places:
 
-- **`/commit`** — the commit skill runs `.claude/commit-checks.sh` (base suite,
-  then the regression suite) before planning commits, and blocks on failure.
+- **`/commit`** — the commit skill runs `.claude/commit-checks.sh` (conventions
+  checker, base suite, then the regression suite) before planning commits, and
+  blocks on failure.
 - **Development** — the project `CLAUDE.md` instructs Claude to run it
   (`pytest tests/ -m regression`) after substantive changes under `common/`.
 
