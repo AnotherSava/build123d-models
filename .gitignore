@@ -6,5 +6,4 @@
 .env
 __pycache__/
 .chrome_mw_profile/
-/tmp/
 similar_models.txt
