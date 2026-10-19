@@ -10,7 +10,7 @@ from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.sweepsolid import SweepSolid
-from sava.csg.build123d.common.text import TextDimensions, create_text
+from sava.csg.build123d.common.text import TextDimensions, TextSolid, create_text
 
 
 class RecessDimensions:
@@ -176,8 +176,8 @@ class PowerAdapterLid(PowerAdapterBase):
         text = create_text(self.dim.text, self.dim.label, label="text")
         text.align_zxy(lid, Alignment.RL)
 
-        # return lid.cut(snaps), snaps, text.connected()
-        return lid.cut(snaps, text), snaps, text
+        # cut with the bare letters: the pane connected() adds would leave a slit in the lid
+        return lid.cut(snaps, text), snaps, text.connected()
 
     # Creates profile for thinning snap lock cantilever
     def create_snap_thinning(self) -> SmartSolid:
@@ -297,7 +297,7 @@ class PowerAdapterBox(PowerAdapterBase):
         slots = self.orient(self.create_lock_slot(), box)
         box.cut(slots)
 
-        socket_texts = SmartSolid(texts, label="socket types")
+        socket_texts = TextSolid(texts, label="socket types").connected()
         return box, socket_texts
 
     # Creates all socket recesses with type labels (12 international socket types)

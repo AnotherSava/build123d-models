@@ -42,3 +42,4 @@
 - [feedback_diff_against_draft.md](feedback_diff_against_draft.md) — On model/draft mismatch reports, diff feature-by-feature (corner convexity!); generic metrics that already passed can't catch it
 - [feedback_draft_rules_as_automation.md](feedback_draft_rules_as_automation.md) — Implement quantitative draft layout rules as draft_lib automation (bounds → auto-layout), never as guidance + per-draft tuning
 - [feedback_draft_first_model_changes.md](feedback_draft_first_model_changes.md) — On model-change requests, update and review the dimensioned draft FIRST, then implement the model
+- [feedback_text_one_object.md](feedback_text_one_object.md) — Every exported text label is one object: join glyphs with TextSolid.connected(); cut engravings with the bare glyphs
