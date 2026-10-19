@@ -12,7 +12,7 @@ allowed-tools: Read, Write, Bash, Edit
 ```python
 from dataclasses import dataclass
 
-from sava.csg.build123d.common.exporter import export_3mf, export_stl
+from sava.csg.build123d.common.modelspec import ModelSpec, export_model
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
 ```
@@ -36,14 +36,16 @@ class CableHolder:
         return SmartBox(self.dim.length, self.dim.width, self.dim.height)
 ```
 
-6. Add main section that creates a dimensions object, model object, solid and exports it both to 3mf and stl (use model group and snake_case in model folder path):
+6. Add a `build()` function returning a `ModelSpec`, and a main section exporting it. `export_model` writes the 3MF scene (`export.3mf`, also copied to the viewer's current model) and one STL per part under `stl/`. `name` is the model name in snake_case; `output_dir` is `models/<group>/<name>` — except where the group's existing models already export to a differently named folder, which wins (the `hydroponics` package exports to `models/hydroponic/`). Once the model has more than one part, pass the assembled parts as `scene` and the print-posed parts as `prints` (see `docs/code/model_regression.md` and `tray.py`):
 ```python
-if __name__ == "__main__":
+def build() -> ModelSpec:
     dimensions = CableHolderDimensions()
     cable_holder = CableHolder(dimensions)
-    model = cable_holder.create()
-    export_3mf("models/other/cable_holder/export.3mf", model)
-    export_stl("models/other/cable_holder/stl", model)
+    return ModelSpec(name="cable_holder", output_dir="models/other/cable_holder", scene=[cable_holder.create()])
+
+
+if __name__ == "__main__":
+    export_model(build())
 ```
 
 7. Execute and see if output files are created.
@@ -53,3 +55,5 @@ if __name__ == "__main__":
 9. Create PyCharm run configuration by adding a new `<configuration>` block to `.idea/workspace.xml` inside the `<component name="RunManager">` section. Copy an existing Python configuration and update:
    - `name` attribute: model name in Title Case (e.g., "Cable holder")
    - `SCRIPT_NAME` option: module path (e.g., "sava.csg.build123d.models.other.cableholder")
+
+   Then add `<item itemvalue="Python.<name>" />` (e.g. `Python.Cable holder`) to the `<list>` at the end of that same `RunManager` component, beside the other configurations' items.
