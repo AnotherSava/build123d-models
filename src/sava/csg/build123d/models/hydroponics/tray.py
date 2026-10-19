@@ -288,16 +288,7 @@ class TrayFactory:
         )
 
     def create_peg(self) -> SmartSolid:
-        thread = self.create_peg_thread()
-
-        peg = SmarterCone.cylinder(thread.min_radius, thread.length + self.dim.peg_height, label="peg")
-        peg.fillet_by(self.dim.peg_fillet_radius, PositionalFilter(Axis.Z, peg.z_max))
-
-        thread_screw_solid = SmartSolid(thread)
-        thread_screw_solid.align_zxy(peg, Alignment.LR)
-
-        peg_base = SmarterCone.base(thread.min_radius).extend(angle=-45, height=self.dim.peg_base_width_delta).rotate_x(180)
-        peg_base.align_zxy(peg, Alignment.LR, thread.length)
+        peg = self.create_plain_peg(self.dim.peg_height)
 
         cap_hole, cap_thread = self.create_hole_parts(self.dim.peg_cap_hole_diameter, self.dim.peg_cap_hole_height, self.dim.peg_cap_hole_pitch)
         cap_hole.align_zxy(peg, Alignment.RL)
@@ -306,7 +297,22 @@ class TrayFactory:
         cap_hole_cone = SmarterCone.base(self.dim.peg_cap_hole_diameter / 2).extend(angle=-45, radius=0)
         cap_hole_cone.align_zxy(cap_hole, Alignment.LL)
 
-        return peg.cut(cap_hole, cap_hole_cone).fuse(thread_screw_solid, cap_thread, peg_base)
+        return peg.cut(cap_hole, cap_hole_cone).fuse(cap_thread)
+
+    # A peg with no hole for the cap: `height` is the length past the threaded part.
+    def create_plain_peg(self, height: float) -> SmartSolid:
+        thread = self.create_peg_thread()
+
+        peg = SmarterCone.cylinder(thread.min_radius, thread.length + height, label="peg")
+        peg.fillet_by(self.dim.peg_fillet_radius, PositionalFilter(Axis.Z, peg.z_max))
+
+        thread_screw_solid = SmartSolid(thread)
+        thread_screw_solid.align_zxy(peg, Alignment.LR)
+
+        peg_base = SmarterCone.base(thread.min_radius).extend(angle=-45, height=self.dim.peg_base_width_delta).rotate_x(180)
+        peg_base.align_zxy(peg, Alignment.LR, thread.length)
+
+        return peg.fuse(thread_screw_solid, peg_base)
 
 
     def create_peg_cap(self) -> SmartSolid:
