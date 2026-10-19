@@ -2,6 +2,7 @@ import unittest
 
 from build123d import Axis, Mesher
 
+from sava.csg.build123d.common.exporter import get_path
 from sava.csg.build123d.common.smartsolid import SmartSolid
 from sava.csg.build123d.common.text import TextDimensions, create_text
 
@@ -74,6 +75,33 @@ class TestTextSolidRotation(unittest.TestCase):
         text = create_text(dim, "E/F")
 
         text.rotate_multi((0, 0, 180))
+
+        self.assertTrue(text.wrap_solid().is_valid)
+
+
+class TestTextSolidConnected(unittest.TestCase):
+
+    def test_connected_joins_letters_into_one_solid(self) -> None:
+        dim = TextDimensions(font_size=12, font="Liberation Sans", height=0.8)
+        text = create_text(dim, "E/F")
+        self.assertGreater(len(text.wrap_solid().solids()), 1)
+
+        joined = text.connected()
+
+        self.assertEqual(len(joined.wrap_solid().solids()), 1)
+        self.assertTrue(joined.wrap_solid().is_valid)
+        for axis in (Axis.X, Axis.Y, Axis.Z):
+            self.assertAlmostEqual(joined.get_from(axis), text.get_from(axis), places=5)
+            self.assertAlmostEqual(joined.get_to(axis), text.get_to(axis), places=5)
+
+
+class TestCreateTextFontPath(unittest.TestCase):
+
+    def test_glyph_occt_rejects_is_repaired(self) -> None:
+        """Caveat's «н» comes out of OCCT as a face it reports invalid; extruded unrepaired, the solid is invalid too."""
+        dim = TextDimensions(font_size=12.7, font="Caveat", height=0.6, font_path=get_path("input", "fonts", "caveat", "Caveat-Regular.ttf"))
+
+        text = create_text(dim, "с днём")
 
         self.assertTrue(text.wrap_solid().is_valid)
 
