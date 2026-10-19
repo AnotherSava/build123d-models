@@ -76,9 +76,10 @@ class SmartSolid:
     `rotate()`/`move()` calls.
 
     For `ShapeList`-valued solids (boolean ops that produced disconnected
-    pieces) there's no single `location` to anchor; the invariant helpers
-    are no-ops and `rotate()` falls back to rotating a wrapped `Compound`
-    at origin.
+    pieces, multi-glyph text) there's no single `location` to anchor; the
+    invariant helpers are no-ops, so `self.origin` keeps following `move()`
+    while no location matches it. `rotate()` wraps them into a fresh
+    `Compound` at identity location and pivots on that, not on `self.origin`.
     """
 
     def __init__(self, *args: Any, label: str = None) -> None:
@@ -311,11 +312,11 @@ class SmartSolid:
         For the three world axes through the origin (`Axis.X`, `Axis.Y`, `Axis.Z`),
         the rotation goes through `orient()` so subclass overrides (`SmartLoft`,
         `SweepSolid`) can keep their subsidiary profiles/paths in sync.
-        `orient()` rotates the geometry around `self.solid.location.position`;
-        the class invariant `self.origin == self.solid.location.position`
-        guarantees that pivot equals `self.origin`, so `R(θ)·old_origin − old_origin`
-        is exactly the translation needed to re-anchor the rotation to the world
-        axis line.
+        `orient()` rotates the geometry around the location of the shape it
+        sets the orientation on — `self.solid.location.position` for a single
+        shape, the world origin for a ShapeList it first wraps into a fresh
+        Compound — so `R(θ)·pivot − pivot` for that pivot is exactly the
+        translation needed to re-anchor the rotation to the world axis line.
 
         For any other axis (including off-origin parallel axes like the polar
         pivot used by N-fold patterns), the rotation is applied directly via
@@ -327,8 +328,9 @@ class SmartSolid:
         if axis in (Axis.X, Axis.Y, Axis.Z):
             rotations = (angle, 0, 0) if axis == Axis.X else (0, angle, 0) if axis == Axis.Y else (0, 0, angle)
             new_orient = rotate_orientation(self._orientation, rotations, Plane.XY)
+            pivot = Vector(self.wrap_solid().location.position)
             self.orient(new_orient)
-            delta = rotate_vector(old_origin, axis, angle) - old_origin
+            delta = rotate_vector(pivot, axis, angle) - pivot
             if delta.length > 1e-10:
                 self.solid = self.solid.moved(Location(tuple(delta)))
         else:
@@ -340,7 +342,7 @@ class SmartSolid:
                 ),
                 radians(angle),
             )
-            self.solid = self.solid.moved(Location(trsf))
+            self.solid = self.wrap_solid().moved(Location(trsf))
             x_ax, y_ax, z_ax = orient_axis(self._orientation)
             self._orientation = calculate_orientation(
                 rotate_axis(x_ax, axis, angle),
@@ -383,12 +385,13 @@ class SmartSolid:
     #  - rotations are incremental, and (0,0,0) param will not change orientation no matter what
     def rotate_multi(self, rotations: VectorLike, plane: Plane = Plane.XY) -> 'SmartSolid':
         old_origin = Vector(self.origin)
+        # the point orient() turns about, as in rotate(): the world origin for a ShapeList it wraps into a fresh Compound
+        pivot = Vector(self.wrap_solid().location.position)
         self.orient(rotate_orientation(self._orientation, rotations, plane))
-        new_origin = multi_rotate_vector(old_origin, plane, rotations)
-        delta = new_origin - old_origin
+        delta = multi_rotate_vector(pivot, plane, rotations) - pivot
         if delta.length > 1e-10:
             self.solid = self.solid.moved(Location(tuple(delta)))
-        self.origin = new_origin
+        self.origin = multi_rotate_vector(old_origin, plane, rotations)
         return self
 
     def rotated_multi(self, rotations: VectorLike, plane: Plane = Plane.XY, label: str = None) -> 'SmartSolid':

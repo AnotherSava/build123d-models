@@ -3,7 +3,7 @@ import unittest
 from build123d import Axis, Box, Plane, ShapeList, Sphere, Vector
 from parameterized import parameterized
 
-from sava.csg.build123d.common.geometry import rotate_vector
+from sava.csg.build123d.common.geometry import multi_rotate_vector, rotate_vector
 from sava.csg.build123d.common.pencil import Pencil
 from sava.csg.build123d.common.smartbox import SmartBox
 from sava.csg.build123d.common.smartsolid import SmartSolid
@@ -881,14 +881,11 @@ class TestSmartSolidOrientationTracking(unittest.TestCase):
 
 
 def _offset_axis(axis: Axis) -> Axis:
-    """Axis with the same direction as `axis` but a sub-tolerance positional
-    offset — bypasses the `axis in (Axis.X/Y/Z)` shortcut in `SmartSolid.rotate`
-    while staying on the same axis line within floating-point precision."""
-    if axis == Axis.Z:
-        return Axis((1e-9, 0, 0), (0, 0, 1))
-    if axis == Axis.X:
-        return Axis((0, 1e-9, 0), (1, 0, 0))
-    return Axis((1e-9, 0, 0), (0, 1, 0))  # Axis.Y
+    """The same axis line as `axis`, anchored one unit along it — not equal to
+    the cardinal axis, so `SmartSolid.rotate` takes its general OCC branch
+    instead of the `axis in (Axis.X/Y/Z)` shortcut. An anchor moved off the
+    line by a sub-tolerance amount still compares equal and takes the shortcut."""
+    return Axis(axis.direction, axis.direction)
 
 
 class TestSmartSolidRotateAroundWorldOrigin(unittest.TestCase):
@@ -946,6 +943,39 @@ class TestSmartSolidRotateAroundWorldOrigin(unittest.TestCase):
 
         assertVectorAlmostEqual(self, a1.bound_box.min, a2.bound_box.min)
         assertVectorAlmostEqual(self, a1.bound_box.max, a2.bound_box.max)
+
+    @parameterized.expand([
+        (Axis.Z, 30), (Axis.Z, 90), (Axis.Z, -120),
+        (Axis.X, 45),
+        (Axis.Y, 60),
+    ])
+    def test_moved_shapelist_pivots_at_world_origin(self, axis, angle) -> None:
+        """Regression: a ShapeList (disconnected pieces, e.g. extruded multi-glyph
+        text) is wrapped into a fresh Compound at the world origin before
+        `orient()`, so that is the pivot — while `self.origin` has followed every
+        `move()`. Compensating for a pivot at `self.origin` shifted the result by
+        `R(θ)·origin − origin`. Two identical cubes keep the AABB centre at the
+        midpoint of their centres under any rotation, so it must map to
+        `R(θ)·centre`."""
+        pieces = SmartSolid([SmartSolid(Box(4, 4, 4)), SmartSolid(Box(4, 4, 4)).move(10, 0, 0)])
+        pieces.move(-7, 3, 2)
+        c_before = pieces.bound_box.center()
+
+        pieces.rotate(axis, angle)
+
+        assertVectorAlmostEqual(self, pieces.bound_box.center(), rotate_vector(c_before, axis, angle))
+
+    @parameterized.expand([((0, 0, 30),), ((45, 0, 0),), ((0, 60, 0),), ((30, 0, 45),)])
+    def test_moved_shapelist_rotate_multi_pivots_at_world_origin(self, rotations) -> None:
+        """`rotate_multi()` shares `rotate()`'s pivot rule, so the same moved
+        ShapeList must land at the rotated centre there too."""
+        pieces = SmartSolid([SmartSolid(Box(4, 4, 4)), SmartSolid(Box(4, 4, 4)).move(10, 0, 0)])
+        pieces.move(-7, 3, 2)
+        c_before = pieces.bound_box.center()
+
+        pieces.rotate_multi(rotations)
+
+        assertVectorAlmostEqual(self, pieces.bound_box.center(), multi_rotate_vector(c_before, Plane.XY, rotations))
 
     @parameterized.expand([(30,), (60,), (90,), (120,), (180,), (-60,)])
     def test_pencil_built_matches_offaxis(self, angle) -> None:

@@ -34,7 +34,7 @@ self.assert_valid()
 ```
 This makes builder calls commute with prior `rotate(Axis.X/Y/Z)` and `move()` — any order of interleaving produces the same world geometry as "complete the builder chain first, then transform." Pinned by `TestSmarterConeBuilderTransformCommute`.
 
-**`ShapeList`-valued solids** (boolean ops that produced disconnected pieces): no single `location` to anchor; both helpers are no-ops. `rotate()` falls back to rotating a wrapped `Compound` at origin.
+**`ShapeList`-valued solids** (boolean ops that produced disconnected pieces, multi-glyph text): no single `location` to anchor; both helpers are no-ops, so `self.origin` keeps following `move()` while no location matches it — the invariant does not hold for them. `rotate()` wraps them into a fresh `Compound` (identity location) in both branches, and the cardinal branch takes its pivot from that wrapped shape's location rather than from `self.origin`; compensating for `self.origin` shifted moved text by `R(θ)·origin − origin` until 2026-10-17. Pinned by `test_moved_shapelist_pivots_at_world_origin`.
 
 **Behavioral consequence**: `self.origin` does NOT follow the shape through boolean ops / mirror / scale — it resets to `(0, 0, 0)`. Use `bound_box.center()` for "where is this shape now."
 
