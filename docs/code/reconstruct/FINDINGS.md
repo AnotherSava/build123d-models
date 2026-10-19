@@ -114,14 +114,15 @@ What this algorithm does NOT handle:
 
 ## Pedagogical artifacts
 
-The `data/` folder of this transfer package contains visualizations from the iris-blade development run:
+The [`images/`](images/) folder holds visualizations from the iris-blade development run:
 
-- `planes/00_overview.png` — color-coded view of all 9 planes
-- `planes/01-09_plane.png` — one image per plane with that plane highlighted
-- `planes/10_fillet_group.png` — the "fillet group" that turns out to be the pivot pin
-- `pencil_2d/01-09_pencil.png` — 2D polygon outlines with numbered stroke directions
-- `extrusion/cross_section_overlay.png` — all 4 cap silhouettes + cylinder overlay in cross-section
-- `datum_aligned/datum_aligned_overlay.png` — final clean reconstruction in the datum-aligned frame
-- `datum_aligned/blade_datum_aligned.py` — generated build123d code for the blade
+- [`00_overview.png`](images/00_overview.png) — color-coded view of all 9 planes
+- `01_plane.png`–`09_plane.png` (e.g. [`01_plane.png`](images/01_plane.png)) — one image per plane with that plane highlighted
+- [`10_fillet_group.png`](images/10_fillet_group.png) — the "fillet group" that turns out to be the pivot pin
+- `01_pencil.png`–`09_pencil.png` (e.g. [`01_pencil.png`](images/01_pencil.png)) — 2D polygon outlines with numbered stroke directions
+- [`cross_section_overlay.png`](images/cross_section_overlay.png) — all 4 cap silhouettes + cylinder overlay in cross-section
+- [`datum_aligned_overlay.png`](images/datum_aligned_overlay.png) — final clean reconstruction in the datum-aligned frame
+
+The build123d code for the blade lives in the reference test's fixture, [`expected_iris_blade.py`](../../../tests/sava/csg/build123d/reconstruct/data/expected_iris_blade.py).
 
 These are useful as both regression-test references and pedagogical material for "what is this algorithm actually doing."
