@@ -112,7 +112,7 @@ src/sava/csg/build123d/
 ├── common/           # Core utilities and base classes
 └── models/           # Actual 3D model definitions
     ├── common/       # Shared model components
-    ├── hydroponics/  # Hydroponics models (basket, stand, tray, splitter)
+    ├── hydroponics/  # Hydroponics models (basket, stand, tray, planter tray, splitter)
     ├── inserts/      # Board game inserts (e.g., grand_austria_hotel/)
     └── other/        # Other models (cable_channel/, poweradapters.py)
 ```

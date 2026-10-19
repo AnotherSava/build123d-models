@@ -19,7 +19,7 @@ import os
 import pytest
 
 from sava.csg.build123d.common.modelspec import export_model
-from sava.csg.build123d.models.hydroponics import basket, splitter, stand, tray
+from sava.csg.build123d.models.hydroponics import basket, plantertray, splitter, stand, tray
 from sava.csg.build123d.models.inserts.grand_austria_hotel import celebrities, player, turnorder
 from sava.csg.build123d.models.other import cableholder, dispenserbottlemount, markerholder, pipeclamp, poweradapters
 
@@ -39,6 +39,7 @@ MODEL_BUILDERS = {
     "splitter": splitter.build,
     "dispenser_bottle_mount": dispenserbottlemount.build,
     "tray": tray.build,
+    "planter_tray": plantertray.build,
     "power_adapters": poweradapters.build,
     "cable_holder": cableholder.build,
     "celebrities": celebrities.build,

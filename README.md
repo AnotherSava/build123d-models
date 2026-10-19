@@ -34,6 +34,7 @@ See `docs/code/reconstruct/` for the algorithm, findings, and the public Python 
 
 - **Basket** - Hydroponic basket with cap ([Thingiverse](https://www.thingiverse.com/thing:7266974), [Maker world](https://makerworld.com/en/models/2162074)).
 - **Connector** - Pipe connector. 
+- **Planter Tray** - One-piece elliptical variant of the hydroponic tray holding two baskets and a watering hole, standing on screw-in pegs, with a raised text label.
 - **Splitter** - Water pump flow control connector ([Thingiverse](https://www.thingiverse.com/thing:7266985), [Maker world](https://makerworld.com/en/models/2084438)).
 - **Stand** - Hydroponic setup stand with side piping.
 - **Tray** - Germination tray for Ahopegarden hydroponic system ([Thingiverse](https://www.thingiverse.com/thing:7266976), [Maker world](https://makerworld.com/en/models/2095406)).
@@ -69,9 +70,10 @@ pip install -r requirements.txt
 This project uses [F3D](https://f3d.app/) as the recommended viewer for generated 3D models. It provides an opportunity to automatically reload model upon file changes. Having export operation as the last step of your script will let you see the changes after each execution:
 
 ```python
-from sava.csg.build123d.common.exporter import Exporter
+from sava.csg.build123d.common.exporter import export, save_3mf
 
-Exporter(model_to_export).export()
+export(model_to_export)
+save_3mf()  # writes models/current_model.3mf
 ```
 
 ### Quick Start
