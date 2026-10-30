@@ -29,7 +29,7 @@ class CableHolderDimensions:
 5. Create model class in the same file that takes and stores dimensions in constructor, with a method that creates and returns a SmartBox with length, width and height taken from dimensions fields:
 ```python
 class CableHolder:
-    def __init__(self, dim: CableHolderDimensions):
+    def __init__(self, dim: CableHolderDimensions) -> None:
         self.dim = dim
 
     def create(self) -> SmartSolid:
