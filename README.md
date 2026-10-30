@@ -47,6 +47,7 @@ See `docs/code/reconstruct/` for the algorithm, findings, and the public Python 
 - **Dispenser Bottle Mount** - Inverted-bottle refill mount with iris grip for simplehuman wall pump dispensers ([Thingiverse](https://www.thingiverse.com/thing:7356658), [MakerWorld](https://makerworld.com/en/models/2827942)).
 - **Marker Holder** - Wall-mounted marker holder ([Thingiverse](https://www.thingiverse.com/thing:7294115), [MakerWorld](https://makerworld.com/en/models/2390507)).
 - **Power Adapters** - Travel power adapter storage box for 12 international socket types ([Thingiverse](https://www.thingiverse.com/thing:7297385), [MakerWorld](https://makerworld.com/en/models/2409726)).
+- **Toothpaste Cap** - Replacement screw-on cap for a toothpaste tube, with a ribbed grip.
 
 ## Claude Code Skills
 
